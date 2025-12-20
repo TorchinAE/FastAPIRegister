@@ -41,6 +41,7 @@ class DirectorsSchema(BaseModel):
     email: Optional[str]
     phone: Optional[str]
 
+
 class DirectorAddSchema(BaseModel):
     name: str
     short_name: str
@@ -58,7 +59,7 @@ class DirectorPatch(BaseModel):
     email: Optional[str] = None
     phone: Optional[str] = None
     post_id: Optional[int] = None
-    petition_id:Optional[int] = None
+    petition_id: Optional[int] = None
 
     class Config:
         from_attributes = True
@@ -82,8 +83,7 @@ class DirectorListResponse(BaseModel):
     class Config:
         from_attributes = True
 
+
 class PetitionSchema(BaseSchema):
     petition: str
     directors: Optional[list]
-
-

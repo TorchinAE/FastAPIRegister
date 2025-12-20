@@ -1,17 +1,20 @@
+# config.py
+import os
+
 from pydantic_settings import BaseSettings, SettingsConfigDict
 
 
 class Settings(BaseSettings):
+    NAME_BASE: str
+
     model_config = SettingsConfigDict(
         env_file=".env",
         env_file_encoding="utf-8",
     )
 
-    NAME_BASE: str
-
     @property
     def database_url(self) -> str:
-        return f"sqlite+aiosqlite:///{self.NAME_BASE}.db"
+        return f"sqlite+aiosqlite:///{os.path.abspath(self.NAME_BASE)}.db"
 
 
 settings = Settings()
