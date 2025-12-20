@@ -1,9 +1,46 @@
 # models.py
 from datetime import datetime, timezone
-from typing import Optional, Union, List
+from typing import Optional, List
 
 from sqlalchemy import String, DateTime, ForeignKey
 from sqlalchemy.orm import DeclarativeBase, Mapped, mapped_column, relationship
+
+
+def split_name(input_name: str) -> dict:
+    parts = input_name.split(None, 2)
+    for x in range(len(parts)):
+        parts[x] = parts[x].title().strip()
+    keys = ["last_name", "name", "patronymic"]
+    return dict(zip(keys, parts))
+
+
+def get_short_name(input_name: str) -> str:
+    names = split_name(input_name)
+    return (
+        f"{names.get('last_name')}"
+        f"{' ' + names.get('name')[0] + '.' if names.get('name') else ''}"
+        f"{' ' + names.get('patronymic')[0] + '.' if names.get('patronymic') else ''}"
+    )
+
+
+def get_give_name(input_name: str) -> str:
+    spl_name = split_name(input_name)
+    result = ""
+
+    name = spl_name.get("name")
+    if name:
+        if name[-1] == "й":
+            result += name[:-1] + "ю"
+        else:
+            result += name + "у"
+
+    patronymic = spl_name.get("patronymic")
+    if patronymic:
+        if patronymic[-1] == "ч":
+            result += " " + patronymic + "у"
+        else:
+            result += " " + patronymic
+    return result
 
 
 class Base(DeclarativeBase):
@@ -24,7 +61,9 @@ class BaseID(Base):
         default=lambda: datetime.now(timezone.utc),
         onupdate=lambda: datetime.now(timezone.utc),
     )
-    changed_by_id: Mapped[Union[int, None]] = mapped_column(nullable=True, default=None)
+    changed_by_id: Mapped[int | None] = mapped_column(
+        ForeignKey("managers.id"), nullable=True
+    )
 
 
 class Manager(BaseID):
@@ -32,7 +71,6 @@ class Manager(BaseID):
 
     __tablename__ = "managers"
     name: Mapped[str] = mapped_column(String(50), unique=True, nullable=False)
-    short_name: Mapped[str] = mapped_column(String(50), nullable=False)
     email: Mapped[str] = mapped_column(String(50), unique=True, nullable=False)
     phone: Mapped[str] = mapped_column(String(20), nullable=False)
     organizations: Mapped[List["Organization"]] = relationship(back_populates="manager")
@@ -41,10 +79,13 @@ class Manager(BaseID):
         return (
             f"Manager(id={self.id}, "
             f"name='{self.name}', "
-            f"short_name='{self.short_name}', "
             f"phone='{self.phone}', "
             f"email='{self.email}')"
         )
+
+    @property
+    def short_name(self) -> str:
+        return get_short_name(self.name)
 
 
 class Organization(BaseID):
@@ -78,56 +119,45 @@ class Directors(BaseID):
 
     __tablename__ = "directors"
     name: Mapped[str] = mapped_column(String(100), unique=True, nullable=False)
-    short_name: Mapped[str] = mapped_column(String(50), nullable=False)
     email: Mapped[Optional[str]] = mapped_column(
         String(100), unique=True, nullable=True
     )
     phone: Mapped[Optional[str]] = mapped_column(String(20), nullable=True)
+    position_id: Mapped[int] = mapped_column(ForeignKey("positions.id"))
 
-    petition_id: Mapped[int] = mapped_column(ForeignKey("petitions.id"), nullable=True)
-    post_id: Mapped[int] = mapped_column(ForeignKey("posts.id"), nullable=False)
-
-    petition: Mapped["Petitions"] = relationship(back_populates="directors")
-    post: Mapped["Posts"] = relationship(back_populates="directors")
-
+    position: Mapped["Positions"] = relationship(back_populates="directors")
     organizations: Mapped[List["Organization"]] = relationship(
         back_populates="director"
     )
 
+    @property
+    def short_name(self) -> str:
+        return get_short_name(self.name)
+
+    @property
+    def give_name(self) -> str:
+        return get_give_name(self.name)
+
     def __repr__(self) -> str:
-        post_name = self.post.name if self.post else "None"
         org_names = (
             [org.name for org in self.organizations] if self.organizations else []
         )
         return (
             f"Director(id={self.id}, "
             f"name='{self.name}', "
-            f"short_name='{self.short_name}', "
-            f"post='{post_name}', "
+            f"position='{self.position}', "
             f"email='{self.email}', "
             f"phone='{self.phone}', "
             f"organizations={org_names})"
         )
 
 
-class Petitions(BaseID):
-    """Модель обращения."""
-
-    __tablename__ = "petitions"
-    petition: Mapped[str] = mapped_column(String(200), nullable=False)
-    directors: Mapped[List["Directors"]] = relationship(back_populates="petition")
-
-    def __repr__(self) -> str:
-        return f"Petition(id={self.id}, petition='{self.petition}')"
-
-
-class Posts(BaseID):
+class Positions(BaseID):
     """Модель должности."""
 
-    __tablename__ = "posts"
-    name: Mapped[str] = mapped_column(String(100), unique=True, nullable=False)
-
-    directors: Mapped[List["Directors"]] = relationship(back_populates="post")
+    __tablename__ = "positions"
+    title: Mapped[str] = mapped_column(String(100), unique=True, nullable=False)
+    directors: Mapped[List["Directors"]] = relationship(back_populates="position")
 
     def __repr__(self) -> str:
-        return f"Post(id={self.id}, " f"name='{self.name}')"
+        return f"Positions(id={self.id}, " f"title='{self.title}')"
