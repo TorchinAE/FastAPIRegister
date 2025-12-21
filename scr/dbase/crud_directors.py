@@ -14,11 +14,13 @@ async def get_dirs(session: AsyncSession) -> list[Directors]:
 async def get_dir_to_id(session: AsyncSession, dir_id: int) -> Directors | None:
     return await session.get(Directors, dir_id)
 
-async def get_dir_by_name(session:AsyncSession, name:str) -> Directors |None:
-    stat = select(Directors).where(Directors.name==name)
+
+async def get_dir_by_name(session: AsyncSession, name: str) -> Directors | None:
+    stat = select(Directors).where(Directors.name == name)
     result: Result = await session.execute(stat)
     director = result.scalar_one_or_none()
     return director
+
 
 async def create_dir(session: AsyncSession, dir_in: DirectorSchema) -> Directors:
     check_dir = await get_dir_by_name(session, dir_in.name)
