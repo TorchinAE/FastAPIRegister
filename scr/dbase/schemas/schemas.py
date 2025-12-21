@@ -34,7 +34,7 @@ class OrganizationAddSchema(BaseSchema):
     manager_id: int
 
 
-class DirectorShemas(BaseModel):
+class DirectorSchema(BaseModel):
     name: str
     email: Optional[str]
     phone: Optional[str]
