@@ -27,28 +27,18 @@ class ManagerSchema(BaseSchema):
     phone: str
 
 
-class OrganizationSchema(BaseSchema):
+class OrganizationAddSchema(BaseSchema):
     name: str
     inn: Optional[str]
     address: Optional[str]
-    director_id: int
     manager_id: int
 
 
-class DirectorsSchema(BaseModel):
+class DirectorShemas(BaseModel):
     name: str
-    short_name: str
-    email: Optional[str]
-    phone: Optional[str]
-
-
-class DirectorAddSchema(BaseModel):
-    name: str
-    short_name: str
     email: Optional[str]
     phone: Optional[str]
     post_id: int
-    petition_id: int
 
     class Config:
         from_attributes = True
