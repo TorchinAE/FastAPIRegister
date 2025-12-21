@@ -74,6 +74,5 @@ class DirectorListResponse(BaseModel):
         from_attributes = True
 
 
-class PetitionSchema(BaseSchema):
-    petition: str
-    directors: Optional[list]
+class PositionCreateSchema(BaseSchema):
+    title: str
