@@ -84,3 +84,8 @@ class DirectorListResponse(BaseModel):
 
 class PositionCreateSchema(BaseSchema):
     title: str
+
+class PositionUpdateSchema(BaseSchema):
+    id:int
+    title: Optional[str] = None
+    directors: Optional[list[int]] = None
