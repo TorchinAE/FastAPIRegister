@@ -27,6 +27,13 @@ class ManagerSchema(BaseSchema):
     phone: str
 
 
+class ManagerUpdateSchema(BaseSchema):
+    name: Optional[str] = None
+    short_name: Optional[str] = None
+    email: Optional[str] = None
+    phone: Optional[str] = None
+
+
 class OrganizationAddSchema(BaseSchema):
     name: str
     inn: Optional[str]
@@ -44,12 +51,13 @@ class DirectorSchema(BaseModel):
         from_attributes = True
 
 
-class DirectorPatch(BaseModel):
-    short_name: Optional[str] = None
+class DirectorUpdateSchema(BaseModel):
+    id: int
+    name: Optional[str] = None
     email: Optional[str] = None
     phone: Optional[str] = None
-    post_id: Optional[int] = None
-    petition_id: Optional[int] = None
+    position_id: Optional[int] = None
+    organizations: Optional[list[int]] = None
 
     class Config:
         from_attributes = True
