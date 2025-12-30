@@ -3,7 +3,11 @@ from sqlalchemy.ext.asyncio import AsyncSession
 
 
 from scr.dbase.models import Manager
-from scr.dbase.schemas.schemas import ManagerUpdateSchema
+from scr.dbase.schemas.schemas import (
+    ManagerUpdateSchema,
+    ManagerSchema,
+    ManagerCreateSchema,
+)
 
 
 async def get_managers(session: AsyncSession) -> list[Manager]:
@@ -22,6 +26,18 @@ async def get_manager_by_name(session: AsyncSession, name: str) -> Manager | Non
     result: Result = await session.execute(stmt)
     manager = result.scalar_one_or_none()
     return manager
+
+
+async def create_manager(
+    session: AsyncSession, new_manager: ManagerCreateSchema
+) -> Manager:
+    check_manager = await get_manager_by_name(session, new_manager.name)
+    if check_manager:
+        return check_manager
+    new_manager: Manager = Manager(**new_manager.model_dump())
+    session.add(new_manager)
+    await session.flush()
+    return new_manager
 
 
 async def update_manager(
