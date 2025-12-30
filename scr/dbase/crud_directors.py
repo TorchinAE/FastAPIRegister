@@ -22,7 +22,7 @@ async def get_dir_by_name(session: AsyncSession, name: str) -> Directors | None:
     return director
 
 
-async def create_dir(session: AsyncSession, dir_in: DirectorSchema) -> Directors:
+async def add_dir(session: AsyncSession, dir_in: DirectorSchema) -> Directors:
     check_dir = await get_dir_by_name(session, dir_in.name)
     if check_dir:
         return check_dir

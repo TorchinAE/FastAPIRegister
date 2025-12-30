@@ -25,7 +25,7 @@ async def get_position_title(session: AsyncSession, title: str) -> Positions | N
     return position
 
 
-async def create_position(
+async def add_position(
     session: AsyncSession, in_position: PositionCreateSchema
 ) -> Positions:
     check_pos = await get_position_title(session, in_position.title)
@@ -36,18 +36,21 @@ async def create_position(
     await session.flush()
     return new_pos
 
-async def update_position(session: AsyncSession, upd_position:PositionUpdateSchema) -> Positions | None:
+
+async def update_position(
+    session: AsyncSession, upd_position: PositionUpdateSchema
+) -> Positions | None:
     check_position = await get_position_id(session, upd_position.id)
     if not check_position:
         return None
     for pos_field, value in upd_position.model_dump(exclude_unset=True).items():
-        if field!='id' and hasattr(upd_position, pos_field):
-            setattr(upd_position,pos_field, value)
+        if field != "id" and hasattr(upd_position, pos_field):
+            setattr(upd_position, pos_field, value)
     await session.flush()
     return check_position
 
 
-async def del_position(session: AsyncSession, pos_id: int) -> Positions | None:
+async def delete_position(session: AsyncSession, pos_id: int) -> Positions | None:
     position = await get_position_id(session, pos_id)
     if position:
         await session.delete(position)

@@ -1,7 +1,7 @@
 from fastapi import APIRouter
 
 from scr.dbase.orm_dir import get_dirs, get_dir_item, add_director, del_dir, update_dir
-from scr.schemas.schemas import (
+from scr.dbase.schemas import (
     DirectorResponseSchema,
     DirectorAddSchema,
     DirectorListResponse,

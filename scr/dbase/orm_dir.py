@@ -6,7 +6,7 @@ from sqlalchemy.orm import selectinload
 
 from scr.dbase.database import async_session
 from scr.dbase.models import Directors
-from scr.schemas.schemas import DirectorPatch, DirectorListResponse
+from scr.dbase.schemas import DirectorPatch, DirectorListResponse
 
 
 async def add_director(

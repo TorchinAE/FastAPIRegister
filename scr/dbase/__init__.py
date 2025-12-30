@@ -5,4 +5,9 @@ class Base(DeclarativeBase):
     pass
 
 
-from scr.dbase.models import Directors, Organization, Manager, Petitions, Posts
+from scr.dbase.models import (
+    Directors,
+    Organization,
+    Manager,
+    Positions,
+)

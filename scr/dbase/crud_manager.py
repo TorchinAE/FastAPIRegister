@@ -28,7 +28,7 @@ async def get_manager_by_name(session: AsyncSession, name: str) -> Manager | Non
     return manager
 
 
-async def create_manager(
+async def add_manager(
     session: AsyncSession, new_manager: ManagerCreateSchema
 ) -> Manager:
     check_manager = await get_manager_by_name(session, new_manager.name)

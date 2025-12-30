@@ -4,35 +4,13 @@ from sqlalchemy import select
 from fastapi import HTTPException
 
 from scr.dbase.database import async_session
-from scr.dbase.models import Manager, Posts, Petitions
+from scr.dbase.models import Manager, Positions
 
 
-async def add_petition(petition: Petitions):
+async def add_post(post: Positions):
     async with async_session() as session:
         try:
-            stmt = select(Petitions).where(Petitions.petition == petition.petition)
-            result = await session.execute(stmt)
-            if result.scalar_one_or_none():
-                return HTTPException(
-                    status_code=409, detail="Такое обращение уже существует."
-                )
-            session.add(petition)
-            await session.commit()
-            return HTTPException(status_code=201, detail="Обращение успешно сохранено.")
-        except HTTPException:
-            raise
-        except Exception as e:
-            await session.rollback()
-            logging.error(f"Ошибка при сохранении обращения: {e}")
-            return HTTPException(
-                status_code=500, detail="ошибка данных при сохранении обращения."
-            )
-
-
-async def add_post(post: Posts):
-    async with async_session() as session:
-        try:
-            stmt = select(Posts).where(Posts.name == post.name)
+            stmt = select(Positions).where(Positions.name == post.name)
             result = await session.execute(stmt)
             existing = result.scalar_one_or_none()
             if existing:

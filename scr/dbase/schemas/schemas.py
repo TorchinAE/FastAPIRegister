@@ -20,7 +20,15 @@ class PostResponseSchema(BaseModel):
         from_attributes = True
 
 
+class ManagerCreateSchema(BaseSchema):
+    name: str
+    short_name: str
+    email: str
+    phone: str
+
+
 class ManagerSchema(BaseSchema):
+    id: int
     name: str
     short_name: str
     email: str
@@ -40,6 +48,12 @@ class OrganizationAddSchema(BaseSchema):
     address: Optional[str]
     manager_id: int
 
+class OrganizationUpdateSchema(BaseSchema):
+    id: int
+    name: Optional[str]
+    inn: Optional[str]
+    address: Optional[str]
+    manager_id: Optional[str]
 
 class DirectorSchema(BaseModel):
     name: str
@@ -85,7 +99,8 @@ class DirectorListResponse(BaseModel):
 class PositionCreateSchema(BaseSchema):
     title: str
 
+
 class PositionUpdateSchema(BaseSchema):
-    id:int
+    id: int
     title: Optional[str] = None
     directors: Optional[list[int]] = None

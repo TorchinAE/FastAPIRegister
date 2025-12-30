@@ -1,6 +1,6 @@
 from fastapi import APIRouter, HTTPException
 
-from scr.dbase.models import Posts, Petitions
+from scr.dbase.models import Positions, NamePetitions, PatronymicPetitions
 from scr.dbase.orm import add_post, add_petition, add_man_list
 from scr.dbase.orm_dir import (
     get_dirs,
@@ -23,50 +23,40 @@ async def home():
 
 @router.post("/create_start", description="Создание данных")
 async def create_start():
-    posts = {
+    titles = {
         "Директор",
         "Генеральный директор",
         "Исполнительный директор",
         "Технический директор",
         "Коммерческий директор",
     }
-    for post in posts:
+    for title in titles:
         try:
-            await add_post(Posts(name=post, directors=[]))
+            await add_post(Positions(title=title, directors=[]))
         except HTTPException as e:
             if e.status_code == 409:
-                print(f"Пост '{post}' уже существует, пропускаем.")
+                print(f"Должность '{title}' уже существует, пропускаем.")
             else:
                 raise
-
-    petitions = {"Ивану Ивановичу", "Петру Петровичу", "Сергею Сергеевичу"}
-    for petition in petitions:
-        await add_petition(Petitions(petition=petition))
 
     dir_data = [
         {
             "name": "Иванов Иван Иванович",
-            "short_name": "Иванов И.И.",
             "email": "ivanov@ya.ru",
             "phone": "+79991234567",
             "post_id": 3,
-            "petition_id": 1,
         },
         {
             "name": "Кубин Петр Петрович",
-            "short_name": "Кубин П.П.",
             "email": "kubin@rambler.ru",
             "phone": "+79991234765",
             "post_id": 2,
-            "petition_id": 2,
         },
         {
             "name": "Старин Сергей Сергеевич",
-            "short_name": "Старин С.С.",
             "email": "starin@mail.ru",
             "phone": "+79991234765",
             "post_id": 1,
-            "petition_id": 3,
         },
     ]
 
@@ -75,19 +65,16 @@ async def create_start():
     man_data = [
         {
             "name": "Pupkin Vasya",
-            "short_name": "Pupkin V.",
             "email": "d@vri.ru",
             "phone": "+79991234567",
         },
         {
             "name": "Kozin Ilya",
-            "short_name": "KOzin I.",
             "email": "kozin@vri.ru",
             "phone": "+79991233333",
         },
         {
             "name": "Факир Абдурахманов",
-            "short_name": "Факир А.",
             "email": "fakir@vri.ru",
             "phone": "+79991244444",
         },
