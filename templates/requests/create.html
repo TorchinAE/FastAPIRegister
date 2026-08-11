@@ -1,0 +1,45 @@
+{% extends "base.html" %}
+{% block title %}Создать запрос{% endblock %}
+{% block content %}
+<h1>Создать запрос</h1>
+<form method="post" action="/requests/create">
+    <div class="form-group">
+        <label>Контрагент</label>
+        <select name="counterparty_id" required>
+            <option value="">-- Выберите контрагента --</option>
+            {% for cp in counterparties %}
+            <option value="{{ cp.id }}">{{ cp.name }} ({{ cp.email }})</option>
+            {% endfor %}
+        </select>
+    </div>
+    <div class="form-group">
+        <label>Статус</label>
+        <select name="status">
+            {% for s in statuses %}
+            <option value="{{ s.value }}">{{ s.value }}</option>
+            {% endfor %}
+        </select>
+    </div>
+    <div class="form-group">
+        <label>Описание</label>
+        <textarea name="description"></textarea>
+    </div>
+    <div class="form-group">
+        <label>Заметки</label>
+        <textarea name="notes"></textarea>
+    </div>
+    <h3>Оборудование</h3>
+    <div style="display:grid;grid-template-columns:1fr 1fr 1fr;gap:0.5rem;">
+        {% for f in ['bktpb','ktpb','ktp','kso_393','kso_204','k_104','k_104m','sho','pku','pus','parn'] %}
+        <div class="form-group">
+            <label>{{ f | upper }}</label>
+            <input type="number" name="{{ f }}" value="0" min="0" max="100">
+        </div>
+        {% endfor %}
+    </div>
+    <div class="actions">
+        <button type="submit" class="btn btn-primary">Создать</button>
+        <a href="/requests" class="btn">Отмена</a>
+    </div>
+</form>
+{% endblock %}

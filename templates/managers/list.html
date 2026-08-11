@@ -1,0 +1,29 @@
+{% extends "base.html" %}
+{% block title %}Менеджеры{% endblock %}
+{% block content %}
+<h1>Менеджеры ({{ total }})</h1>
+<table>
+    <thead>
+        <tr><th>ID</th><th>Имя</th><th>Email</th><th>Телефон</th><th>Город</th></tr>
+    </thead>
+    <tbody>
+        {% for item in items %}
+        <tr>
+            <td>{{ item.id }}</td>
+            <td>{{ item.name }}</td>
+            <td>{{ item.email }}</td>
+            <td>{{ item.phone }}</td>
+            <td>{{ item.city }}</td>
+        </tr>
+        {% endfor %}
+        {% if not items %}<tr><td colspan="5">Нет менеджеров</td></tr>{% endif %}
+    </tbody>
+</table>
+{% if pages > 1 %}
+<div class="pagination">
+    {% for p in range(1, pages + 1) %}
+    <a href="/managers?page={{ p }}" class="{{ 'active' if p == page else '' }}">{{ p }}</a>
+    {% endfor %}
+</div>
+{% endif %}
+{% endblock %}

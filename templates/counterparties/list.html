@@ -1,0 +1,29 @@
+{% extends "base.html" %}
+{% block title %}Контрагенты{% endblock %}
+{% block content %}
+<h1>Контрагенты ({{ total }})</h1>
+<table>
+    <thead>
+        <tr><th>ID</th><th>Имя</th><th>Email</th><th>Телефон</th><th>Компания ID</th></tr>
+    </thead>
+    <tbody>
+        {% for item in items %}
+        <tr>
+            <td>{{ item.id }}</td>
+            <td>{{ item.name }}</td>
+            <td>{{ item.email }}</td>
+            <td>{{ item.phone or '-' }}</td>
+            <td>{{ item.company_id }}</td>
+        </tr>
+        {% endfor %}
+        {% if not items %}<tr><td colspan="5">Нет контрагентов</td></tr>{% endif %}
+    </tbody>
+</table>
+{% if pages > 1 %}
+<div class="pagination">
+    {% for p in range(1, pages + 1) %}
+    <a href="/counterparties?page={{ p }}" class="{{ 'active' if p == page else '' }}">{{ p }}</a>
+    {% endfor %}
+</div>
+{% endif %}
+{% endblock %}

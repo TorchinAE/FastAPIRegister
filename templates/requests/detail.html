@@ -1,0 +1,38 @@
+{% extends "base.html" %}
+{% block title %}Запрос #{{ req.id }}{% endblock %}
+{% block content %}
+<h1>Запрос #{{ req.id }}</h1>
+<div class="card">
+    <dl class="detail-grid">
+        <dt>ID</dt><dd>{{ req.id }}</dd>
+        <dt>ТКП номер</dt><dd>{{ req.tkp_num or '-' }}</dd>
+        <dt>Дата запроса</dt><dd>{{ req.request_date.strftime('%d.%m.%Y %H:%M') if req.request_date else '-' }}</dd>
+        <dt>Статус</dt><dd>{{ req.status.value if req.status else '-' }}</dd>
+        <dt>Контрагент ID</dt><dd>{{ req.counterparty_id }}</dd>
+        <dt>Компания ID</dt><dd>{{ req.company_id }}</dd>
+        <dt>Менеджер ID</dt><dd>{{ req.manager_id }}</dd>
+        <dt>Создал</dt><dd>{{ req.created_by or '-' }}</dd>
+        <dt>Описание</dt><dd>{{ req.description or '-' }}</dd>
+        <dt>Заметки</dt><dd>{{ req.notes or '-' }}</dd>
+    </dl>
+</div>
+<h2>Оборудование</h2>
+<div class="card">
+    <dl class="detail-grid">
+        <dt>БКТПБ</dt><dd>{{ req.bktpb }}</dd>
+        <dt>КТПБ</dt><dd>{{ req.ktpb }}</dd>
+        <dt>КТП</dt><dd>{{ req.ktp }}</dd>
+        <dt>КСО-393</dt><dd>{{ req.kso_393 }}</dd>
+        <dt>КСО-204</dt><dd>{{ req.kso_204 }}</dd>
+        <dt>К-104</dt><dd>{{ req.k_104 }}</dd>
+        <dt>К-104М</dt><dd>{{ req.k_104m }}</dd>
+        <dt>ЩО</dt><dd>{{ req.sho }}</dd>
+        <dt>ПКУ</dt><dd>{{ req.pku }}</dd>
+        <dt>ПУС</dt><dd>{{ req.pus }}</dd>
+        <dt>ПАРН</dt><dd>{{ req.parn }}</dd>
+    </dl>
+</div>
+<div class="actions">
+    <a href="/requests" class="btn">Назад</a>
+</div>
+{% endblock %}

@@ -1,0 +1,35 @@
+* { box-sizing: border-box; margin: 0; padding: 0; }
+body { font-family: system-ui, sans-serif; background: #f5f5f5; color: #333; }
+nav { background: #2c3e50; color: #fff; padding: 1rem 2rem; display: flex; align-items: center; gap: 1.5rem; flex-wrap: wrap; }
+nav a { color: #ecf0f1; text-decoration: none; font-size: 0.9rem; }
+nav a:hover { text-decoration: underline; }
+nav .brand { font-weight: bold; font-size: 1.1rem; margin-right: 1rem; }
+.container { max-width: 1200px; margin: 1.5rem auto; padding: 0 1rem; }
+h1, h2 { margin-bottom: 1rem; }
+table { width: 100%; border-collapse: collapse; background: #fff; border-radius: 6px; overflow: hidden; box-shadow: 0 1px 3px rgba(0,0,0,0.1); }
+th, td { padding: 0.6rem 1rem; text-align: left; border-bottom: 1px solid #eee; }
+th { background: #34495e; color: #fff; }
+tr:hover { background: #f9f9f9; }
+.btn { display: inline-block; padding: 0.5rem 1rem; border: none; border-radius: 4px; cursor: pointer; font-size: 0.9rem; text-decoration: none; color: #fff; }
+.btn-primary { background: #3498db; }
+.btn-danger { background: #e74c3c; }
+.btn-success { background: #27ae60; }
+.btn:hover { opacity: 0.9; }
+form { background: #fff; padding: 1.5rem; border-radius: 6px; box-shadow: 0 1px 3px rgba(0,0,0,0.1); max-width: 600px; }
+.form-group { margin-bottom: 1rem; }
+.form-group label { display: block; margin-bottom: 0.3rem; font-weight: 600; font-size: 0.85rem; }
+.form-group input, .form-group select, .form-group textarea { width: 100%; padding: 0.5rem; border: 1px solid #ddd; border-radius: 4px; font-size: 0.9rem; }
+.form-group textarea { min-height: 80px; resize: vertical; }
+.actions { display: flex; gap: 0.5rem; margin-top: 1rem; }
+.alert { padding: 0.8rem 1rem; border-radius: 4px; margin-bottom: 1rem; }
+.alert-error { background: #fdecea; color: #c0392b; }
+.alert-success { background: #eafaf1; color: #27ae60; }
+.filters { display: flex; gap: 1rem; flex-wrap: wrap; margin-bottom: 1rem; align-items: flex-end; }
+.filters .form-group { margin-bottom: 0; }
+.pagination { display: flex; gap: 0.5rem; margin-top: 1rem; justify-content: center; }
+.pagination a { padding: 0.4rem 0.8rem; background: #3498db; color: #fff; border-radius: 4px; text-decoration: none; }
+.pagination a.active { background: #2c3e50; }
+.card { background: #fff; padding: 1.5rem; border-radius: 6px; box-shadow: 0 1px 3px rgba(0,0,0,0.1); margin-bottom: 1rem; }
+.detail-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 0.5rem; }
+.detail-grid dt { font-weight: 600; color: #555; }
+.detail-grid dd { margin-bottom: 0.5rem; }

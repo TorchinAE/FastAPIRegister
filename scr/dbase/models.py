@@ -1,8 +1,9 @@
 # models.py
+import enum
 from datetime import datetime, timezone
 from typing import Optional, List
 
-from sqlalchemy import String, DateTime, ForeignKey
+from sqlalchemy import String, DateTime, ForeignKey, Integer, Text, Enum
 from sqlalchemy.orm import DeclarativeBase, Mapped, mapped_column, relationship
 
 
@@ -43,16 +44,25 @@ def get_give_name(input_name: str) -> str:
     return result
 
 
+class RequestStatus(str, enum.Enum):
+    ZAPROS = "запрос"
+    TENDER = "тендер"
+    NOT_ACTUAL = "не актуально"
+    DOC_PROCESSING = "оформление документов"
+    DOC_SIGNING = "подписание документов"
+    WAITING_PAYMENT = "ожидание оплаты"
+    ORDER = "заказ"
+
+
 class Base(DeclarativeBase):
     pass
 
 
 class BaseID(Base):
-    """Абстрактный базовый класс с полями id, created_at и updated_at."""
-
     __abstract__ = True
 
     id: Mapped[int] = mapped_column(primary_key=True)
+    created_by: Mapped[Optional[str]] = mapped_column(String(100), nullable=True)
     created_at: Mapped[datetime] = mapped_column(
         DateTime, default=lambda: datetime.now(timezone.utc)
     )
@@ -66,14 +76,26 @@ class BaseID(Base):
     )
 
 
-class Manager(BaseID):
-    """Модель менеджера."""
+class User(Base):
+    __tablename__ = "users"
+    id: Mapped[int] = mapped_column(primary_key=True)
+    name: Mapped[str] = mapped_column(String(100), nullable=False)
+    email: Mapped[str] = mapped_column(String(100), unique=True, nullable=False)
+    hashed_password: Mapped[str] = mapped_column(String(200), nullable=False)
+    created_at: Mapped[datetime] = mapped_column(
+        DateTime, default=lambda: datetime.now(timezone.utc)
+    )
 
+
+class Manager(BaseID):
     __tablename__ = "managers"
     name: Mapped[str] = mapped_column(String(50), unique=True, nullable=False)
     email: Mapped[str] = mapped_column(String(50), unique=True, nullable=False)
     phone: Mapped[str] = mapped_column(String(20), nullable=False)
-    organizations: Mapped[List["Organization"]] = relationship(back_populates="manager")
+    city: Mapped[str] = mapped_column(String(50), nullable=False, default="ив")
+    organizations: Mapped[List["Organization"]] = relationship(
+        back_populates="manager", foreign_keys="Organization.manager_id"
+    )
 
     def __repr__(self) -> str:
         return (
@@ -89,17 +111,23 @@ class Manager(BaseID):
 
 
 class Organization(BaseID):
-    """Модель организации."""
-
     __tablename__ = "organizations"
     name: Mapped[str] = mapped_column(String(100), unique=True, nullable=False)
     inn: Mapped[str] = mapped_column(String(12), unique=True, nullable=True)
     address: Mapped[Optional[str]] = mapped_column(String(200), nullable=True)
+    server_address_slug: Mapped[str] = mapped_column(
+        String(200), nullable=False, default="/02_сторонние_заказчики"
+    )
     director_id: Mapped[int] = mapped_column(ForeignKey("directors.id"), nullable=False)
     manager_id: Mapped[int] = mapped_column(ForeignKey("managers.id"), nullable=False)
 
     director: Mapped["Directors"] = relationship(back_populates="organizations")
-    manager: Mapped["Manager"] = relationship(back_populates="organizations")
+    manager: Mapped["Manager"] = relationship(
+        back_populates="organizations", foreign_keys=[manager_id]
+    )
+    counterparties: Mapped[List["Counterparty"]] = relationship(
+        back_populates="company"
+    )
 
     def __repr__(self) -> str:
         director_name = self.director.name if self.director else "None"
@@ -115,8 +143,6 @@ class Organization(BaseID):
 
 
 class Directors(BaseID):
-    """Модель директора."""
-
     __tablename__ = "directors"
     name: Mapped[str] = mapped_column(String(100), unique=True, nullable=False)
     email: Mapped[Optional[str]] = mapped_column(
@@ -153,11 +179,56 @@ class Directors(BaseID):
 
 
 class Positions(BaseID):
-    """Модель должности."""
-
     __tablename__ = "positions"
-    title: Mapped[str] = mapped_column(String(100), unique=True, nullable=False)
+    name: Mapped[str] = mapped_column(String(100), unique=True, nullable=False)
     directors: Mapped[List["Directors"]] = relationship(back_populates="position")
 
     def __repr__(self) -> str:
-        return f"Positions(id={self.id}, " f"title='{self.title}')"
+        return f"Positions(id={self.id}, name='{self.name}')"
+
+
+class Counterparty(BaseID):
+    __tablename__ = "counterparties"
+    name: Mapped[str] = mapped_column(String(100), nullable=False)
+    email: Mapped[str] = mapped_column(String(100), unique=True, nullable=False)
+    phone: Mapped[Optional[str]] = mapped_column(String(20), nullable=True)
+    company_id: Mapped[int] = mapped_column(
+        ForeignKey("organizations.id"), nullable=False
+    )
+
+    company: Mapped["Organization"] = relationship(back_populates="counterparties")
+
+
+class Request(BaseID):
+    __tablename__ = "requests"
+    counterparty_id: Mapped[int] = mapped_column(
+        ForeignKey("counterparties.id"), nullable=False
+    )
+    company_id: Mapped[int] = mapped_column(
+        ForeignKey("organizations.id"), nullable=False
+    )
+    manager_id: Mapped[int] = mapped_column(ForeignKey("managers.id"), nullable=False)
+    request_date: Mapped[datetime] = mapped_column(
+        DateTime, default=lambda: datetime.now(timezone.utc)
+    )
+    status: Mapped[RequestStatus] = mapped_column(
+        Enum(RequestStatus), default=RequestStatus.ZAPROS, nullable=False
+    )
+    description: Mapped[Optional[str]] = mapped_column(Text, nullable=True)
+    notes: Mapped[Optional[str]] = mapped_column(Text, nullable=True)
+    tkp_num: Mapped[Optional[str]] = mapped_column(String(50), nullable=True)
+    bktpb: Mapped[int] = mapped_column(Integer, default=0)
+    ktpb: Mapped[int] = mapped_column(Integer, default=0)
+    ktp: Mapped[int] = mapped_column(Integer, default=0)
+    kso_393: Mapped[int] = mapped_column(Integer, default=0)
+    kso_204: Mapped[int] = mapped_column(Integer, default=0)
+    k_104: Mapped[int] = mapped_column(Integer, default=0)
+    k_104m: Mapped[int] = mapped_column(Integer, default=0)
+    sho: Mapped[int] = mapped_column(Integer, default=0)
+    pku: Mapped[int] = mapped_column(Integer, default=0)
+    pus: Mapped[int] = mapped_column(Integer, default=0)
+    parn: Mapped[int] = mapped_column(Integer, default=0)
+
+    counterparty: Mapped["Counterparty"] = relationship(foreign_keys=[counterparty_id])
+    company: Mapped["Organization"] = relationship(foreign_keys=[company_id])
+    manager: Mapped["Manager"] = relationship(foreign_keys=[manager_id])

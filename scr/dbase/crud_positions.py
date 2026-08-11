@@ -1,37 +1,44 @@
-from black.cache import field
-from sqlalchemy import select, Result
+from sqlalchemy import select, Result, func
 from sqlalchemy.ext.asyncio import AsyncSession
-from sqlalchemy.ext.horizontal_shard import set_shard_id
 
 from scr.dbase.models import Positions
 from scr.dbase.schemas.schemas import PositionCreateSchema, PositionUpdateSchema
 
 
-async def get_all_positions(session: AsyncSession) -> list[Positions]:
-    stmt = select(Positions).order_by(Positions.title)
+async def get_all_positions(
+    session: AsyncSession, search: str | None = None, page: int = 1, per_page: int = 20
+) -> tuple[list[Positions], int]:
+    stmt = select(Positions).order_by(Positions.name)
+    count_stmt = select(func.count(Positions.id))
+
+    if search:
+        stmt = stmt.where(Positions.name.ilike(f"%{search}%"))
+        count_stmt = count_stmt.where(Positions.name.ilike(f"%{search}%"))
+
+    total = (await session.execute(count_stmt)).scalar() or 0
+    stmt = stmt.offset((page - 1) * per_page).limit(per_page)
     result: Result = await session.execute(stmt)
-    positions = result.scalars().all()
-    return list(positions)
+    return list(result.scalars().all()), total
 
 
 async def get_position_id(session: AsyncSession, pos_id: int) -> Positions | None:
     return await session.get(Positions, pos_id)
 
 
-async def get_position_title(session: AsyncSession, title: str) -> Positions | None:
-    stmt = select(Positions).where(Positions.title == title)
+async def get_position_name(session: AsyncSession, name: str) -> Positions | None:
+    stmt = select(Positions).where(Positions.name == name)
     result: Result = await session.execute(stmt)
-    position = result.scalar_one_or_none()
-    return position
+    return result.scalar_one_or_none()
 
 
 async def add_position(
-    session: AsyncSession, in_position: PositionCreateSchema
+    session: AsyncSession, in_position: PositionCreateSchema, created_by: str | None = None
 ) -> Positions:
-    check_pos = await get_position_title(session, in_position.title)
+    check_pos = await get_position_name(session, in_position.name)
     if check_pos:
         return check_pos
     new_pos = Positions(**in_position.model_dump())
+    new_pos.created_by = created_by
     session.add(new_pos)
     await session.flush()
     return new_pos
@@ -44,8 +51,8 @@ async def update_position(
     if not check_position:
         return None
     for pos_field, value in upd_position.model_dump(exclude_unset=True).items():
-        if field != "id" and hasattr(upd_position, pos_field):
-            setattr(upd_position, pos_field, value)
+        if pos_field != "id" and hasattr(check_position, pos_field):
+            setattr(check_position, pos_field, value)
     await session.flush()
     return check_position
 

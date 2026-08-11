@@ -1,47 +1,41 @@
+import sys
+from pathlib import Path
+
+sys.path.insert(0, str(Path(__file__).resolve().parent.parent))
+
 import pytest
-from fastapi.testclient import TestClient
-from sqlalchemy import create_engine
-from sqlalchemy.orm import sessionmaker
-from sqlalchemy.pool import StaticPool
+from httpx import AsyncClient, ASGITransport
+from sqlalchemy.ext.asyncio import create_async_engine, async_sessionmaker, AsyncSession
 
-from scr.dbase.database import Base
+from scr.dbase.models import Base
+from scr.dbase.database import db_helper
 from main import app
-from scr.dbase.database import (
-    create_db_and_tables,
-)  # замените на ваш способ получения сессии
 
-# Создаём тестовую синхронную БД в памяти (для простоты)
-# Если используете async SQLAlchemy — см. примечание ниже
-SQLALCHEMY_DATABASE_URL = "sqlite+aiosqlite:///./test.db?check_same_thread=False"
+TEST_DB_URL = "sqlite+aiosqlite:///:memory:"
 
-engine = create_engine(
-    SQLALCHEMY_DATABASE_URL,
-    connect_args={"check_same_thread": False},
-    poolclass=StaticPool,
-)
+engine = create_async_engine(TEST_DB_URL, echo=False)
+TestSessionLocal = async_sessionmaker(engine, expire_on_commit=False)
 
-TestingSessionLocal = sessionmaker(autocommit=False, autoflush=False, bind=engine)
+
+async def override_session() -> AsyncSession:
+    async with TestSessionLocal() as session:
+        yield session
+
+
+app.dependency_overrides[db_helper.session_dependency] = override_session
 
 
 @pytest.fixture(scope="session", autouse=True)
-def setup_test_db():
-    Base.metadata.create_all(bind=engine)
+async def setup_db():
+    async with engine.begin() as conn:
+        await conn.run_sync(Base.metadata.create_all)
     yield
-    Base.metadata.drop_all(bind=engine)
+    async with engine.begin() as conn:
+        await conn.run_sync(Base.metadata.drop_all)
 
 
 @pytest.fixture
-def client():
-    def override_get_db():
-        db = TestingSessionLocal()
-        try:
-            yield db
-        finally:
-            db.close()
-
-    # Замените get_async_session на вашу зависимость, если она используется в роутах
-    # Если вы НЕ используете Depends(get_async_session) в роутах — эту строку можно удалить
-    # app.dependency_overrides[get_async_session] = override_get_db
-
-    with TestClient(app) as c:
-        yield c
+async def client():
+    transport = ASGITransport(app=app)
+    async with AsyncClient(transport=transport, base_url="http://test") as ac:
+        yield ac

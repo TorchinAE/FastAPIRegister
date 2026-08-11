@@ -1,0 +1,26 @@
+{% extends "base.html" %}
+{% block title %}Должности{% endblock %}
+{% block content %}
+<h1>Должности ({{ total }})</h1>
+<table>
+    <thead>
+        <tr><th>ID</th><th>Название</th></tr>
+    </thead>
+    <tbody>
+        {% for item in items %}
+        <tr>
+            <td>{{ item.id }}</td>
+            <td>{{ item.name }}</td>
+        </tr>
+        {% endfor %}
+        {% if not items %}<tr><td colspan="2">Нет должностей</td></tr>{% endif %}
+    </tbody>
+</table>
+{% if pages > 1 %}
+<div class="pagination">
+    {% for p in range(1, pages + 1) %}
+    <a href="/positions?page={{ p }}" class="{{ 'active' if p == page else '' }}">{{ p }}</a>
+    {% endfor %}
+</div>
+{% endif %}
+{% endblock %}

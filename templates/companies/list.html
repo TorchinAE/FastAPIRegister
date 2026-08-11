@@ -1,0 +1,29 @@
+{% extends "base.html" %}
+{% block title %}Компании{% endblock %}
+{% block content %}
+<h1>Компании ({{ total }})</h1>
+<table>
+    <thead>
+        <tr><th>ID</th><th>Название</th><th>ИНН</th><th>Адрес</th><th>Директор ID</th></tr>
+    </thead>
+    <tbody>
+        {% for item in items %}
+        <tr>
+            <td>{{ item.id }}</td>
+            <td>{{ item.name }}</td>
+            <td>{{ item.inn or '-' }}</td>
+            <td>{{ item.address or '-' }}</td>
+            <td>{{ item.director_id }}</td>
+        </tr>
+        {% endfor %}
+        {% if not items %}<tr><td colspan="5">Нет компаний</td></tr>{% endif %}
+    </tbody>
+</table>
+{% if pages > 1 %}
+<div class="pagination">
+    {% for p in range(1, pages + 1) %}
+    <a href="/companies?page={{ p }}" class="{{ 'active' if p == page else '' }}">{{ p }}</a>
+    {% endfor %}
+</div>
+{% endif %}
+{% endblock %}

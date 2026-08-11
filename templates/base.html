@@ -1,0 +1,30 @@
+<!DOCTYPE html>
+<html lang="ru">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>{% block title %}Регистрация запросов{% endblock %}</title>
+    <link rel="stylesheet" href="/static/style.css">
+</head>
+<body>
+    <nav>
+        <span class="brand">Регистрация запросов</span>
+        <a href="/dashboard">Дашборд</a>
+        <a href="/requests">Запросы</a>
+        <a href="/counterparties">Контрагенты</a>
+        <a href="/companies">Компании</a>
+        <a href="/managers">Менеджеры</a>
+        <a href="/directors">Директора</a>
+        <a href="/positions">Должности</a>
+        {% if user %}
+            <span style="margin-left:auto;">{{ user.name }} ({{ user.email }})</span>
+            <a href="/logout">Выход</a>
+        {% else %}
+            <a href="/" style="margin-left:auto;">Войти</a>
+        {% endif %}
+    </nav>
+    <div class="container">
+        {% block content %}{% endblock %}
+    </div>
+</body>
+</html>
