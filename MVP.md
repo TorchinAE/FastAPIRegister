@@ -9,7 +9,7 @@
 ## Стек технологий
 
 - **Backend**: FastAPI + Django Ninja
-- **Database**: PostgreSQL
+- **Database**: SQLite
 - **Frontend**: рендеринг страниц через Ninja templates
 
 ---
