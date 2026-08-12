@@ -7,24 +7,44 @@
     <link rel="stylesheet" href="/static/style.css">
 </head>
 <body>
-    <nav>
-        <span class="brand">Регистрация запросов</span>
-        <a href="/dashboard">Дашборд</a>
-        <a href="/requests">Запросы</a>
-        <a href="/counterparties">Контрагенты</a>
-        <a href="/companies">Компании</a>
-        <a href="/managers">Менеджеры</a>
-        <a href="/directors">Директора</a>
-        <a href="/positions">Должности</a>
-        {% if user %}
-            <span style="margin-left:auto;">{{ user.name }} ({{ user.email }})</span>
-            <a href="/logout">Выход</a>
-        {% else %}
-            <a href="/" style="margin-left:auto;">Войти</a>
-        {% endif %}
-    </nav>
-    <div class="container">
-        {% block content %}{% endblock %}
+    <button class="hamburger" onclick="toggleSidebar()">&#9776;</button>
+    <div class="overlay" id="overlay" onclick="toggleSidebar()"></div>
+    <div class="app">
+        <aside class="sidebar" id="sidebar">
+            <div class="brand">Регистрация запросов</div>
+            <nav>
+                <a href="/dashboard" class="{{ 'active' if active_page == 'dashboard' else '' }}"><span class="icon">&#9632;</span> Дашборд</a>
+                <a href="/requests" class="{{ 'active' if active_page == 'requests' else '' }}"><span class="icon">&#9993;</span> Запросы</a>
+                <a href="/counterparties" class="{{ 'active' if active_page == 'counterparties' else '' }}"><span class="icon">&#9823;</span> Контрагенты</a>
+                <a href="/companies" class="{{ 'active' if active_page == 'companies' else '' }}"><span class="icon">&#9960;</span> Компании</a>
+                <a href="/managers" class="{{ 'active' if active_page == 'managers' else '' }}"><span class="icon">&#9824;</span> Менеджеры</a>
+                <a href="/directors" class="{{ 'active' if active_page == 'directors' else '' }}"><span class="icon">&#9733;</span> Директора</a>
+                <a href="/positions" class="{{ 'active' if active_page == 'positions' else '' }}"><span class="icon">&#9830;</span> Должности</a>
+            </nav>
+            {% if user %}
+            <div class="user-section">
+                <div class="user-name">{{ user.name }}</div>
+                <div class="user-email">{{ user.email }}</div>
+                <a href="/logout">Выйти</a>
+            </div>
+            {% endif %}
+        </aside>
+        <main class="main-content fade-in">
+            {% block content %}{% endblock %}
+        </main>
     </div>
+    <script>
+        function toggleSidebar() {
+            document.getElementById('sidebar').classList.toggle('open');
+            document.getElementById('overlay').classList.toggle('open');
+        }
+        document.addEventListener('keydown', e => {
+            if (e.key === 'Escape') {
+                document.getElementById('sidebar').classList.remove('open');
+                document.getElementById('overlay').classList.remove('open');
+            }
+        });
+    </script>
+    {% block scripts %}{% endblock %}
 </body>
 </html>

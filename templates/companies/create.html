@@ -1,0 +1,125 @@
+{% extends "base.html" %}
+{% block title %}Новая компания{% endblock %}
+{% block content %}
+<div class="page-header">
+    <div>
+        <h1>Новая компания</h1>
+    </div>
+    <a href="{{ back_to or '/companies' }}" class="btn btn-ghost">← Назад</a>
+</div>
+
+<div class="card">
+    <form id="newCompanyForm">
+        <div class="form-row" style="grid-template-columns: 1fr 1fr 1fr;">
+            <div class="form-group">
+                <label>Название</label>
+                <input type="text" name="name" required style="width:100%;min-width:0">
+            </div>
+            <div class="form-group">
+                <label>ИНН</label>
+                <input type="text" name="inn" pattern="[0-9]*" inputmode="numeric" maxlength="12" style="width:100%;min-width:0">
+            </div>
+            <div class="form-group">
+                <label>Адрес</label>
+                <input type="text" name="address" style="width:100%;min-width:0">
+            </div>
+            <div class="form-group">
+                <label>Slug сервера</label>
+                <input type="text" name="server_address_slug" value="/02_сторонние_заказчики" style="width:100%;min-width:0">
+            </div>
+            <div class="form-group">
+                <label>Директор</label>
+                <select name="director_id" id="directorSelect" required style="width:100%;min-width:0">
+                    <option value="">-- выбрать --</option>
+                    {% for d in directors %}
+                    <option value="{{ d.id }}">{{ d.name }}</option>
+                    {% endfor %}
+                </select>
+                <a href="#" id="editDirectorLink" class="btn btn-ghost btn-sm" style="margin-top:0.35rem;font-size:0.8rem;display:none">Изменить данные директора</a>
+            </div>
+            <div class="form-group">
+                <label>Менеджер</label>
+                <select name="manager_id" style="width:100%;min-width:0">
+                    <option value="">-- не указан --</option>
+                    {% for m in managers %}
+                    <option value="{{ m.id }}">{{ m.name }}</option>
+                    {% endfor %}
+                </select>
+            </div>
+        </div>
+        <div class="actions">
+            <button type="submit" class="btn btn-primary">Создать</button>
+        </div>
+    </form>
+</div>
+
+<div id="toast" class="toast" style="display:none"></div>
+{% endblock %}
+
+{% block scripts %}
+<script>
+const backTo = '{{ back_to or "/companies" }}';
+const backParam = encodeURIComponent(backTo);
+
+const dirSelect = document.getElementById('directorSelect');
+const dirLink = document.getElementById('editDirectorLink');
+dirSelect.addEventListener('change', function() {
+    if (this.value) {
+        dirLink.href = '/directors/' + this.value + '?back_to=' + backParam;
+        dirLink.style.display = 'inline-block';
+    } else {
+        dirLink.style.display = 'none';
+    }
+});
+
+// INN — only digits
+document.querySelector('[name="inn"]').addEventListener('input', function() {
+    this.value = this.value.replace(/[^0-9]/g, '');
+});
+
+document.getElementById('newCompanyForm').addEventListener('submit', async function(e) {
+    e.preventDefault();
+    const fd = new FormData(this);
+    const dirId = fd.get('director_id');
+    if (!dirId) { showToast('Выберите директора'); return; }
+    const data = {
+        name: fd.get('name'),
+        inn: fd.get('inn') || null,
+        address: fd.get('address') || null,
+        server_address_slug: fd.get('server_address_slug'),
+        director_id: parseInt(dirId),
+    };
+    const mgrId = fd.get('manager_id');
+    data.manager_id = mgrId ? parseInt(mgrId) : null;
+
+    try {
+        const resp = await fetch('/api/companies/', {
+            method: 'POST',
+            headers: {'Content-Type': 'application/json'},
+            body: JSON.stringify(data),
+        });
+        if (resp.ok) {
+            const company = await resp.json();
+            if (backTo.includes('/counterparties/')) {
+                const sep = backTo.includes('?') ? '&' : '?';
+                window.location.href = backTo + sep + 'company_id=' + company.id;
+            } else {
+                window.location.href = backTo;
+            }
+        } else {
+            const err = await resp.json();
+            showToast('Ошибка: ' + JSON.stringify(err.detail || err));
+        }
+    } catch(ex) {
+        showToast('Ошибка сети: ' + ex.message);
+    }
+});
+
+function showToast(msg) {
+    const t = document.getElementById('toast');
+    t.textContent = msg;
+    t.style.display = 'block';
+    setTimeout(() => t.style.display = 'none', 2500);
+}
+</script>
+{% endblock %}

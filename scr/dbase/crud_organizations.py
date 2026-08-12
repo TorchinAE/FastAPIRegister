@@ -1,5 +1,6 @@
 from sqlalchemy import select, Result, func
 from sqlalchemy.ext.asyncio import AsyncSession
+from sqlalchemy.orm import selectinload
 
 from scr.dbase.models import Organization
 from scr.dbase.schemas.schemas import OrganizationAddSchema, OrganizationUpdateSchema
@@ -11,7 +12,7 @@ async def get_organizations(
     page: int = 1,
     per_page: int = 20,
 ) -> tuple[list[Organization], int]:
-    stmt = select(Organization).order_by(Organization.name)
+    stmt = select(Organization).options(selectinload(Organization.director)).order_by(Organization.id)
     count_stmt = select(func.count(Organization.id))
 
     if search:

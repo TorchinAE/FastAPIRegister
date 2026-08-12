@@ -119,7 +119,7 @@ class Organization(BaseID):
         String(200), nullable=False, default="/02_сторонние_заказчики"
     )
     director_id: Mapped[int] = mapped_column(ForeignKey("directors.id"), nullable=False)
-    manager_id: Mapped[int] = mapped_column(ForeignKey("managers.id"), nullable=False)
+    manager_id: Mapped[int | None] = mapped_column(ForeignKey("managers.id"), nullable=True)
 
     director: Mapped["Directors"] = relationship(back_populates="organizations")
     manager: Mapped["Manager"] = relationship(

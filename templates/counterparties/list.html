@@ -1,24 +1,34 @@
 {% extends "base.html" %}
 {% block title %}Контрагенты{% endblock %}
 {% block content %}
-<h1>Контрагенты ({{ total }})</h1>
-<table>
-    <thead>
-        <tr><th>ID</th><th>Имя</th><th>Email</th><th>Телефон</th><th>Компания ID</th></tr>
-    </thead>
-    <tbody>
-        {% for item in items %}
-        <tr>
-            <td>{{ item.id }}</td>
-            <td>{{ item.name }}</td>
-            <td>{{ item.email }}</td>
-            <td>{{ item.phone or '-' }}</td>
-            <td>{{ item.company_id }}</td>
-        </tr>
-        {% endfor %}
-        {% if not items %}<tr><td colspan="5">Нет контрагентов</td></tr>{% endif %}
-    </tbody>
-</table>
+<div class="page-header">
+    <div>
+        <h1>Контрагенты</h1>
+        <div class="subtitle">Всего: {{ total }}</div>
+    </div>
+</div>
+<div class="table-wrap">
+    <table>
+        <thead>
+            <tr><th>ID</th><th>Имя</th><th>Email</th><th>Телефон</th><th>Компания</th><th></th></tr>
+        </thead>
+        <tbody>
+            {% for item in items %}
+            <tr class="cp-row" onclick="location.href='/counterparties/{{ item.id }}'" style="cursor:pointer">
+                <td><strong>{{ item.id }}</strong></td>
+                <td>{{ item.name }}</td>
+                <td>{{ item.email }}</td>
+                <td>{{ item.phone or '-' }}</td>
+                <td>{{ item.company.name }}</td>
+                <td style="text-align:center;width:40px">
+                    <button class="btn btn-danger btn-sm btn-icon cp-delete" data-id="{{ item.id }}" title="Удалить" onclick="event.stopPropagation(); deleteCp({{ item.id }}, this)">&#10005;</button>
+                </td>
+            </tr>
+            {% endfor %}
+            {% if not items %}<tr class="empty-row"><td colspan="6">Нет контрагентов</td></tr>{% endif %}
+        </tbody>
+    </table>
+</div>
 {% if pages > 1 %}
 <div class="pagination">
     {% for p in range(1, pages + 1) %}
@@ -26,4 +36,26 @@
     {% endfor %}
 </div>
 {% endif %}
+<div id="toast" class="toast" style="display:none"></div>
+{% endblock %}
+
+{% block scripts %}
+<script>
+async function deleteCp(id, btn) {
+    if (!confirm('Удалить контрагента?')) return;
+    const resp = await fetch(`/counterparties/${id}/delete`, {method: 'DELETE'});
+    if (resp.ok) {
+        btn.closest('tr').remove();
+        showToast('Удалён');
+    } else {
+        showToast('Ошибка удаления');
+    }
+}
+function showToast(msg) {
+    const t = document.getElementById('toast');
+    t.textContent = msg;
+    t.style.display = 'block';
+    setTimeout(() => t.style.display = 'none', 2500);
+}
+</script>
 {% endblock %}

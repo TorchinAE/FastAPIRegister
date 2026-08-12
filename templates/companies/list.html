@@ -1,24 +1,31 @@
 {% extends "base.html" %}
 {% block title %}Компании{% endblock %}
 {% block content %}
-<h1>Компании ({{ total }})</h1>
-<table>
-    <thead>
-        <tr><th>ID</th><th>Название</th><th>ИНН</th><th>Адрес</th><th>Директор ID</th></tr>
-    </thead>
-    <tbody>
-        {% for item in items %}
-        <tr>
-            <td>{{ item.id }}</td>
-            <td>{{ item.name }}</td>
-            <td>{{ item.inn or '-' }}</td>
-            <td>{{ item.address or '-' }}</td>
-            <td>{{ item.director_id }}</td>
-        </tr>
-        {% endfor %}
-        {% if not items %}<tr><td colspan="5">Нет компаний</td></tr>{% endif %}
-    </tbody>
-</table>
+<div class="page-header">
+    <div>
+        <h1>Компании</h1>
+        <div class="subtitle">Всего: {{ total }}</div>
+    </div>
+</div>
+<div class="table-wrap">
+    <table>
+        <thead>
+            <tr><th>ID</th><th>Название</th><th>ИНН</th><th>Адрес</th><th>Директор</th></tr>
+        </thead>
+        <tbody>
+            {% for item in items %}
+            <tr style="cursor:pointer" onclick="location.href='/companies/{{ item.id }}/edit'">
+                <td><strong>{{ item.id }}</strong></td>
+                <td>{{ item.name }}</td>
+                <td>{{ item.inn or '-' }}</td>
+                <td>{{ item.address or '-' }}</td>
+                <td>{{ item.director.name }}</td>
+            </tr>
+            {% endfor %}
+            {% if not items %}<tr class="empty-row"><td colspan="5">Нет компаний</td></tr>{% endif %}
+        </tbody>
+    </table>
+</div>
 {% if pages > 1 %}
 <div class="pagination">
     {% for p in range(1, pages + 1) %}

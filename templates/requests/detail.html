@@ -1,13 +1,28 @@
 {% extends "base.html" %}
 {% block title %}Запрос #{{ req.id }}{% endblock %}
 {% block content %}
-<h1>Запрос #{{ req.id }}</h1>
+<div class="page-header">
+    <div>
+        <h1>Запрос #{{ req.id }}</h1>
+        <div class="subtitle">{{ req.tkp_num or '' }}</div>
+    </div>
+    <a href="/requests" class="btn btn-ghost">← Назад</a>
+</div>
 <div class="card">
+    <h3 style="margin-bottom:1rem; font-size:0.95rem; color:var(--text-muted); text-transform:uppercase; letter-spacing:0.05em;">Основная информация</h3>
     <dl class="detail-grid">
         <dt>ID</dt><dd>{{ req.id }}</dd>
         <dt>ТКП номер</dt><dd>{{ req.tkp_num or '-' }}</dd>
         <dt>Дата запроса</dt><dd>{{ req.request_date.strftime('%d.%m.%Y %H:%M') if req.request_date else '-' }}</dd>
-        <dt>Статус</dt><dd>{{ req.status.value if req.status else '-' }}</dd>
+        <dt>Статус</dt>
+        <dd>
+            {% set status = req.status.value if req.status else '' %}
+            {% if status == 'Новый' %}<span class="badge badge-new">{{ status }}</span>
+            {% elif status == 'В работе' %}<span class="badge badge-progress">{{ status }}</span>
+            {% elif status == 'Выполнен' %}<span class="badge badge-done">{{ status }}</span>
+            {% elif status == 'Отменён' %}<span class="badge badge-cancel">{{ status }}</span>
+            {% else %}<span class="badge">{{ status or '-' }}</span>{% endif %}
+        </dd>
         <dt>Контрагент ID</dt><dd>{{ req.counterparty_id }}</dd>
         <dt>Компания ID</dt><dd>{{ req.company_id }}</dd>
         <dt>Менеджер ID</dt><dd>{{ req.manager_id }}</dd>
@@ -16,8 +31,8 @@
         <dt>Заметки</dt><dd>{{ req.notes or '-' }}</dd>
     </dl>
 </div>
-<h2>Оборудование</h2>
 <div class="card">
+    <h3 style="margin-bottom:1rem; font-size:0.95rem; color:var(--text-muted); text-transform:uppercase; letter-spacing:0.05em;">Оборудование</h3>
     <dl class="detail-grid">
         <dt>БКТПБ</dt><dd>{{ req.bktpb }}</dd>
         <dt>КТПБ</dt><dd>{{ req.ktpb }}</dd>
@@ -31,8 +46,5 @@
         <dt>ПУС</dt><dd>{{ req.pus }}</dd>
         <dt>ПАРН</dt><dd>{{ req.parn }}</dd>
     </dl>
-</div>
-<div class="actions">
-    <a href="/requests" class="btn">Назад</a>
 </div>
 {% endblock %}

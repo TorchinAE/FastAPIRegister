@@ -1,5 +1,6 @@
 from sqlalchemy import select, Result, func
 from sqlalchemy.ext.asyncio import AsyncSession
+from sqlalchemy.orm import selectinload
 
 from scr.dbase.models import Counterparty
 from scr.dbase.schemas.schemas import CounterpartyCreateSchema, CounterpartyUpdateSchema
@@ -12,7 +13,7 @@ async def get_counterparties(
     page: int = 1,
     per_page: int = 20,
 ) -> tuple[list[Counterparty], int]:
-    stmt = select(Counterparty).order_by(Counterparty.name)
+    stmt = select(Counterparty).options(selectinload(Counterparty.company)).order_by(Counterparty.id)
     count_stmt = select(func.count(Counterparty.id))
 
     if company_id:
@@ -32,7 +33,9 @@ async def get_counterparties(
 async def get_counterparty_by_id(
     session: AsyncSession, cp_id: int
 ) -> Counterparty | None:
-    return await session.get(Counterparty, cp_id)
+    stmt = select(Counterparty).options(selectinload(Counterparty.company)).where(Counterparty.id == cp_id)
+    result: Result = await session.execute(stmt)
+    return result.scalar_one_or_none()
 
 
 async def get_counterparty_by_email(

@@ -24,6 +24,18 @@ async def add_counterparty(
     return new_cp
 
 
+def _cp_response(cp) -> CounterpartyResponseSchema:
+    return CounterpartyResponseSchema(
+        id=cp.id,
+        name=cp.name,
+        email=cp.email,
+        phone=cp.phone,
+        company_id=cp.company_id,
+        company_name=cp.company.name if cp.company else None,
+        created_by=cp.created_by,
+    )
+
+
 @cp_router.get("/", response_model=PaginatedResponse)
 async def read_counterparties(
     company_id: int | None = Query(None),
@@ -36,7 +48,7 @@ async def read_counterparties(
         session=session, company_id=company_id, search=search, page=page, per_page=per_page
     )
     return PaginatedResponse(
-        items=[CounterpartyResponseSchema.model_validate(c) for c in cps],
+        items=[_cp_response(c) for c in cps],
         total=total,
         page=page,
         per_page=per_page,
@@ -51,7 +63,7 @@ async def read_counterparty(
     cp = await crud_counterparties.get_counterparty_by_id(session=session, cp_id=cp_id)
     if not cp:
         raise HTTPException(status_code=404, detail="Контрагент не найден")
-    return cp
+    return _cp_response(cp)
 
 
 @cp_router.patch("/", response_model=CounterpartyResponseSchema)

@@ -78,7 +78,7 @@ def upgrade() -> None:
     sa.Column('address', sa.String(length=200), nullable=True),
     sa.Column('server_address_slug', sa.String(length=200), nullable=False),
     sa.Column('director_id', sa.Integer(), nullable=False),
-    sa.Column('manager_id', sa.Integer(), nullable=False),
+    sa.Column('manager_id', sa.Integer(), nullable=True),
     sa.Column('id', sa.Integer(), nullable=False),
     sa.Column('created_by', sa.String(length=100), nullable=True),
     sa.Column('created_at', sa.DateTime(), nullable=False),

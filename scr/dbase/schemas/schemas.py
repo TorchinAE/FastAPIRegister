@@ -104,7 +104,7 @@ class OrganizationAddSchema(BaseModel):
     address: Optional[str] = None
     server_address_slug: str = "/02_сторонние_заказчики"
     director_id: int
-    manager_id: int
+    manager_id: Optional[int] = None
 
 
 class OrganizationUpdateSchema(BaseModel):
@@ -128,7 +128,7 @@ class OrganizationResponseSchema(BaseModel):
     address: Optional[str] = None
     server_address_slug: str
     director_id: int
-    manager_id: int
+    manager_id: Optional[int] = None
     created_by: Optional[str] = None
 
 
@@ -200,6 +200,7 @@ class CounterpartyResponseSchema(BaseModel):
     email: str
     phone: Optional[str] = None
     company_id: int
+    company_name: Optional[str] = None
     created_by: Optional[str] = None
 
 

@@ -1,5 +1,5 @@
 from fastapi import APIRouter, Request, Depends, Form
-from fastapi.responses import HTMLResponse, RedirectResponse
+from fastapi.responses import HTMLResponse, RedirectResponse, JSONResponse
 from fastapi.templating import Jinja2Templates
 from sqlalchemy.ext.asyncio import AsyncSession
 
@@ -90,7 +90,7 @@ async def dashboard(
     requests_list, _ = await crud_requests.get_requests(session, page=1, per_page=15)
     return templates.TemplateResponse(
         "dashboard.html",
-        {"request": request, "user": user, "requests": requests_list, "statuses": RequestStatus},
+        {"request": request, "user": user, "requests": requests_list, "statuses": RequestStatus, "active_page": "dashboard"},
     )
 
 
@@ -109,7 +109,7 @@ async def requests_page(
     pages = (total + per_page - 1) // per_page
     return templates.TemplateResponse(
         "requests/list.html",
-        {"request": request, "user": user, "items": requests_list, "page": page, "pages": pages, "total": total, "statuses": RequestStatus},
+        {"request": request, "user": user, "items": requests_list, "page": page, "pages": pages, "total": total, "statuses": RequestStatus, "active_page": "requests"},
     )
 
 
@@ -124,7 +124,7 @@ async def request_create_page(
     cps, _ = await crud_counterparties.get_counterparties(session, per_page=100)
     return templates.TemplateResponse(
         "requests/create.html",
-        {"request": request, "user": user, "counterparties": cps, "statuses": RequestStatus},
+        {"request": request, "user": user, "counterparties": cps, "statuses": RequestStatus, "active_page": "requests"},
     )
 
 
@@ -174,7 +174,7 @@ async def request_detail_page(
         return HTMLResponse("Запрос не найден", status_code=404)
     return templates.TemplateResponse(
         "requests/detail.html",
-        {"request": request, "user": user, "req": req},
+        {"request": request, "user": user, "req": req, "active_page": "requests"},
     )
 
 
@@ -192,8 +192,47 @@ async def counterparties_page(
     per_page = 20
     return templates.TemplateResponse(
         "counterparties/list.html",
-        {"request": request, "user": user, "items": items, "page": page, "pages": (total + per_page - 1) // per_page, "total": total},
+        {"request": request, "user": user, "items": items, "page": page, "pages": (total + per_page - 1) // per_page, "total": total, "active_page": "counterparties", "statuses": RequestStatus},
     )
+
+
+@pages_router.get("/counterparties/{cp_id}", response_class=HTMLResponse)
+async def counterparties_detail_page(
+    cp_id: int,
+    request: Request,
+    session: AsyncSession = Depends(db_helper.session_dependency),
+):
+    user = await get_current_user(request, session)
+    if not user:
+        return RedirectResponse("/", status_code=302)
+    cp = await crud_counterparties.get_counterparty_by_id(session, cp_id)
+    if not cp:
+        return HTMLResponse("Контрагент не найден", status_code=404)
+    reqs, _ = await crud_requests.get_requests(session, counterparty_id=cp_id, per_page=100)
+    companies, _ = await crud_organizations.get_organizations(session, per_page=100)
+    directors, _ = await crud_directors.get_dirs(session, per_page=100)
+    managers_list, _ = await crud_manager.get_managers(session, per_page=100)
+    return templates.TemplateResponse(
+        "counterparties/detail.html",
+        {"request": request, "user": user, "cp": cp, "reqs": reqs, "statuses": RequestStatus,
+         "companies": companies, "directors": directors, "managers": managers_list, "active_page": "counterparties"},
+    )
+
+
+@pages_router.delete("/counterparties/{cp_id}/delete")
+async def counterparties_delete(
+    cp_id: int,
+    request: Request,
+    session: AsyncSession = Depends(db_helper.session_dependency),
+):
+    user = await get_current_user(request, session)
+    if not user:
+        return JSONResponse({"error": "Не авторизован"}, status_code=401)
+    result = await crud_counterparties.delete_counterparty(session, cp_id)
+    if not result:
+        return JSONResponse({"error": "Контрагент не найден"}, status_code=404)
+    await session.commit()
+    return JSONResponse({"ok": True})
 
 
 # --- Companies ---
@@ -210,7 +249,45 @@ async def companies_page(
     per_page = 20
     return templates.TemplateResponse(
         "companies/list.html",
-        {"request": request, "user": user, "items": items, "page": page, "pages": (total + per_page - 1) // per_page, "total": total},
+        {"request": request, "user": user, "items": items, "page": page, "pages": (total + per_page - 1) // per_page, "total": total, "active_page": "companies"},
+    )
+
+
+@pages_router.get("/companies/create", response_class=HTMLResponse)
+async def companies_create_page(
+    request: Request,
+    back_to: str | None = None,
+    session: AsyncSession = Depends(db_helper.session_dependency),
+):
+    user = await get_current_user(request, session)
+    if not user:
+        return RedirectResponse("/", status_code=302)
+    directors, _ = await crud_directors.get_dirs(session, per_page=100)
+    managers_list, _ = await crud_manager.get_managers(session, per_page=100)
+    return templates.TemplateResponse(
+        "companies/create.html",
+        {"request": request, "user": user, "directors": directors, "managers": managers_list, "back_to": back_to, "active_page": "companies"},
+    )
+
+
+@pages_router.get("/companies/{org_id}/edit", response_class=HTMLResponse)
+async def companies_edit_page(
+    org_id: int,
+    request: Request,
+    back_to: str | None = None,
+    session: AsyncSession = Depends(db_helper.session_dependency),
+):
+    user = await get_current_user(request, session)
+    if not user:
+        return RedirectResponse("/", status_code=302)
+    org = await crud_organizations.get_organization_by_id(session, org_id)
+    if not org:
+        return HTMLResponse("Компания не найдена", status_code=404)
+    directors, _ = await crud_directors.get_dirs(session, per_page=100)
+    managers_list, _ = await crud_manager.get_managers(session, per_page=100)
+    return templates.TemplateResponse(
+        "companies/edit.html",
+        {"request": request, "user": user, "org": org, "directors": directors, "managers": managers_list, "back_to": back_to, "active_page": "companies"},
     )
 
 
@@ -228,7 +305,7 @@ async def managers_page(
     per_page = 20
     return templates.TemplateResponse(
         "managers/list.html",
-        {"request": request, "user": user, "items": items, "page": page, "pages": (total + per_page - 1) // per_page, "total": total},
+        {"request": request, "user": user, "items": items, "page": page, "pages": (total + per_page - 1) // per_page, "total": total, "active_page": "managers"},
     )
 
 
@@ -246,7 +323,27 @@ async def directors_page(
     per_page = 20
     return templates.TemplateResponse(
         "directors/list.html",
-        {"request": request, "user": user, "items": items, "page": page, "pages": (total + per_page - 1) // per_page, "total": total},
+        {"request": request, "user": user, "items": items, "page": page, "pages": (total + per_page - 1) // per_page, "total": total, "active_page": "directors"},
+    )
+
+
+@pages_router.get("/directors/{dir_id}", response_class=HTMLResponse)
+async def directors_detail_page(
+    dir_id: int,
+    request: Request,
+    back_to: str | None = None,
+    session: AsyncSession = Depends(db_helper.session_dependency),
+):
+    user = await get_current_user(request, session)
+    if not user:
+        return RedirectResponse("/", status_code=302)
+    dir = await crud_directors.get_dir_to_id(session, dir_id)
+    if not dir:
+        return HTMLResponse("Директор не найден", status_code=404)
+    positions, _ = await crud_positions.get_all_positions(session, per_page=100)
+    return templates.TemplateResponse(
+        "directors/detail.html",
+        {"request": request, "user": user, "dir": dir, "positions": positions, "back_to": back_to, "active_page": "directors"},
     )
 
 
@@ -264,5 +361,5 @@ async def positions_page(
     per_page = 20
     return templates.TemplateResponse(
         "positions/list.html",
-        {"request": request, "user": user, "items": items, "page": page, "pages": (total + per_page - 1) // per_page, "total": total},
+        {"request": request, "user": user, "items": items, "page": page, "pages": (total + per_page - 1) // per_page, "total": total, "active_page": "positions"},
     )

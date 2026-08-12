@@ -1,37 +1,49 @@
 {% extends "base.html" %}
 {% block title %}Запросы{% endblock %}
 {% block content %}
-<h1>Запросы ({{ total }})</h1>
-<div class="actions" style="margin-bottom:1rem;">
-    <a href="/requests/create" class="btn btn-success">Создать запрос</a>
+<div class="page-header">
+    <div>
+        <h1>Запросы</h1>
+        <div class="subtitle">Всего: {{ total }}</div>
+    </div>
+    <a href="/requests/create" class="btn btn-success">+ Создать запрос</a>
 </div>
-<table>
-    <thead>
-        <tr>
-            <th>ID</th>
-            <th>ТКП</th>
-            <th>Дата</th>
-            <th>Статус</th>
-            <th>Описание</th>
-            <th>Действия</th>
-        </tr>
-    </thead>
-    <tbody>
-        {% for req in items %}
-        <tr>
-            <td>{{ req.id }}</td>
-            <td>{{ req.tkp_num or '-' }}</td>
-            <td>{{ req.request_date.strftime('%d.%m.%Y') if req.request_date else '-' }}</td>
-            <td>{{ req.status.value if req.status else '-' }}</td>
-            <td>{{ (req.description or '-')[:60] }}</td>
-            <td><a href="/requests/{{ req.id }}" class="btn btn-primary">Детали</a></td>
-        </tr>
-        {% endfor %}
-        {% if not items %}
-        <tr><td colspan="6">Нет запросов</td></tr>
-        {% endif %}
-    </tbody>
-</table>
+<div class="table-wrap">
+    <table>
+        <thead>
+            <tr>
+                <th>ID</th>
+                <th>ТКП</th>
+                <th>Дата</th>
+                <th>Статус</th>
+                <th>Описание</th>
+                <th></th>
+            </tr>
+        </thead>
+        <tbody>
+            {% for req in items %}
+            <tr>
+                <td><strong>#{{ req.id }}</strong></td>
+                <td>{{ req.tkp_num or '-' }}</td>
+                <td>{{ req.request_date.strftime('%d.%m.%Y') if req.request_date else '-' }}</td>
+                <td>
+                    {% set status = req.status.value if req.status else '' %}
+                    {% if status == 'Новый' %}<span class="badge badge-new">{{ status }}</span>
+                    {% elif status == 'В работе' %}<span class="badge badge-progress">{{ status }}</span>
+                    {% elif status == 'Выполнен' %}<span class="badge badge-done">{{ status }}</span>
+                    {% elif status == 'Отменён' %}<span class="badge badge-cancel">{{ status }}</span>
+                    {% else %}<span class="badge">{{ status or '-' }}</span>{% endif %}
+                </td>
+                <td>{{ (req.description or '-')[:60] }}</td>
+                <td><a href="/requests/{{ req.id }}" class="btn btn-primary btn-sm">Детали</a></td>
+            </tr>
+            {% endfor %}
+            {% if not items %}
+            <tr class="empty-row"><td colspan="6">Нет запросов</td></tr>
+            {% endif %}
+        </tbody>
+    </table>
+</div>
 {% if pages > 1 %}
 <div class="pagination">
     {% for p in range(1, pages + 1) %}

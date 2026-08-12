@@ -20,7 +20,6 @@ from scr.Routers.pages import pages_router
 
 @asynccontextmanager
 async def lifespan(_: FastAPI):
-    # Tables managed by Alembic. Run: alembic upgrade head
     yield
 
 
