@@ -23,6 +23,9 @@ class UserCreate(BaseModel):
     name: str
     email: str
     password: str
+    phone: Optional[str] = None
+    city: str = "ив"
+    signature: Optional[str] = None
 
 
 class UserLogin(BaseModel):
@@ -36,6 +39,8 @@ class UserResponse(BaseModel):
     id: int
     name: str
     email: str
+    city: str = "ив"
+    signature: Optional[str] = None
 
 
 # --- Position ---
@@ -69,7 +74,7 @@ class ManagerCreateSchema(BaseModel):
     name: str
     email: str
     phone: str
-    city: str = "ив"
+    user_id: Optional[int] = None
 
 
 class ManagerUpdateSchema(BaseModel):
@@ -79,7 +84,7 @@ class ManagerUpdateSchema(BaseModel):
     name: Optional[str] = None
     email: Optional[str] = None
     phone: Optional[str] = None
-    city: Optional[str] = None
+    user_id: Optional[int] = None
 
 
 class ManagerResponseSchema(BaseModel):
@@ -90,7 +95,7 @@ class ManagerResponseSchema(BaseModel):
     short_name: str
     email: str
     phone: str
-    city: str
+    user_id: Optional[int] = None
     created_by: Optional[str] = None
 
 
@@ -104,7 +109,7 @@ class OrganizationAddSchema(BaseModel):
     address: Optional[str] = None
     server_address_slug: str = "/02_сторонние_заказчики"
     director_id: int
-    manager_id: Optional[int] = None
+    manager_ids: list[int] = []
 
 
 class OrganizationUpdateSchema(BaseModel):
@@ -116,7 +121,13 @@ class OrganizationUpdateSchema(BaseModel):
     address: Optional[str] = None
     server_address_slug: Optional[str] = None
     director_id: Optional[int] = None
-    manager_id: Optional[int] = None
+    manager_ids: Optional[list[int]] = None
+
+
+class ManagerShort(BaseModel):
+    model_config = ConfigDict(from_attributes=True)
+    id: int
+    name: str
 
 
 class OrganizationResponseSchema(BaseModel):
@@ -128,7 +139,7 @@ class OrganizationResponseSchema(BaseModel):
     address: Optional[str] = None
     server_address_slug: str
     director_id: int
-    manager_id: Optional[int] = None
+    managers: list[ManagerShort] = []
     created_by: Optional[str] = None
 
 
@@ -237,6 +248,7 @@ class RequestUpdateSchema(BaseModel):
 
     id: int
     counterparty_id: Optional[int] = None
+    manager_id: Optional[int] = None
     description: Optional[str] = None
     notes: Optional[str] = None
     status: Optional[RequestStatus] = None

@@ -5,7 +5,7 @@ import pytest
 async def test_home(client):
     response = await client.get("/")
     assert response.status_code == 200
-    assert response.json() == {"message": "home page"}
+    assert "login" in response.text.lower() or "вход" in response.text.lower()
 
 
 @pytest.mark.asyncio

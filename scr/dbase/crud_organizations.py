@@ -2,7 +2,7 @@ from sqlalchemy import select, Result, func
 from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy.orm import selectinload
 
-from scr.dbase.models import Organization
+from scr.dbase.models import Organization, Manager
 from scr.dbase.schemas.schemas import OrganizationAddSchema, OrganizationUpdateSchema
 
 
@@ -12,7 +12,9 @@ async def get_organizations(
     page: int = 1,
     per_page: int = 20,
 ) -> tuple[list[Organization], int]:
-    stmt = select(Organization).options(selectinload(Organization.director)).order_by(Organization.id)
+    stmt = select(Organization).options(
+        selectinload(Organization.director), selectinload(Organization.managers)
+    ).order_by(Organization.name)
     count_stmt = select(func.count(Organization.id))
 
     if search:
@@ -29,7 +31,11 @@ async def get_organizations(
 async def get_organization_by_id(
     session: AsyncSession, org_id: int
 ) -> Organization | None:
-    return await session.get(Organization, org_id)
+    stmt = select(Organization).options(
+        selectinload(Organization.director), selectinload(Organization.managers)
+    ).where(Organization.id == org_id)
+    result: Result = await session.execute(stmt)
+    return result.scalar_one_or_none()
 
 
 async def get_organization_by_name(
@@ -46,8 +52,14 @@ async def add_organization(
     check_org = await get_organization_by_name(session, name=in_org.name)
     if check_org:
         return check_org
-    organization = Organization(**in_org.model_dump())
+    data = in_org.model_dump(exclude={"manager_ids"})
+    organization = Organization(**data)
     organization.created_by = created_by
+    if in_org.manager_ids:
+        managers = (await session.execute(
+            select(Manager).where(Manager.id.in_(in_org.manager_ids))
+        )).scalars().all()
+        organization.managers = list(managers)
     session.add(organization)
     await session.flush()
     return organization
@@ -59,9 +71,15 @@ async def update_organization(
     check_org = await get_organization_by_id(session, update_organization.id)
     if not check_org:
         return None
-    for field, value in update_organization.model_dump(exclude_unset=True).items():
-        if field != "id" and hasattr(check_org, field):
+    update_data = update_organization.model_dump(exclude_unset=True, exclude={"id", "manager_ids"})
+    for field, value in update_data.items():
+        if hasattr(check_org, field):
             setattr(check_org, field, value)
+    if update_organization.manager_ids is not None:
+        managers = (await session.execute(
+            select(Manager).where(Manager.id.in_(update_organization.manager_ids))
+        )).scalars().all()
+        check_org.managers = list(managers)
     await session.flush()
     return check_org
 

@@ -7,6 +7,13 @@
         <div class="subtitle">Всего: {{ total }}</div>
     </div>
 </div>
+<form method="post" action="/positions" style="display:flex; gap:0.75rem; align-items:flex-end; margin-bottom:1rem; padding:1rem 1.25rem;">
+    <div class="form-group" style="flex:1; margin-bottom:0;">
+        <label>Новая должность</label>
+        <input type="text" name="name" placeholder="Введите название должности" required>
+    </div>
+    <button type="submit" class="btn btn-success" style="height:38px;">Добавить должность</button>
+</form>
 <div class="table-wrap">
     <table>
         <thead>
@@ -14,8 +21,8 @@
         </thead>
         <tbody>
             {% for item in items %}
-            <tr>
-                <td><strong>#{{ item.id }}</strong></td>
+            <tr style="cursor:pointer" onclick="location.href='/positions/{{ item.id }}'">
+                <td><strong>{{ item.id }}</strong></td>
                 <td>{{ item.name }}</td>
             </tr>
             {% endfor %}

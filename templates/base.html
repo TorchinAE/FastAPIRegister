@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>{% block title %}Регистрация запросов{% endblock %}</title>
+    <title>{% block title %}Регистрация ТКП{% endblock %}</title>
     <link rel="stylesheet" href="/static/style.css">
 </head>
 <body>
@@ -13,11 +13,10 @@
         <aside class="sidebar" id="sidebar">
             <div class="brand">Регистрация запросов</div>
             <nav>
-                <a href="/dashboard" class="{{ 'active' if active_page == 'dashboard' else '' }}"><span class="icon">&#9632;</span> Дашборд</a>
-                <a href="/requests" class="{{ 'active' if active_page == 'requests' else '' }}"><span class="icon">&#9993;</span> Запросы</a>
-                <a href="/counterparties" class="{{ 'active' if active_page == 'counterparties' else '' }}"><span class="icon">&#9823;</span> Контрагенты</a>
+                <a href="/requests" class="{{ 'active' if active_page == 'requests' else '' }}"><span class="icon">&#9993;</span> ТКП</a>
+                <a href="/counterparties" class="{{ 'active' if active_page == 'counterparties' else '' }}"><span class="icon">&#9823;</span> Менеджеры</a>
                 <a href="/companies" class="{{ 'active' if active_page == 'companies' else '' }}"><span class="icon">&#9960;</span> Компании</a>
-                <a href="/managers" class="{{ 'active' if active_page == 'managers' else '' }}"><span class="icon">&#9824;</span> Менеджеры</a>
+                <a href="/users" class="{{ 'active' if active_page == 'users' else '' }}"><span class="icon">&#9824;</span> Пользователи</a>
                 <a href="/directors" class="{{ 'active' if active_page == 'directors' else '' }}"><span class="icon">&#9733;</span> Директора</a>
                 <a href="/positions" class="{{ 'active' if active_page == 'positions' else '' }}"><span class="icon">&#9830;</span> Должности</a>
             </nav>

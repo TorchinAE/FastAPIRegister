@@ -9,7 +9,7 @@
     <a href="{{ back_to or '/companies' }}" class="btn btn-ghost">← Назад</a>
 </div>
 
-<div class="card">
+<div class="card" style="margin-bottom:1.5rem">
     <form id="editCompanyForm">
         <input type="hidden" name="id" value="{{ org.id }}">
         <div class="form-row" style="grid-template-columns: 1fr 1fr 1fr;">
@@ -39,13 +39,15 @@
                 <a href="/directors/{{ org.director_id }}?back_to=/companies/{{ org.id }}/edit" id="editDirectorLink" class="btn btn-ghost btn-sm" style="margin-top:0.35rem;font-size:0.8rem">Изменить данные директора</a>
             </div>
             <div class="form-group">
-                <label>Менеджер</label>
-                <select name="manager_id" style="width:100%;min-width:0">
-                    <option value="">-- не указан --</option>
-                    {% for m in managers %}
-                    <option value="{{ m.id }}" {{ 'selected' if m.id == org.manager_id else '' }}>{{ m.name }}</option>
+                <label>Менеджеры</label>
+                <div style="display:flex;flex-direction:column;gap:0.5rem">
+                    {% for m in all_managers %}
+                    <label style="display:flex;align-items:center;gap:0.5rem;font-size:0.9rem;cursor:pointer">
+                        <input type="checkbox" name="manager_ids" value="{{ m.id }}" {{ 'checked' if m in org.managers else '' }}>
+                        {{ m.name }}
+                    </label>
                     {% endfor %}
-                </select>
+                </div>
             </div>
         </div>
         <div class="actions">
@@ -54,20 +56,56 @@
     </form>
 </div>
 
+{% if org.managers %}
+<div class="card" style="margin-bottom:1.5rem">
+    <h3 style="margin-bottom:0.75rem">Менеджеры компании</h3>
+    <div style="display:flex;flex-direction:column;gap:0.5rem">
+        {% for m in org.managers %}
+        <div style="display:flex;align-items:center;gap:0.75rem">
+            <span style="font-weight:600">{{ m.name }}</span>
+            <a href="/managers/{{ m.id }}?back_to=/companies/{{ org.id }}/edit" class="btn btn-ghost btn-sm" style="font-size:0.8rem">Изменить</a>
+        </div>
+        {% endfor %}
+    </div>
+</div>
+{% endif %}
+
+<div class="card">
+    <h3 style="margin-bottom:1rem">ТКП ({{ reqs|length }})</h3>
+    {% if reqs %}
+    <div class="table-wrap" style="box-shadow:none">
+        <table>
+            <thead>
+                <tr><th>ТКП</th><th>Дата</th><th>Статус</th><th>Описание</th></tr>
+            </thead>
+            <tbody>
+                {% for r in reqs %}
+                <tr style="cursor:pointer" onclick="location.href='/requests/{{ r.id }}'">
+                    <td>{{ r.tkp_num or '-' }}</td>
+                    <td>{{ r.request_date.strftime('%d.%m.%Y') }}</td>
+                    <td><span class="badge badge-new">{{ r.status.value }}</span></td>
+                    <td>{{ r.description or '-' }}</td>
+                </tr>
+                {% endfor %}
+            </tbody>
+        </table>
+    </div>
+    {% else %}
+    <p style="color:var(--text-muted);font-style:italic">Нет ТКП</p>
+    {% endif %}
+</div>
+
 <div id="toast" class="toast" style="display:none"></div>
 {% endblock %}
 
 {% block scripts %}
 <script>
-const backTo = '{{ back_to or "/companies" }}';
-
 const dirSelect = document.getElementById('directorSelect');
 const dirLink = document.getElementById('editDirectorLink');
 dirSelect.addEventListener('change', function() {
     dirLink.href = '/directors/' + this.value + '?back_to=/companies/{{ org.id }}/edit';
 });
 
-// INN — only digits
 document.querySelector('[name="inn"]').addEventListener('input', function() {
     this.value = this.value.replace(/[^0-9]/g, '');
 });
@@ -75,6 +113,7 @@ document.querySelector('[name="inn"]').addEventListener('input', function() {
 document.getElementById('editCompanyForm').addEventListener('submit', async function(e) {
     e.preventDefault();
     const fd = new FormData(this);
+    const managerIds = fd.getAll('manager_ids').map(Number);
     const data = {
         id: parseInt(fd.get('id')),
         name: fd.get('name'),
@@ -82,10 +121,8 @@ document.getElementById('editCompanyForm').addEventListener('submit', async func
         address: fd.get('address') || null,
         server_address_slug: fd.get('server_address_slug'),
         director_id: parseInt(fd.get('director_id')),
+        manager_ids: managerIds,
     };
-    const mgrId = fd.get('manager_id');
-    data.manager_id = mgrId ? parseInt(mgrId) : null;
-
     const resp = await fetch('/api/companies/', {
         method: 'PATCH',
         headers: {'Content-Type': 'application/json'},

@@ -3,7 +3,7 @@ import enum
 from datetime import datetime, timezone
 from typing import Optional, List
 
-from sqlalchemy import String, DateTime, ForeignKey, Integer, Text, Enum
+from sqlalchemy import String, DateTime, ForeignKey, Integer, Text, Enum, Table, Column
 from sqlalchemy.orm import DeclarativeBase, Mapped, mapped_column, relationship
 
 
@@ -82,20 +82,34 @@ class User(Base):
     name: Mapped[str] = mapped_column(String(100), nullable=False)
     email: Mapped[str] = mapped_column(String(100), unique=True, nullable=False)
     hashed_password: Mapped[str] = mapped_column(String(200), nullable=False)
+    phone: Mapped[Optional[str]] = mapped_column(String(20), nullable=True)
+    city: Mapped[str] = mapped_column(String(50), nullable=False, default="ив")
+    signature: Mapped[Optional[str]] = mapped_column(String(200), nullable=True)
     created_at: Mapped[datetime] = mapped_column(
         DateTime, default=lambda: datetime.now(timezone.utc)
     )
+
+    managers: Mapped[List["Manager"]] = relationship(back_populates="user")
+
+
+organization_managers = Table(
+    "organization_managers",
+    Base.metadata,
+    Column("organization_id", Integer, ForeignKey("organizations.id"), primary_key=True),
+    Column("manager_id", Integer, ForeignKey("managers.id"), primary_key=True),
+)
 
 
 class Manager(BaseID):
     __tablename__ = "managers"
     name: Mapped[str] = mapped_column(String(50), unique=True, nullable=False)
-    email: Mapped[str] = mapped_column(String(50), unique=True, nullable=False)
+    email: Mapped[str] = mapped_column(String(50), nullable=False)
     phone: Mapped[str] = mapped_column(String(20), nullable=False)
-    city: Mapped[str] = mapped_column(String(50), nullable=False, default="ив")
+    user_id: Mapped[int | None] = mapped_column(ForeignKey("users.id"), nullable=True)
     organizations: Mapped[List["Organization"]] = relationship(
-        back_populates="manager", foreign_keys="Organization.manager_id"
+        back_populates="managers", secondary=organization_managers
     )
+    user: Mapped[Optional["User"]] = relationship(back_populates="managers", foreign_keys=[user_id])
 
     def __repr__(self) -> str:
         return (
@@ -119,11 +133,10 @@ class Organization(BaseID):
         String(200), nullable=False, default="/02_сторонние_заказчики"
     )
     director_id: Mapped[int] = mapped_column(ForeignKey("directors.id"), nullable=False)
-    manager_id: Mapped[int | None] = mapped_column(ForeignKey("managers.id"), nullable=True)
 
     director: Mapped["Directors"] = relationship(back_populates="organizations")
-    manager: Mapped["Manager"] = relationship(
-        back_populates="organizations", foreign_keys=[manager_id]
+    managers: Mapped[List["Manager"]] = relationship(
+        back_populates="organizations", secondary=organization_managers
     )
     counterparties: Mapped[List["Counterparty"]] = relationship(
         back_populates="company"
@@ -131,14 +144,14 @@ class Organization(BaseID):
 
     def __repr__(self) -> str:
         director_name = self.director.name if self.director else "None"
-        manager_name = self.manager.name if self.manager else "None"
+        manager_names = [m.name for m in self.managers] if self.managers else []
         return (
             f"Organization(id={self.id}, "
             f"name='{self.name}', "
             f"inn='{self.inn}', "
             f"director='{director_name}', "
             f"address='{self.address}', "
-            f"manager='{manager_name}')"
+            f"managers={manager_names})"
         )
 
 

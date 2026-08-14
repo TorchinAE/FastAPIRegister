@@ -1,10 +1,10 @@
 {% extends "base.html" %}
-{% block title %}Создать запрос{% endblock %}
+{% block title %}Создать ТКП{% endblock %}
 {% block content %}
 <div class="page-header">
     <div>
-        <h1>Создать запрос</h1>
-        <div class="subtitle">Заполните форму для создания нового запроса</div>
+        <h1>Создать ТКП</h1>
+        <div class="subtitle">Заполните форму для создания новой ТКП</div>
     </div>
 </div>
 <form method="post" action="/requests/create">
@@ -45,7 +45,7 @@
         {% endfor %}
     </div>
     <div class="actions">
-        <button type="submit" class="btn btn-primary">Создать</button>
+        <button type="submit" class="btn btn-primary">Создать ТКП</button>
         <a href="/requests" class="btn btn-ghost">Отмена</a>
     </div>
 </form>

@@ -13,7 +13,7 @@ async def get_counterparties(
     page: int = 1,
     per_page: int = 20,
 ) -> tuple[list[Counterparty], int]:
-    stmt = select(Counterparty).options(selectinload(Counterparty.company)).order_by(Counterparty.id)
+    stmt = select(Counterparty).options(selectinload(Counterparty.company)).order_by(Counterparty.name)
     count_stmt = select(func.count(Counterparty.id))
 
     if company_id:

@@ -2,6 +2,7 @@ from datetime import datetime
 
 from sqlalchemy import select, Result, func
 from sqlalchemy.ext.asyncio import AsyncSession
+from sqlalchemy.orm import selectinload
 
 from scr.dbase.models import Request, RequestStatus, Counterparty
 from scr.dbase.schemas.schemas import RequestCreateSchema, RequestUpdateSchema
@@ -18,7 +19,7 @@ async def get_requests(
     page: int = 1,
     per_page: int = 20,
 ) -> tuple[list[Request], int]:
-    stmt = select(Request).order_by(Request.created_at.desc())
+    stmt = select(Request).order_by(Request.id.desc())
     count_stmt = select(func.count(Request.id))
 
     if status:
@@ -49,7 +50,13 @@ async def get_requests(
 async def get_request_by_id(
     session: AsyncSession, req_id: int
 ) -> Request | None:
-    return await session.get(Request, req_id)
+    stmt = select(Request).options(
+        selectinload(Request.counterparty),
+        selectinload(Request.company),
+        selectinload(Request.manager),
+    ).where(Request.id == req_id)
+    result: Result = await session.execute(stmt)
+    return result.scalar_one_or_none()
 
 
 async def add_request(
@@ -57,6 +64,7 @@ async def add_request(
     in_req: RequestCreateSchema,
     manager_id: int,
     created_by: str | None = None,
+    user_city: str = "ив",
 ) -> Request:
     # Resolve company_id from counterparty
     counterparty = await session.get(Counterparty, in_req.counterparty_id)
@@ -86,12 +94,7 @@ async def add_request(
     session.add(req)
     await session.flush()
 
-    # Generate tkp_num: "{id}-{city}"
-    from scr.dbase.models import Manager
-
-    manager = await session.get(Manager, manager_id)
-    city = manager.city if manager else "ив"
-    req.tkp_num = f"{req.id}-{city}"
+    req.tkp_num = f"{req.id}-{user_city}"
     await session.flush()
 
     return req
