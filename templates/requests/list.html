@@ -9,14 +9,25 @@
     <a href="/requests/create" class="btn btn-success">+ Создать ТКП</a>
 </div>
 <div class="table-wrap">
-    <table>
+    <table id="dataTable">
         <thead>
             <tr>
                 <th>ID</th>
                 <th>ТКП</th>
                 <th>Дата</th>
                 <th>Статус</th>
+                <th>Оборудование</th>
+                <th>Стоимость</th>
                 <th>Описание</th>
+            </tr>
+            <tr class="table-filter">
+                <th><input type="text" data-col="0" data-min="1" placeholder="Фильтр..." class="tf-input"></th>
+                <th><input type="text" data-col="1" data-min="1" placeholder="Фильтр..." class="tf-input"></th>
+                <th></th>
+                <th><input type="text" data-col="3" placeholder="Фильтр..." class="tf-input"></th>
+                <th><input type="text" data-col="4" placeholder="Фильтр..." class="tf-input"></th>
+                <th><input type="text" data-col="5" data-min="1" placeholder="Фильтр..." class="tf-input"></th>
+                <th><input type="text" data-col="6" placeholder="Фильтр..." class="tf-input"></th>
             </tr>
         </thead>
         <tbody>
@@ -33,11 +44,13 @@
                     {% elif status == 'не актуально' %}<span class="badge badge-cancel">{{ status }}</span>
                     {% else %}<span class="badge">{{ status or '-' }}</span>{% endif %}
                 </td>
-                <td>{{ (req.description or '-')[:60] }}</td>
+                <td>{{ req.equipment.name if req.equipment else '-' }}</td>
+                <td>{{ req.cost or 0 }}</td>
+                <td>{{ (req.description or '-')[:40] }}</td>
             </tr>
             {% endfor %}
             {% if not items %}
-            <tr class="empty-row"><td colspan="5">Нет ТКП</td></tr>
+            <tr class="empty-row"><td colspan="7">Нет ТКП</td></tr>
             {% endif %}
         </tbody>
     </table>
@@ -49,4 +62,22 @@
     {% endfor %}
 </div>
 {% endif %}
+{% endblock %}
+
+{% block scripts %}
+<script>
+document.querySelectorAll('.tf-input').forEach(input => {
+    input.addEventListener('input', function() {
+        const col = parseInt(this.dataset.col);
+        const minLen = parseInt(this.dataset.min) || 3;
+        const val = this.value.toLowerCase();
+        document.querySelectorAll('#dataTable tbody tr:not(.empty-row)').forEach(row => {
+            if (val.length < minLen) { row.style.display = ''; return; }
+            const cell = row.cells[col];
+            const cellText = cell ? (cell.textContent || cell.innerText) : '';
+            row.style.display = cell && cellText.toLowerCase().includes(val) ? '' : 'none';
+        });
+    });
+});
+</script>
 {% endblock %}

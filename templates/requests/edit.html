@@ -1,9 +1,9 @@
 {% extends "base.html" %}
-{% block title %}Регистрация ТКП #{{ req.id }}{% endblock %}
+{% block title %}Редактирование ТКП #{{ req.id }}{% endblock %}
 {% block content %}
 <div class="page-header">
     <div>
-        <h1>Регистрация запроса ТКП</h1>
+        <h1>Редактирование запроса ТКП</h1>
         <div class="subtitle">Код: {{ req.id }} &middot; {{ req.tkp_num or '' }}</div>
     </div>
     <a href="/requests" class="btn btn-ghost">← Назад к списку</a>
@@ -77,16 +77,23 @@
             </div>
         </div>
 
-        <!-- Оборудование -->
+        <!-- Оборудование и стоимость -->
         <div class="form-section">
-            <h3 class="form-section-title">Оборудование</h3>
-            <div class="form-row">
-                {% for f in ['bktpb','ktpb','ktp','kso_393','kso_204','k_104','k_104m','sho','pku','pus','parn'] %}
+            <h3 class="form-section-title">Оборудование и стоимость</h3>
+            <div class="form-grid-2">
                 <div class="form-group">
-                    <label>{{ f | upper }}</label>
-                    <input type="number" name="{{ f }}" value="{{ req[f] if req[f] is not none else 0 }}" min="0" max="100">
+                    <label>Оборудование</label>
+                    <select name="equipment_id">
+                        <option value="">-- Не выбрано --</option>
+                        {% for eq in equipment %}
+                        <option value="{{ eq.id }}" {{ 'selected' if req.equipment_id == eq.id else '' }}>{{ eq.name }}</option>
+                        {% endfor %}
+                    </select>
                 </div>
-                {% endfor %}
+                <div class="form-group">
+                    <label>Стоимость (руб.)</label>
+                    <input type="number" name="cost" value="{{ req.cost or 0 }}" min="0" step="0.01">
+                </div>
             </div>
         </div>
 

@@ -15,9 +15,14 @@
     <button type="submit" class="btn btn-success" style="height:38px;">Добавить</button>
 </form>
 <div class="table-wrap">
-    <table>
+    <table id="dataTable">
         <thead>
             <tr><th>ID</th><th>Название</th><th></th></tr>
+            <tr class="table-filter">
+                <th><input type="text" data-col="0" data-min="1" placeholder="Фильтр..." class="tf-input"></th>
+                <th><input type="text" data-col="1" placeholder="Фильтр..." class="tf-input"></th>
+                <th></th>
+            </tr>
         </thead>
         <tbody>
             {% for item in items %}
@@ -48,18 +53,23 @@
 async function deleteEq(id, btn) {
     if (!confirm('Удалить оборудование?')) return;
     const resp = await fetch(`/api/equipment/${id}`, {method: 'DELETE'});
-    if (resp.ok) {
-        btn.closest('tr').remove();
-        showToast('Удалено');
-    } else {
-        showToast('Ошибка удаления');
-    }
+    if (resp.ok) { btn.closest('tr').remove(); showToast('Удалено'); } else { showToast('Ошибка удаления'); }
 }
 function showToast(msg) {
-    const t = document.getElementById('toast');
-    t.textContent = msg;
-    t.style.display = 'block';
-    setTimeout(() => t.style.display = 'none', 2500);
+    const t = document.getElementById('toast'); t.textContent = msg;
+    t.style.display = 'block'; setTimeout(() => t.style.display = 'none', 2500);
 }
+document.querySelectorAll('.tf-input').forEach(input => {
+    input.addEventListener('input', function() {
+        const col = parseInt(this.dataset.col);
+        const minLen = parseInt(this.dataset.min) || 3;
+        const val = this.value.toLowerCase();
+        document.querySelectorAll('#dataTable tbody tr:not(.empty-row)').forEach(row => {
+            if (val.length < minLen) { row.style.display = ''; return; }
+            const cell = row.cells[col];
+            row.style.display = cell && cell.textContent.toLowerCase().includes(val) ? '' : 'none';
+        });
+    });
+});
 </script>
 {% endblock %}

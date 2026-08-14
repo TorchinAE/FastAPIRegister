@@ -3,7 +3,7 @@ import enum
 from datetime import datetime, timezone
 from typing import Optional, List
 
-from sqlalchemy import String, DateTime, ForeignKey, Integer, Text, Enum, Table, Column
+from sqlalchemy import String, DateTime, ForeignKey, Integer, Text, Enum, Table, Column, Numeric
 from sqlalchemy.orm import DeclarativeBase, Mapped, mapped_column, relationship
 
 
@@ -212,6 +212,14 @@ class Counterparty(BaseID):
     company: Mapped["Organization"] = relationship(back_populates="counterparties")
 
 
+class Equipment(BaseID):
+    __tablename__ = "equipment"
+    name: Mapped[str] = mapped_column(String(100), nullable=False)
+
+    def __repr__(self) -> str:
+        return f"Equipment(id={self.id}, name='{self.name}')"
+
+
 class Request(BaseID):
     __tablename__ = "requests"
     counterparty_id: Mapped[int] = mapped_column(
@@ -221,27 +229,21 @@ class Request(BaseID):
         ForeignKey("organizations.id"), nullable=False
     )
     manager_id: Mapped[int] = mapped_column(ForeignKey("managers.id"), nullable=False)
+    equipment_id: Mapped[Optional[int]] = mapped_column(
+        ForeignKey("equipment.id"), nullable=True
+    )
     request_date: Mapped[datetime] = mapped_column(
         DateTime, default=lambda: datetime.now(timezone.utc)
     )
     status: Mapped[RequestStatus] = mapped_column(
         Enum(RequestStatus), default=RequestStatus.ZAPROS, nullable=False
     )
+    cost: Mapped[float] = mapped_column(Numeric(12, 2), default=0)
     description: Mapped[Optional[str]] = mapped_column(Text, nullable=True)
     notes: Mapped[Optional[str]] = mapped_column(Text, nullable=True)
     tkp_num: Mapped[Optional[str]] = mapped_column(String(50), nullable=True)
-    bktpb: Mapped[int] = mapped_column(Integer, default=0)
-    ktpb: Mapped[int] = mapped_column(Integer, default=0)
-    ktp: Mapped[int] = mapped_column(Integer, default=0)
-    kso_393: Mapped[int] = mapped_column(Integer, default=0)
-    kso_204: Mapped[int] = mapped_column(Integer, default=0)
-    k_104: Mapped[int] = mapped_column(Integer, default=0)
-    k_104m: Mapped[int] = mapped_column(Integer, default=0)
-    sho: Mapped[int] = mapped_column(Integer, default=0)
-    pku: Mapped[int] = mapped_column(Integer, default=0)
-    pus: Mapped[int] = mapped_column(Integer, default=0)
-    parn: Mapped[int] = mapped_column(Integer, default=0)
 
     counterparty: Mapped["Counterparty"] = relationship(foreign_keys=[counterparty_id])
     company: Mapped["Organization"] = relationship(foreign_keys=[company_id])
     manager: Mapped["Manager"] = relationship(foreign_keys=[manager_id])
+    equipment: Mapped[Optional["Equipment"]] = relationship(foreign_keys=[equipment_id])

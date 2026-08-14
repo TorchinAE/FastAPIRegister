@@ -19,7 +19,9 @@ async def get_requests(
     page: int = 1,
     per_page: int = 20,
 ) -> tuple[list[Request], int]:
-    stmt = select(Request).order_by(Request.id.desc())
+    stmt = select(Request).options(
+        selectinload(Request.equipment),
+    ).order_by(Request.id.desc())
     count_stmt = select(func.count(Request.id))
 
     if status:
@@ -54,6 +56,7 @@ async def get_request_by_id(
         selectinload(Request.counterparty),
         selectinload(Request.company),
         selectinload(Request.manager),
+        selectinload(Request.equipment),
     ).where(Request.id == req_id)
     result: Result = await session.execute(stmt)
     return result.scalar_one_or_none()
@@ -66,7 +69,6 @@ async def add_request(
     created_by: str | None = None,
     user_city: str = "ив",
 ) -> Request:
-    # Resolve company_id from counterparty
     counterparty = await session.get(Counterparty, in_req.counterparty_id)
     if not counterparty:
         return None
@@ -75,20 +77,11 @@ async def add_request(
         counterparty_id=in_req.counterparty_id,
         company_id=counterparty.company_id,
         manager_id=manager_id,
+        equipment_id=in_req.equipment_id,
         description=in_req.description,
         notes=in_req.notes,
         status=in_req.status,
-        bktpb=in_req.bktpb,
-        ktpb=in_req.ktpb,
-        ktp=in_req.ktp,
-        kso_393=in_req.kso_393,
-        kso_204=in_req.kso_204,
-        k_104=in_req.k_104,
-        k_104m=in_req.k_104m,
-        sho=in_req.sho,
-        pku=in_req.pku,
-        pus=in_req.pus,
-        parn=in_req.parn,
+        cost=in_req.cost,
         created_by=created_by,
     )
     session.add(req)

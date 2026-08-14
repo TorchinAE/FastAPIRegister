@@ -27,6 +27,21 @@
             </select>
         </div>
     </div>
+    <div style="display:grid; grid-template-columns: 1fr 1fr; gap: 1rem;">
+        <div class="form-group">
+            <label>Оборудование</label>
+            <select name="equipment_id">
+                <option value="">-- Не выбрано --</option>
+                {% for eq in equipment %}
+                <option value="{{ eq.id }}">{{ eq.name }}</option>
+                {% endfor %}
+            </select>
+        </div>
+        <div class="form-group">
+            <label>Стоимость (руб.)</label>
+            <input type="number" name="cost" value="0" min="0" step="0.01">
+        </div>
+    </div>
     <div class="form-group">
         <label>Описание</label>
         <textarea name="description" placeholder="Опишите запрос..."></textarea>
@@ -34,15 +49,6 @@
     <div class="form-group">
         <label>Заметки</label>
         <textarea name="notes" placeholder="Дополнительные заметки..."></textarea>
-    </div>
-    <h3 style="margin: 1.5rem 0 1rem; font-size: 1rem; color: var(--text);">Оборудование</h3>
-    <div class="form-row">
-        {% for f in ['bktpb','ktpb','ktp','kso_393','kso_204','k_104','k_104m','sho','pku','pus','parn'] %}
-        <div class="form-group">
-            <label>{{ f | upper }}</label>
-            <input type="number" name="{{ f }}" value="0" min="0" max="100">
-        </div>
-        {% endfor %}
     </div>
     <div class="actions">
         <button type="submit" class="btn btn-primary">Создать ТКП</button>

@@ -38,9 +38,10 @@ scr/
     companies.py               # /api/companies CRUD
     counterparties.py          # /api/counterparties CRUD
     requests.py                # /api/requests CRUD
+    equipment.py               # /api/equipment CRUD
   dbase/
     database.py                # DatabaseHelper, engine, session deps
-    models.py                  # SQLAlchemy models (Base, BaseID, User, Manager, Organization, Directors, Positions, Counterparty, Request, RequestStatus)
+    models.py                  # SQLAlchemy models (Base, BaseID, User, Manager, Organization, Directors, Positions, Counterparty, Equipment, Request, RequestStatus)
     schemas/
       schemas.py               # Pydantic schemas (ConfigDict style)
     crud_directors.py
@@ -49,6 +50,7 @@ scr/
     crud_positions.py
     crud_counterparties.py
     crud_requests.py
+    crud_equipment.py
     crud_users.py
 templates/                     # Jinja2 HTML templates
   base.html                    # Layout with nav
@@ -66,7 +68,7 @@ tests/
 ## Architecture notes
 
 - **Async SQLAlchemy** throughout. Sessions via `db_helper.session_dependency` (FastAPI Depends).
-- Tables auto-created in `main.py` lifespan (`Base.metadata.create_all`). No migration tool (no Alembic).
+- **Alembic for migrations** — all schema changes via `uv run alembic revision --autogenerate -m "desc"` then `uv run alembic upgrade head`. No manual SQL or create_all in lifespan.
 - `BaseID` is the abstract base with `id`, `created_by`, `created_at`, `updated_at`, `changed_by_id` (FK to managers).
 - API routers all use prefix `/api/...`. Page routes (Jinja2) are in `pages_router` without prefix.
 - Auth uses cookie-based sessions (`user_email` cookie). Passwords hashed with bcrypt.

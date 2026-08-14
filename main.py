@@ -13,6 +13,7 @@ from scr.Routers.positions import pos_router
 from scr.Routers.companies import org_router
 from scr.Routers.counterparties import cp_router
 from scr.Routers.requests import req_router
+from scr.Routers.equipment import eq_router
 from scr.Routers.auth import auth_router
 from scr.Routers.users import users_router
 from scr.Routers.pages import pages_router
@@ -46,6 +47,7 @@ app.include_router(pos_router)
 app.include_router(org_router)
 app.include_router(cp_router)
 app.include_router(req_router)
+app.include_router(eq_router)
 app.include_router(users_router)
 app.include_router(pages_router)
 

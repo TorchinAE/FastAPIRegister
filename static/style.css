@@ -57,6 +57,10 @@ tr:last-child td { border-bottom: none; }
 tr:hover td { background: #f8fafc; }
 .clickable-row { cursor: pointer; }
 .clickable-row:hover td { background: #eef2ff; }
+.table-filter th { background: #f8fafc !important; padding: 0.4rem 0.5rem !important; border-bottom: 2px solid var(--border) !important; }
+.table-filter .tf-input { width: 100%; padding: 0.55rem 0.75rem; border: 1.5px solid var(--border); border-radius: 6px; font-size: 0.9rem; color: var(--text); background: #fff; outline: none; font-family: inherit; transition: border-color var(--transition), box-shadow var(--transition); }
+.table-filter .tf-input:focus { border-color: var(--primary); box-shadow: 0 0 0 3px rgba(79,70,229,0.15); }
+.table-filter .tf-input::placeholder { color: var(--text-muted); }
 tr { transition: background var(--transition); }
 .empty-row td { text-align: center; padding: 2rem; color: var(--text-muted); font-style: italic; }
 

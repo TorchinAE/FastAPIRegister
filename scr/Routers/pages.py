@@ -5,7 +5,7 @@ from sqlalchemy.ext.asyncio import AsyncSession
 
 from scr.dbase.database import db_helper
 from scr.dbase import crud_users, crud_requests, crud_counterparties
-from scr.dbase import crud_organizations, crud_directors, crud_positions
+from scr.dbase import crud_organizations, crud_directors, crud_positions, crud_equipment
 from scr.dbase.models import RequestStatus
 
 templates = Jinja2Templates(directory="templates")
@@ -94,7 +94,8 @@ async def requests_page(
     pages = (total + per_page - 1) // per_page
     return templates.TemplateResponse(
         "requests/list.html",
-        {"request": request, "user": user, "items": requests_list, "page": page, "pages": pages, "total": total, "statuses": RequestStatus, "active_page": "requests"},
+        {"request": request, "user": user, "items": requests_list, "page": page, "pages": pages, "total": total,
+         "statuses": RequestStatus, "active_page": "requests"},
     )
 
 
@@ -107,9 +108,10 @@ async def request_create_page(
     if not user:
         return RedirectResponse("/", status_code=302)
     cps, _ = await crud_counterparties.get_counterparties(session, per_page=100)
+    equipment_list, _ = await crud_equipment.get_equipment_list(session, per_page=100)
     return templates.TemplateResponse(
         "requests/create.html",
-        {"request": request, "user": user, "counterparties": cps, "statuses": RequestStatus, "active_page": "requests"},
+        {"request": request, "user": user, "counterparties": cps, "equipment": equipment_list, "statuses": RequestStatus, "active_page": "requests"},
     )
 
 
@@ -130,9 +132,10 @@ async def request_create_submit(
         "description": form.get("description", ""),
         "notes": form.get("notes", ""),
         "status": form.get("status", RS.ZAPROS.value),
+        "cost": float(form.get("cost", 0)),
     }
-    for f in ["bktpb", "ktpb", "ktp", "kso_393", "kso_204", "k_104", "k_104m", "sho", "pku", "pus", "parn"]:
-        data[f] = int(form.get(f, 0))
+    if form.get("equipment_id"):
+        data["equipment_id"] = int(form["equipment_id"])
 
     # Find manager by user email
     mgr, _ = await crud_users.get_users(session, search=user.email, per_page=1)
@@ -176,10 +179,11 @@ async def request_edit_page(
         return HTMLResponse("ТКП не найдена", status_code=404)
     cps, _ = await crud_counterparties.get_counterparties(session, per_page=100)
     managers_list, _ = await crud_users.get_users(session, per_page=100)
+    equipment_list, _ = await crud_equipment.get_equipment_list(session, per_page=100)
     related, _ = await crud_requests.get_requests(session, counterparty_id=req.counterparty_id, per_page=50)
     return templates.TemplateResponse(
         "requests/edit.html",
-        {"request": request, "user": user, "req": req, "counterparties": cps, "managers": managers_list, "related_requests": related, "statuses": RequestStatus, "active_page": "requests"},
+        {"request": request, "user": user, "req": req, "counterparties": cps, "managers": managers_list, "equipment": equipment_list, "related_requests": related, "statuses": RequestStatus, "active_page": "requests"},
     )
 
 
@@ -200,14 +204,16 @@ async def request_edit_submit(
         data["counterparty_id"] = int(form["counterparty_id"])
     if form.get("manager_id"):
         data["manager_id"] = int(form["manager_id"])
+    if form.get("equipment_id"):
+        data["equipment_id"] = int(form["equipment_id"])
     if form.get("description") is not None:
         data["description"] = form["description"]
     if form.get("notes") is not None:
         data["notes"] = form["notes"]
     if form.get("status"):
         data["status"] = form["status"]
-    for f in ["bktpb", "ktpb", "ktp", "kso_393", "kso_204", "k_104", "k_104m", "sho", "pku", "pus", "parn"]:
-        data[f] = int(form.get(f, 0))
+    if form.get("cost") is not None:
+        data["cost"] = float(form["cost"])
 
     schema = RequestUpdateSchema(**data)
     await crud_requests.update_request(session, schema)
@@ -581,3 +587,73 @@ async def positions_detail_page(
         "positions/detail.html",
         {"request": request, "user": user, "pos": pos, "back_to": back_to, "active_page": "positions"},
     )
+
+
+# --- Equipment ---
+@pages_router.get("/equipment", response_class=HTMLResponse)
+async def equipment_page(
+    request: Request,
+    page: int = 1,
+    session: AsyncSession = Depends(db_helper.session_dependency),
+):
+    user = await get_current_user(request, session)
+    if not user:
+        return RedirectResponse("/", status_code=302)
+    items, total = await crud_equipment.get_equipment_list(session, page=page)
+    per_page = 20
+    return templates.TemplateResponse(
+        "equipment/list.html",
+        {"request": request, "user": user, "items": items, "page": page, "pages": (total + per_page - 1) // per_page, "total": total, "active_page": "equipment"},
+    )
+
+
+@pages_router.post("/equipment", response_class=HTMLResponse)
+async def equipment_create_submit(
+    request: Request,
+    session: AsyncSession = Depends(db_helper.session_dependency),
+):
+    user = await get_current_user(request, session)
+    if not user:
+        return RedirectResponse("/", status_code=302)
+    form = await request.form()
+    name = form.get("name", "").strip()
+    if name:
+        from scr.dbase.schemas.schemas import EquipmentCreateSchema
+        await crud_equipment.add_equipment(session, EquipmentCreateSchema(name=name), created_by=user.name)
+        await session.commit()
+    return RedirectResponse("/equipment", status_code=302)
+
+
+@pages_router.get("/equipment/{eq_id}", response_class=HTMLResponse)
+async def equipment_detail_page(
+    eq_id: int,
+    request: Request,
+    back_to: str | None = None,
+    session: AsyncSession = Depends(db_helper.session_dependency),
+):
+    user = await get_current_user(request, session)
+    if not user:
+        return RedirectResponse("/", status_code=302)
+    eq = await crud_equipment.get_equipment_by_id(session, eq_id)
+    if not eq:
+        return HTMLResponse("Оборудование не найдено", status_code=404)
+    return templates.TemplateResponse(
+        "equipment/detail.html",
+        {"request": request, "user": user, "eq": eq, "back_to": back_to, "active_page": "equipment"},
+    )
+
+
+@pages_router.delete("/equipment/{eq_id}/delete")
+async def equipment_delete(
+    eq_id: int,
+    request: Request,
+    session: AsyncSession = Depends(db_helper.session_dependency),
+):
+    user = await get_current_user(request, session)
+    if not user:
+        return JSONResponse({"error": "Не авторизован"}, status_code=401)
+    result = await crud_equipment.delete_equipment(session, eq_id)
+    if not result:
+        return JSONResponse({"error": "Оборудование не найдено"}, status_code=404)
+    await session.commit()
+    return JSONResponse({"ok": True})

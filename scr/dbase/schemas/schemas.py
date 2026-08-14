@@ -215,32 +215,40 @@ class CounterpartyResponseSchema(BaseModel):
     created_by: Optional[str] = None
 
 
+# --- Equipment ---
+
+class EquipmentCreateSchema(BaseModel):
+    model_config = ConfigDict(from_attributes=True)
+
+    name: str
+
+
+class EquipmentUpdateSchema(BaseModel):
+    model_config = ConfigDict(from_attributes=True)
+
+    id: int
+    name: Optional[str] = None
+
+
+class EquipmentResponseSchema(BaseModel):
+    model_config = ConfigDict(from_attributes=True)
+
+    id: int
+    name: str
+    created_by: Optional[str] = None
+
+
 # --- Request ---
-
-EQUIPMENT_FIELDS = [
-    "bktpb", "ktpb", "ktp", "kso_393", "kso_204",
-    "k_104", "k_104m", "sho", "pku", "pus", "parn",
-]
-
 
 class RequestCreateSchema(BaseModel):
     model_config = ConfigDict(from_attributes=True)
 
     counterparty_id: int
+    equipment_id: Optional[int] = None
     description: Optional[str] = None
     notes: Optional[str] = None
     status: RequestStatus = RequestStatus.ZAPROS
-    bktpb: int = Field(0, ge=0, le=100)
-    ktpb: int = Field(0, ge=0, le=100)
-    ktp: int = Field(0, ge=0, le=100)
-    kso_393: int = Field(0, ge=0, le=100)
-    kso_204: int = Field(0, ge=0, le=100)
-    k_104: int = Field(0, ge=0, le=100)
-    k_104m: int = Field(0, ge=0, le=100)
-    sho: int = Field(0, ge=0, le=100)
-    pku: int = Field(0, ge=0, le=100)
-    pus: int = Field(0, ge=0, le=100)
-    parn: int = Field(0, ge=0, le=100)
+    cost: float = Field(0, ge=0)
 
 
 class RequestUpdateSchema(BaseModel):
@@ -249,21 +257,12 @@ class RequestUpdateSchema(BaseModel):
     id: int
     counterparty_id: Optional[int] = None
     manager_id: Optional[int] = None
+    equipment_id: Optional[int] = None
     description: Optional[str] = None
     notes: Optional[str] = None
     status: Optional[RequestStatus] = None
     request_date: Optional[datetime] = None
-    bktpb: Optional[int] = Field(None, ge=0, le=100)
-    ktpb: Optional[int] = Field(None, ge=0, le=100)
-    ktp: Optional[int] = Field(None, ge=0, le=100)
-    kso_393: Optional[int] = Field(None, ge=0, le=100)
-    kso_204: Optional[int] = Field(None, ge=0, le=100)
-    k_104: Optional[int] = Field(None, ge=0, le=100)
-    k_104m: Optional[int] = Field(None, ge=0, le=100)
-    sho: Optional[int] = Field(None, ge=0, le=100)
-    pku: Optional[int] = Field(None, ge=0, le=100)
-    pus: Optional[int] = Field(None, ge=0, le=100)
-    parn: Optional[int] = Field(None, ge=0, le=100)
+    cost: Optional[float] = Field(None, ge=0)
 
 
 class RequestResponseSchema(BaseModel):
@@ -273,22 +272,13 @@ class RequestResponseSchema(BaseModel):
     counterparty_id: int
     company_id: int
     manager_id: int
+    equipment_id: Optional[int] = None
     request_date: datetime
     status: RequestStatus
+    cost: float = 0
     description: Optional[str] = None
     notes: Optional[str] = None
     tkp_num: Optional[str] = None
-    bktpb: int = 0
-    ktpb: int = 0
-    ktp: int = 0
-    kso_393: int = 0
-    kso_204: int = 0
-    k_104: int = 0
-    k_104m: int = 0
-    sho: int = 0
-    pku: int = 0
-    pus: int = 0
-    parn: int = 0
     created_by: Optional[str] = None
 
 
