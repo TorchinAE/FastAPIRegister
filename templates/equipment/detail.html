@@ -1,0 +1,70 @@
+{% extends "base.html" %}
+{% block title %}{{ eq.name }}{% endblock %}
+{% block content %}
+<div class="page-header">
+    <div>
+        <h1>{{ eq.name }}</h1>
+        <div class="subtitle">Оборудование #{{ eq.id }}</div>
+    </div>
+    <a href="{{ back_to or '/equipment' }}" class="btn btn-ghost">← Назад</a>
+</div>
+
+<div class="card">
+    <form id="editEqForm">
+        <input type="hidden" name="id" value="{{ eq.id }}">
+        <div class="form-row" style="grid-template-columns: 1fr;">
+            <div class="form-group">
+                <label>Название</label>
+                <input type="text" name="name" value="{{ eq.name }}" required style="width:100%;min-width:0">
+            </div>
+        </div>
+        <div class="actions">
+            <button type="submit" class="btn btn-primary">Сохранить</button>
+            <button type="button" class="btn btn-danger" onclick="deleteEq()">Удалить</button>
+        </div>
+    </form>
+</div>
+
+<div id="toast" class="toast" style="display:none"></div>
+{% endblock %}
+
+{% block scripts %}
+<script>
+document.getElementById('editEqForm').addEventListener('submit', async function(e) {
+    e.preventDefault();
+    const fd = new FormData(this);
+    const data = {
+        id: parseInt(fd.get('id')),
+        name: fd.get('name'),
+    };
+    const resp = await fetch('/api/equipment/', {
+        method: 'PATCH',
+        headers: {'Content-Type': 'application/json'},
+        body: JSON.stringify(data),
+    });
+    if (resp.ok) {
+        showToast('Сохранено');
+    } else {
+        const err = await resp.json();
+        showToast('Ошибка: ' + (err.detail || 'не удалось сохранить'));
+    }
+});
+
+async function deleteEq() {
+    if (!confirm('Удалить оборудование {{ eq.name }}?')) return;
+    const resp = await fetch('/api/equipment/{{ eq.id }}', {method: 'DELETE'});
+    if (resp.ok) {
+        window.location.href = '/equipment';
+    } else {
+        showToast('Ошибка удаления');
+    }
+}
+
+function showToast(msg) {
+    const t = document.getElementById('toast');
+    t.textContent = msg;
+    t.style.display = 'block';
+    setTimeout(() => t.style.display = 'none', 2500);
+}
+</script>
+{% endblock %}
