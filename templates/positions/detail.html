@@ -1,0 +1,55 @@
+{% extends "base.html" %}
+{% block title %}Должность {{ pos.name }}{% endblock %}
+{% block content %}
+<div class="page-header">
+    <div>
+        <h1>{{ pos.name }}</h1>
+        <div class="subtitle">Должность #{{ pos.id }}</div>
+    </div>
+    <a href="{{ back_to or '/positions' }}" class="btn btn-ghost">← Назад</a>
+</div>
+
+<div class="card">
+    <form id="editPosForm">
+        <input type="hidden" name="id" value="{{ pos.id }}">
+        <div class="form-row" style="grid-template-columns: 1fr;">
+            <div class="form-group">
+                <label>Название</label>
+                <input type="text" name="name" value="{{ pos.name }}" required style="width:100%;min-width:0">
+            </div>
+        </div>
+        <div class="actions">
+            <button type="submit" class="btn btn-primary">Сохранить</button>
+        </div>
+    </form>
+</div>
+
+<div id="toast" class="toast" style="display:none"></div>
+{% endblock %}
+
+{% block scripts %}
+<script>
+document.getElementById('editPosForm').addEventListener('submit', async function(e) {
+    e.preventDefault();
+    const fd = new FormData(this);
+    const data = { id: parseInt(fd.get('id')), name: fd.get('name') };
+    const resp = await fetch('/api/positions/', {
+        method: 'PATCH',
+        headers: {'Content-Type': 'application/json'},
+        body: JSON.stringify(data),
+    });
+    if (resp.ok) {
+        showToast('Сохранено');
+    } else {
+        const err = await resp.json();
+        showToast('Ошибка: ' + (err.detail || 'не удалось сохранить'));
+    }
+});
+function showToast(msg) {
+    const t = document.getElementById('toast');
+    t.textContent = msg;
+    t.style.display = 'block';
+    setTimeout(() => t.style.display = 'none', 2500);
+}
+</script>
+{% endblock %}

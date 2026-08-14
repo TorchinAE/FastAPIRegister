@@ -1,0 +1,144 @@
+{% extends "base.html" %}
+{% block title %}Регистрация ТКП #{{ req.id }}{% endblock %}
+{% block content %}
+<div class="page-header">
+    <div>
+        <h1>Регистрация запроса ТКП</h1>
+        <div class="subtitle">Код: {{ req.id }} &middot; {{ req.tkp_num or '' }}</div>
+    </div>
+    <a href="/requests" class="btn btn-ghost">← Назад к списку</a>
+</div>
+
+<div class="edit-layout">
+    <!-- Левая колонка: форма -->
+    <form method="post" action="/requests/{{ req.id }}/edit" class="edit-form">
+        <!-- Идентификация -->
+        <div class="form-section">
+            <h3 class="form-section-title">Идентификация</h3>
+            <div class="form-grid-2">
+                <div class="form-group">
+                    <label>Код</label>
+                    <input type="text" value="{{ req.id }}" disabled>
+                </div>
+                <div class="form-group">
+                    <label>№ ТКП</label>
+                    <input type="text" value="{{ req.tkp_num or '-' }}" disabled>
+                </div>
+            </div>
+            <div class="form-grid-2">
+                <div class="form-group">
+                    <label>Дата заявки</label>
+                    <input type="date" name="request_date" value="{{ req.request_date.strftime('%Y-%m-%d') if req.request_date else '' }}">
+                </div>
+                <div class="form-group">
+                    <label>Статус</label>
+                    <select name="status">
+                        {% for s in statuses %}
+                        <option value="{{ s.value }}" {{ 'selected' if req.status and req.status.value == s.value else '' }}>{{ s.value }}</option>
+                        {% endfor %}
+                    </select>
+                </div>
+            </div>
+        </div>
+
+        <!-- Объект -->
+        <div class="form-section">
+            <h3 class="form-section-title">Объект</h3>
+            <div class="form-group">
+                <label>Описание объекта</label>
+                <textarea name="description" rows="3" placeholder="Например: РП Кольчугино">{{ req.description or '' }}</textarea>
+            </div>
+            <div class="form-group">
+                <label>Заметки</label>
+                <textarea name="notes" rows="2" placeholder="Дополнительные заметки...">{{ req.notes or '' }}</textarea>
+            </div>
+        </div>
+
+        <!-- Организация и контакты -->
+        <div class="form-section">
+            <h3 class="form-section-title">Организация и контакты</h3>
+            <div class="form-grid-2">
+                <div class="form-group">
+                    <label>Пользователь</label>
+                    <select name="manager_id">
+                        {% for m in managers %}
+                        <option value="{{ m.id }}" {{ 'selected' if m.id == req.manager_id else '' }}>{{ m.name }}</option>
+                        {% endfor %}
+                    </select>
+                </div>
+                <div class="form-group">
+                    <label>Контрагент</label>
+                    <select name="counterparty_id" required>
+                        {% for cp in counterparties %}
+                        <option value="{{ cp.id }}" {{ 'selected' if cp.id == req.counterparty_id else '' }}>{{ cp.name }}</option>
+                        {% endfor %}
+                    </select>
+                </div>
+            </div>
+        </div>
+
+        <!-- Оборудование -->
+        <div class="form-section">
+            <h3 class="form-section-title">Оборудование</h3>
+            <div class="form-row">
+                {% for f in ['bktpb','ktpb','ktp','kso_393','kso_204','k_104','k_104m','sho','pku','pus','parn'] %}
+                <div class="form-group">
+                    <label>{{ f | upper }}</label>
+                    <input type="number" name="{{ f }}" value="{{ req[f] if req[f] is not none else 0 }}" min="0" max="100">
+                </div>
+                {% endfor %}
+            </div>
+        </div>
+
+        <!-- Кнопки -->
+        <div class="actions">
+            <button type="submit" class="btn btn-primary">Сохранить запись</button>
+            <a href="/requests" class="btn btn-ghost">Отмена</a>
+            <a href="/requests/create" class="btn btn-success" style="margin-left:auto;">+ Новая ТКП</a>
+        </div>
+    </form>
+
+    <!-- Правая колонка: связанные ТКП -->
+    <div class="edit-sidebar">
+        <div class="card">
+            <h3 class="form-section-title">ТКП контрагента</h3>
+            <p class="sidebar-subtitle">{{ req.counterparty.name if req.counterparty else '-' }}</p>
+        </div>
+        {% if related_requests %}
+        <div class="table-wrap related-table">
+            <table>
+                <thead>
+                    <tr>
+                        <th>Дата</th>
+                        <th>№ ТКП</th>
+                        <th>Описание</th>
+                        <th>Статус</th>
+                    </tr>
+                </thead>
+                <tbody>
+                    {% for r in related_requests %}
+                    <tr class="clickable-row {{ 'current-row' if r.id == req.id else '' }}" onclick="window.location='/requests/{{ r.id }}/edit'">
+                        <td>{{ r.request_date.strftime('%d.%m.%Y') if r.request_date else '-' }}</td>
+                        <td><strong>{{ r.tkp_num or '-' }}</strong></td>
+                        <td>{{ (r.description or '-')[:40] }}</td>
+                        <td>
+                            {% set st = r.status.value if r.status else '' %}
+                            {% if st == 'запрос' %}<span class="badge badge-new">{{ st }}</span>
+                            {% elif st == 'тендер' %}<span class="badge badge-progress">{{ st }}</span>
+                            {% elif st == 'заказ' %}<span class="badge badge-done">{{ st }}</span>
+                            {% elif st == 'не актуально' %}<span class="badge badge-cancel">{{ st }}</span>
+                            {% else %}<span class="badge">{{ st or '-' }}</span>{% endif %}
+                        </td>
+                    </tr>
+                    {% endfor %}
+                </tbody>
+            </table>
+        </div>
+        {% else %}
+        <div class="card">
+            <p style="color: var(--text-muted); font-size: 0.85rem; text-align: center;">Нет других ТКП</p>
+        </div>
+        {% endif %}
+    </div>
+</div>
+{% endblock %}

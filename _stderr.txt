@@ -1,0 +1,156 @@
+INFO:     Started server process [14440]
+INFO:     Waiting for application startup.
+INFO:     Application startup complete.
+INFO:     Uvicorn running on http://127.0.0.1:8000 (Press CTRL+C to quit)
+ERROR:    Exception in ASGI application
+Traceback (most recent call last):
+  File "D:\dev\FastAPIRegister\.venv\Lib\site-packages\sqlalchemy\engine\base.py", line 1967, in _exec_single_context
+    self.dialect.do_execute(
+  File "D:\dev\FastAPIRegister\.venv\Lib\site-packages\sqlalchemy\engine\default.py", line 952, in do_execute
+    cursor.execute(statement, parameters)
+  File "D:\dev\FastAPIRegister\.venv\Lib\site-packages\sqlalchemy\dialects\sqlite\aiosqlite.py", line 180, in execute
+    self._adapt_connection._handle_exception(error)
+  File "D:\dev\FastAPIRegister\.venv\Lib\site-packages\sqlalchemy\dialects\sqlite\aiosqlite.py", line 340, in _handle_exception
+    raise error
+  File "D:\dev\FastAPIRegister\.venv\Lib\site-packages\sqlalchemy\dialects\sqlite\aiosqlite.py", line 162, in execute
+    self.await_(_cursor.execute(operation, parameters))
+  File "D:\dev\FastAPIRegister\.venv\Lib\site-packages\sqlalchemy\util\_concurrency_py3k.py", line 132, in await_only
+    return current.parent.switch(awaitable)  # type: ignore[no-any-return,attr-defined] # noqa: E501
+           ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "D:\dev\FastAPIRegister\.venv\Lib\site-packages\sqlalchemy\util\_concurrency_py3k.py", line 196, in greenlet_spawn
+    value = await result
+            ^^^^^^^^^^^^
+  File "D:\dev\FastAPIRegister\.venv\Lib\site-packages\aiosqlite\cursor.py", line 40, in execute
+    await self._execute(self._cursor.execute, sql, parameters)
+  File "D:\dev\FastAPIRegister\.venv\Lib\site-packages\aiosqlite\cursor.py", line 32, in _execute
+    return await self._conn._execute(fn, *args, **kwargs)
+           ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "D:\dev\FastAPIRegister\.venv\Lib\site-packages\aiosqlite\core.py", line 133, in _execute
+    return await future
+           ^^^^^^^^^^^^
+  File "D:\dev\FastAPIRegister\.venv\Lib\site-packages\aiosqlite\core.py", line 65, in _connection_worker_thread
+    result = function()
+             ^^^^^^^^^^
+sqlite3.IntegrityError: NOT NULL constraint failed: users.email
+
+The above exception was the direct cause of the following exception:
+
+Traceback (most recent call last):
+  File "D:\dev\FastAPIRegister\.venv\Lib\site-packages\uvicorn\protocols\http\h11_impl.py", line 403, in run_asgi
+    result = await app(  # type: ignore[func-returns-value]
+             ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "D:\dev\FastAPIRegister\.venv\Lib\site-packages\uvicorn\middleware\proxy_headers.py", line 60, in __call__
+    return await self.app(scope, receive, send)
+           ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "D:\dev\FastAPIRegister\.venv\Lib\site-packages\fastapi\applications.py", line 1134, in __call__
+    await super().__call__(scope, receive, send)
+  File "D:\dev\FastAPIRegister\.venv\Lib\site-packages\starlette\applications.py", line 107, in __call__
+    await self.middleware_stack(scope, receive, send)
+  File "D:\dev\FastAPIRegister\.venv\Lib\site-packages\starlette\middleware\errors.py", line 186, in __call__
+    raise exc
+  File "D:\dev\FastAPIRegister\.venv\Lib\site-packages\starlette\middleware\errors.py", line 164, in __call__
+    await self.app(scope, receive, _send)
+  File "D:\dev\FastAPIRegister\.venv\Lib\site-packages\starlette\middleware\exceptions.py", line 63, in __call__
+    await wrap_app_handling_exceptions(self.app, conn)(scope, receive, send)
+  File "D:\dev\FastAPIRegister\.venv\Lib\site-packages\starlette\_exception_handler.py", line 53, in wrapped_app
+    raise exc
+  File "D:\dev\FastAPIRegister\.venv\Lib\site-packages\starlette\_exception_handler.py", line 42, in wrapped_app
+    await app(scope, receive, sender)
+  File "D:\dev\FastAPIRegister\.venv\Lib\site-packages\fastapi\middleware\asyncexitstack.py", line 18, in __call__
+    await self.app(scope, receive, send)
+  File "D:\dev\FastAPIRegister\.venv\Lib\site-packages\starlette\routing.py", line 716, in __call__
+    await self.middleware_stack(scope, receive, send)
+  File "D:\dev\FastAPIRegister\.venv\Lib\site-packages\starlette\routing.py", line 736, in app
+    await route.handle(scope, receive, send)
+  File "D:\dev\FastAPIRegister\.venv\Lib\site-packages\starlette\routing.py", line 290, in handle
+    await self.app(scope, receive, send)
+  File "D:\dev\FastAPIRegister\.venv\Lib\site-packages\fastapi\routing.py", line 125, in app
+    await wrap_app_handling_exceptions(app, request)(scope, receive, send)
+  File "D:\dev\FastAPIRegister\.venv\Lib\site-packages\starlette\_exception_handler.py", line 53, in wrapped_app
+    raise exc
+  File "D:\dev\FastAPIRegister\.venv\Lib\site-packages\starlette\_exception_handler.py", line 42, in wrapped_app
+    await app(scope, receive, sender)
+  File "D:\dev\FastAPIRegister\.venv\Lib\site-packages\fastapi\routing.py", line 111, in app
+    response = await f(request)
+               ^^^^^^^^^^^^^^^^
+  File "D:\dev\FastAPIRegister\.venv\Lib\site-packages\fastapi\routing.py", line 391, in app
+    raw_response = await run_endpoint_function(
+                   ^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "D:\dev\FastAPIRegister\.venv\Lib\site-packages\fastapi\routing.py", line 290, in run_endpoint_function
+    return await dependant.call(**values)
+           ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "D:\dev\FastAPIRegister\scr\Routers\users.py", line 26, in update_user
+    result = await crud_users.update_user(session, user_id, **data.model_dump(exclude={"id"}))
+             ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "D:\dev\FastAPIRegister\scr\dbase\crud_users.py", line 71, in update_user
+    await session.flush()
+  File "D:\dev\FastAPIRegister\.venv\Lib\site-packages\sqlalchemy\ext\asyncio\session.py", line 787, in flush
+    await greenlet_spawn(self.sync_session.flush, objects=objects)
+  File "D:\dev\FastAPIRegister\.venv\Lib\site-packages\sqlalchemy\util\_concurrency_py3k.py", line 203, in greenlet_spawn
+    result = context.switch(value)
+             ^^^^^^^^^^^^^^^^^^^^^
+  File "D:\dev\FastAPIRegister\.venv\Lib\site-packages\sqlalchemy\orm\session.py", line 4331, in flush
+    self._flush(objects)
+  File "D:\dev\FastAPIRegister\.venv\Lib\site-packages\sqlalchemy\orm\session.py", line 4466, in _flush
+    with util.safe_reraise():
+         ^^^^^^^^^^^^^^^^^^^
+  File "D:\dev\FastAPIRegister\.venv\Lib\site-packages\sqlalchemy\util\langhelpers.py", line 224, in __exit__
+    raise exc_value.with_traceback(exc_tb)
+  File "D:\dev\FastAPIRegister\.venv\Lib\site-packages\sqlalchemy\orm\session.py", line 4427, in _flush
+    flush_context.execute()
+  File "D:\dev\FastAPIRegister\.venv\Lib\site-packages\sqlalchemy\orm\unitofwork.py", line 466, in execute
+    rec.execute(self)
+  File "D:\dev\FastAPIRegister\.venv\Lib\site-packages\sqlalchemy\orm\unitofwork.py", line 642, in execute
+    util.preloaded.orm_persistence.save_obj(
+  File "D:\dev\FastAPIRegister\.venv\Lib\site-packages\sqlalchemy\orm\persistence.py", line 85, in save_obj
+    _emit_update_statements(
+  File "D:\dev\FastAPIRegister\.venv\Lib\site-packages\sqlalchemy\orm\persistence.py", line 912, in _emit_update_statements
+    c = connection.execute(
+        ^^^^^^^^^^^^^^^^^^^
+  File "D:\dev\FastAPIRegister\.venv\Lib\site-packages\sqlalchemy\engine\base.py", line 1419, in execute
+    return meth(
+           ^^^^^
+  File "D:\dev\FastAPIRegister\.venv\Lib\site-packages\sqlalchemy\sql\elements.py", line 527, in _execute_on_connection
+    return connection._execute_clauseelement(
+           ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "D:\dev\FastAPIRegister\.venv\Lib\site-packages\sqlalchemy\engine\base.py", line 1641, in _execute_clauseelement
+    ret = self._execute_context(
+          ^^^^^^^^^^^^^^^^^^^^^^
+  File "D:\dev\FastAPIRegister\.venv\Lib\site-packages\sqlalchemy\engine\base.py", line 1846, in _execute_context
+    return self._exec_single_context(
+           ^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "D:\dev\FastAPIRegister\.venv\Lib\site-packages\sqlalchemy\engine\base.py", line 1986, in _exec_single_context
+    self._handle_dbapi_exception(
+  File "D:\dev\FastAPIRegister\.venv\Lib\site-packages\sqlalchemy\engine\base.py", line 2363, in _handle_dbapi_exception
+    raise sqlalchemy_exception.with_traceback(exc_info[2]) from e
+  File "D:\dev\FastAPIRegister\.venv\Lib\site-packages\sqlalchemy\engine\base.py", line 1967, in _exec_single_context
+    self.dialect.do_execute(
+  File "D:\dev\FastAPIRegister\.venv\Lib\site-packages\sqlalchemy\engine\default.py", line 952, in do_execute
+    cursor.execute(statement, parameters)
+  File "D:\dev\FastAPIRegister\.venv\Lib\site-packages\sqlalchemy\dialects\sqlite\aiosqlite.py", line 180, in execute
+    self._adapt_connection._handle_exception(error)
+  File "D:\dev\FastAPIRegister\.venv\Lib\site-packages\sqlalchemy\dialects\sqlite\aiosqlite.py", line 340, in _handle_exception
+    raise error
+  File "D:\dev\FastAPIRegister\.venv\Lib\site-packages\sqlalchemy\dialects\sqlite\aiosqlite.py", line 162, in execute
+    self.await_(_cursor.execute(operation, parameters))
+  File "D:\dev\FastAPIRegister\.venv\Lib\site-packages\sqlalchemy\util\_concurrency_py3k.py", line 132, in await_only
+    return current.parent.switch(awaitable)  # type: ignore[no-any-return,attr-defined] # noqa: E501
+           ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "D:\dev\FastAPIRegister\.venv\Lib\site-packages\sqlalchemy\util\_concurrency_py3k.py", line 196, in greenlet_spawn
+    value = await result
+            ^^^^^^^^^^^^
+  File "D:\dev\FastAPIRegister\.venv\Lib\site-packages\aiosqlite\cursor.py", line 40, in execute
+    await self._execute(self._cursor.execute, sql, parameters)
+  File "D:\dev\FastAPIRegister\.venv\Lib\site-packages\aiosqlite\cursor.py", line 32, in _execute
+    return await self._conn._execute(fn, *args, **kwargs)
+           ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "D:\dev\FastAPIRegister\.venv\Lib\site-packages\aiosqlite\core.py", line 133, in _execute
+    return await future
+           ^^^^^^^^^^^^
+  File "D:\dev\FastAPIRegister\.venv\Lib\site-packages\aiosqlite\core.py", line 65, in _connection_worker_thread
+    result = function()
+             ^^^^^^^^^^
+sqlalchemy.exc.IntegrityError: (sqlite3.IntegrityError) NOT NULL constraint failed: users.email
+[SQL: UPDATE users SET name=?, email=?, city=? WHERE users.id = ?]
+[parameters: ('Тест', None, None, 1)]
+(Background on this error at: https://sqlalche.me/e/20/gkpj)
