@@ -249,6 +249,18 @@ class RequestCreateSchema(BaseModel):
     notes: Optional[str] = None
     status: RequestStatus = RequestStatus.ZAPROS
     cost: float = Field(0, ge=0)
+    issue_date: Optional[datetime] = None
+    bktpb: int = Field(0, ge=0, le=100)
+    ktpb: int = Field(0, ge=0, le=100)
+    ktp: int = Field(0, ge=0, le=100)
+    kso_393: int = Field(0, ge=0, le=100)
+    kso_204: int = Field(0, ge=0, le=100)
+    k_104: int = Field(0, ge=0, le=100)
+    k_104m: int = Field(0, ge=0, le=100)
+    sho: int = Field(0, ge=0, le=100)
+    pku: int = Field(0, ge=0, le=100)
+    pus: int = Field(0, ge=0, le=100)
+    parn: int = Field(0, ge=0, le=100)
 
 
 class RequestUpdateSchema(BaseModel):
@@ -262,7 +274,19 @@ class RequestUpdateSchema(BaseModel):
     notes: Optional[str] = None
     status: Optional[RequestStatus] = None
     request_date: Optional[datetime] = None
+    issue_date: Optional[datetime] = None
     cost: Optional[float] = Field(None, ge=0)
+    bktpb: Optional[int] = Field(None, ge=0, le=100)
+    ktpb: Optional[int] = Field(None, ge=0, le=100)
+    ktp: Optional[int] = Field(None, ge=0, le=100)
+    kso_393: Optional[int] = Field(None, ge=0, le=100)
+    kso_204: Optional[int] = Field(None, ge=0, le=100)
+    k_104: Optional[int] = Field(None, ge=0, le=100)
+    k_104m: Optional[int] = Field(None, ge=0, le=100)
+    sho: Optional[int] = Field(None, ge=0, le=100)
+    pku: Optional[int] = Field(None, ge=0, le=100)
+    pus: Optional[int] = Field(None, ge=0, le=100)
+    parn: Optional[int] = Field(None, ge=0, le=100)
 
 
 class RequestResponseSchema(BaseModel):
@@ -274,11 +298,23 @@ class RequestResponseSchema(BaseModel):
     manager_id: int
     equipment_id: Optional[int] = None
     request_date: datetime
+    issue_date: Optional[datetime] = None
     status: RequestStatus
     cost: float = 0
     description: Optional[str] = None
     notes: Optional[str] = None
     tkp_num: Optional[str] = None
+    bktpb: int = 0
+    ktpb: int = 0
+    ktp: int = 0
+    kso_393: int = 0
+    kso_204: int = 0
+    k_104: int = 0
+    k_104m: int = 0
+    sho: int = 0
+    pku: int = 0
+    pus: int = 0
+    parn: int = 0
     created_by: Optional[str] = None
 
 

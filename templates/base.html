@@ -13,13 +13,13 @@
         <aside class="sidebar" id="sidebar">
             <div class="brand">Регистрация запросов</div>
             <nav>
-                <a href="/requests" class="{{ 'active' if active_page == 'requests' else '' }}"><span class="icon">&#9993;</span> ТКП</a>
-                <a href="/counterparties" class="{{ 'active' if active_page == 'counterparties' else '' }}"><span class="icon">&#9823;</span> Контрагенты</a>
-                <a href="/companies" class="{{ 'active' if active_page == 'companies' else '' }}"><span class="icon">&#9960;</span> Компании</a>
-                <a href="/equipment" class="{{ 'active' if active_page == 'equipment' else '' }}"><span class="icon">&#9881;</span> Оборудование</a>
-                <a href="/users" class="{{ 'active' if active_page == 'users' else '' }}"><span class="icon">&#9824;</span> Пользователи</a>
-                <a href="/directors" class="{{ 'active' if active_page == 'directors' else '' }}"><span class="icon">&#9733;</span> Директора</a>
-                <a href="/positions" class="{{ 'active' if active_page == 'positions' else '' }}"><span class="icon">&#9830;</span> Должности</a>
+                <a href="/requests" class="{{ 'active' if active_page == 'requests' else '' }}"><span class="icon">&#9993;</span> <span>ТКП</span></a>
+                <a href="/counterparties" class="{{ 'active' if active_page == 'counterparties' else '' }}"><span class="icon">&#9823;</span> <span>Контрагенты</span></a>
+                <a href="/companies" class="{{ 'active' if active_page == 'companies' else '' }}"><span class="icon">&#9960;</span> <span>Компании</span></a>
+                <a href="/equipment" class="{{ 'active' if active_page == 'equipment' else '' }}"><span class="icon">&#9881;</span> <span>Оборудование</span></a>
+                <a href="/users" class="{{ 'active' if active_page == 'users' else '' }}"><span class="icon">&#9824;</span> <span>Пользователи</span></a>
+                <a href="/directors" class="{{ 'active' if active_page == 'directors' else '' }}"><span class="icon">&#9733;</span> <span>Директора</span></a>
+                <a href="/positions" class="{{ 'active' if active_page == 'positions' else '' }}"><span class="icon">&#9830;</span> <span>Должности</span></a>
             </nav>
             {% if user %}
             <div class="user-section">

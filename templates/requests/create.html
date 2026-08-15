@@ -3,53 +3,122 @@
 {% block content %}
 <div class="page-header">
     <div>
-        <h1>Создать ТКП</h1>
+        <h1>Регистрация запроса ТКП</h1>
         <div class="subtitle">Заполните форму для создания новой ТКП</div>
     </div>
+    <a href="/requests" class="btn btn-ghost">← Назад к списку</a>
 </div>
 <form method="post" action="/requests/create">
-    <div style="display:grid; grid-template-columns: 1fr 1fr; gap: 1rem;">
-        <div class="form-group">
-            <label>Контрагент</label>
-            <select name="counterparty_id" required>
-                <option value="">-- Выберите контрагента --</option>
-                {% for cp in counterparties %}
-                <option value="{{ cp.id }}">{{ cp.name }} ({{ cp.email }})</option>
-                {% endfor %}
-            </select>
+    <!-- Основные реквизиты -->
+    <div class="form-section">
+        <h3 class="form-section-title">Основные реквизиты</h3>
+        <div class="form-grid-2">
+            <div class="form-group">
+                <label>Контрагент <span style="color:var(--danger)">*</span></label>
+                <select name="counterparty_id" required>
+                    <option value="">-- Выберите контрагента --</option>
+                    {% for cp in counterparties %}
+                    <option value="{{ cp.id }}">{{ cp.name }} ({{ cp.email }})</option>
+                    {% endfor %}
+                </select>
+            </div>
+            <div class="form-group">
+                <label>Статус</label>
+                <select name="status">
+                    {% for s in statuses %}
+                    <option value="{{ s.value }}">{{ s.value }}</option>
+                    {% endfor %}
+                </select>
+            </div>
         </div>
-        <div class="form-group">
-            <label>Статус</label>
-            <select name="status">
-                {% for s in statuses %}
-                <option value="{{ s.value }}">{{ s.value }}</option>
-                {% endfor %}
-            </select>
+        <div class="form-grid-2">
+            <div class="form-group">
+                <label>Оборудование</label>
+                <select name="equipment_id">
+                    <option value="">-- Не выбрано --</option>
+                    {% for eq in equipment %}
+                    <option value="{{ eq.id }}">{{ eq.name }}</option>
+                    {% endfor %}
+                </select>
+            </div>
+            <div class="form-group">
+                <label>Стоимость с НДС (руб.) <span style="color:var(--danger)">*</span></label>
+                <input type="number" name="cost" value="0" min="0" step="0.01">
+            </div>
+        </div>
+        <div class="form-grid-2">
+            <div class="form-group">
+                <label>Дата выдачи ТКП</label>
+                <input type="date" name="issue_date">
+            </div>
+            <div></div>
         </div>
     </div>
-    <div style="display:grid; grid-template-columns: 1fr 1fr; gap: 1rem;">
+
+    <!-- Количество оборудования -->
+    <div class="form-section">
+        <h3 class="form-section-title">Количество оборудования</h3>
+        <div style="display:grid; grid-template-columns:repeat(auto-fill,minmax(130px,1fr)); gap:0.75rem;">
+            <div class="form-group">
+                <label>БКТПБ</label>
+                <input type="number" name="bktpb" value="0" min="0" max="100">
+            </div>
+            <div class="form-group">
+                <label>КТПБ</label>
+                <input type="number" name="ktpb" value="0" min="0" max="100">
+            </div>
+            <div class="form-group">
+                <label>КТП</label>
+                <input type="number" name="ktp" value="0" min="0" max="100">
+            </div>
+            <div class="form-group">
+                <label>КСО-393</label>
+                <input type="number" name="kso_393" value="0" min="0" max="100">
+            </div>
+            <div class="form-group">
+                <label>КСО-204</label>
+                <input type="number" name="kso_204" value="0" min="0" max="100">
+            </div>
+            <div class="form-group">
+                <label>К-104</label>
+                <input type="number" name="k_104" value="0" min="0" max="100">
+            </div>
+            <div class="form-group">
+                <label>К-104М</label>
+                <input type="number" name="k_104m" value="0" min="0" max="100">
+            </div>
+            <div class="form-group">
+                <label>ЩО</label>
+                <input type="number" name="sho" value="0" min="0" max="100">
+            </div>
+            <div class="form-group">
+                <label>ПКУ</label>
+                <input type="number" name="pku" value="0" min="0" max="100">
+            </div>
+            <div class="form-group">
+                <label>ПУС</label>
+                <input type="number" name="pus" value="0" min="0" max="100">
+            </div>
+            <div class="form-group">
+                <label>ПАРН</label>
+                <input type="number" name="parn" value="0" min="0" max="100">
+            </div>
+        </div>
+    </div>
+
+    <!-- Описание -->
+    <div class="form-section">
+        <h3 class="form-section-title">Описание</h3>
         <div class="form-group">
-            <label>Оборудование</label>
-            <select name="equipment_id">
-                <option value="">-- Не выбрано --</option>
-                {% for eq in equipment %}
-                <option value="{{ eq.id }}">{{ eq.name }}</option>
-                {% endfor %}
-            </select>
+            <label>Описание объекта</label>
+            <textarea name="description" rows="3" placeholder="Например: РП Кольчугино"></textarea>
         </div>
         <div class="form-group">
-            <label>Стоимость (руб.)</label>
-            <input type="number" name="cost" value="0" min="0" step="0.01">
+            <label>Заметки</label>
+            <textarea name="notes" rows="2" placeholder="Дополнительные заметки..."></textarea>
         </div>
     </div>
-    <div class="form-group">
-        <label>Описание</label>
-        <textarea name="description" placeholder="Опишите запрос..."></textarea>
-    </div>
-    <div class="form-group">
-        <label>Заметки</label>
-        <textarea name="notes" placeholder="Дополнительные заметки..."></textarea>
-    </div>
+
     <div class="actions">
         <button type="submit" class="btn btn-primary">Создать ТКП</button>
         <a href="/requests" class="btn btn-ghost">Отмена</a>

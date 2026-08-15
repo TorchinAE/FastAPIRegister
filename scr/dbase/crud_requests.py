@@ -21,6 +21,8 @@ async def get_requests(
 ) -> tuple[list[Request], int]:
     stmt = select(Request).options(
         selectinload(Request.equipment),
+        selectinload(Request.manager),
+        selectinload(Request.company),
     ).order_by(Request.id.desc())
     count_stmt = select(func.count(Request.id))
 
@@ -82,7 +84,19 @@ async def add_request(
         notes=in_req.notes,
         status=in_req.status,
         cost=in_req.cost,
+        issue_date=in_req.issue_date,
         created_by=created_by,
+        bktpb=in_req.bktpb,
+        ktpb=in_req.ktpb,
+        ktp=in_req.ktp,
+        kso_393=in_req.kso_393,
+        kso_204=in_req.kso_204,
+        k_104=in_req.k_104,
+        k_104m=in_req.k_104m,
+        sho=in_req.sho,
+        pku=in_req.pku,
+        pus=in_req.pus,
+        parn=in_req.parn,
     )
     session.add(req)
     await session.flush()

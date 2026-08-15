@@ -133,6 +133,18 @@ async def request_create_submit(
         "notes": form.get("notes", ""),
         "status": form.get("status", RS.ZAPROS.value),
         "cost": float(form.get("cost", 0)),
+        "issue_date": form.get("issue_date") or None,
+        "bktpb": int(form.get("bktpb", 0)),
+        "ktpb": int(form.get("ktpb", 0)),
+        "ktp": int(form.get("ktp", 0)),
+        "kso_393": int(form.get("kso_393", 0)),
+        "kso_204": int(form.get("kso_204", 0)),
+        "k_104": int(form.get("k_104", 0)),
+        "k_104m": int(form.get("k_104m", 0)),
+        "sho": int(form.get("sho", 0)),
+        "pku": int(form.get("pku", 0)),
+        "pus": int(form.get("pus", 0)),
+        "parn": int(form.get("parn", 0)),
     }
     if form.get("equipment_id"):
         data["equipment_id"] = int(form["equipment_id"])
@@ -214,6 +226,11 @@ async def request_edit_submit(
         data["status"] = form["status"]
     if form.get("cost") is not None:
         data["cost"] = float(form["cost"])
+    if form.get("issue_date"):
+        data["issue_date"] = form["issue_date"]
+    for eq_field in ("bktpb", "ktpb", "ktp", "kso_393", "kso_204", "k_104", "k_104m", "sho", "pku", "pus", "parn"):
+        if form.get(eq_field) is not None:
+            data[eq_field] = int(form[eq_field])
 
     schema = RequestUpdateSchema(**data)
     await crud_requests.update_request(session, schema)

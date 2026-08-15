@@ -6,7 +6,10 @@
         <h1>ТКП #{{ req.id }}</h1>
         <div class="subtitle">{{ req.tkp_num or '' }}</div>
     </div>
-    <a href="/requests" class="btn btn-ghost">← Назад</a>
+    <div style="display:flex;gap:0.5rem;">
+        <a href="/requests/{{ req.id }}/edit" class="btn btn-primary">Редактировать</a>
+        <a href="/requests" class="btn btn-ghost">← Назад</a>
+    </div>
 </div>
 <div class="card">
     <h3 style="margin-bottom:1rem; font-size:0.95rem; color:var(--text-muted); text-transform:uppercase; letter-spacing:0.05em;">Основная информация</h3>
@@ -14,6 +17,7 @@
         <dt>ID</dt><dd>{{ req.id }}</dd>
         <dt>ТКП номер</dt><dd>{{ req.tkp_num or '-' }}</dd>
         <dt>Дата запроса</dt><dd>{{ req.request_date.strftime('%d.%m.%Y %H:%M') if req.request_date else '-' }}</dd>
+        <dt>Дата выдачи ТКП</dt><dd>{{ req.issue_date.strftime('%d.%m.%Y') if req.issue_date else '-' }}</dd>
         <dt>Статус</dt>
         <dd>
             {% set status = req.status.value if req.status else '' %}
@@ -27,10 +31,27 @@
         <dt>Компания</dt><dd>{{ req.company.name if req.company else req.company_id }}</dd>
         <dt>Менеджер</dt><dd>{{ req.manager.name if req.manager else req.manager_id }}</dd>
         <dt>Оборудование</dt><dd>{{ req.equipment.name if req.equipment else '-' }}</dd>
-        <dt>Стоимость</dt><dd>{{ req.cost or 0 }} руб.</dd>
+        <dt>Стоимость с НДС</dt><dd>{{ req.cost or 0 }} руб.</dd>
         <dt>Создал</dt><dd>{{ req.created_by or '-' }}</dd>
         <dt>Описание</dt><dd>{{ req.description or '-' }}</dd>
         <dt>Заметки</dt><dd>{{ req.notes or '-' }}</dd>
     </dl>
+</div>
+
+<div class="card" style="margin-top:1rem;">
+    <h3 style="margin-bottom:1rem; font-size:0.95rem; color:var(--text-muted); text-transform:uppercase; letter-spacing:0.05em;">Количество оборудования</h3>
+    <div style="display:grid; grid-template-columns:repeat(auto-fill,minmax(140px,1fr)); gap:0.75rem;">
+        <div><span style="font-size:0.75rem;color:var(--text-muted);text-transform:uppercase;">БКТПБ</span><div style="font-size:1.1rem;font-weight:600;">{{ req.bktpb }}</div></div>
+        <div><span style="font-size:0.75rem;color:var(--text-muted);text-transform:uppercase;">КТПБ</span><div style="font-size:1.1rem;font-weight:600;">{{ req.ktpb }}</div></div>
+        <div><span style="font-size:0.75rem;color:var(--text-muted);text-transform:uppercase;">КТП</span><div style="font-size:1.1rem;font-weight:600;">{{ req.ktp }}</div></div>
+        <div><span style="font-size:0.75rem;color:var(--text-muted);text-transform:uppercase;">КСО-393</span><div style="font-size:1.1rem;font-weight:600;">{{ req.kso_393 }}</div></div>
+        <div><span style="font-size:0.75rem;color:var(--text-muted);text-transform:uppercase;">КСО-204</span><div style="font-size:1.1rem;font-weight:600;">{{ req.kso_204 }}</div></div>
+        <div><span style="font-size:0.75rem;color:var(--text-muted);text-transform:uppercase;">К-104</span><div style="font-size:1.1rem;font-weight:600;">{{ req.k_104 }}</div></div>
+        <div><span style="font-size:0.75rem;color:var(--text-muted);text-transform:uppercase;">К-104М</span><div style="font-size:1.1rem;font-weight:600;">{{ req.k_104m }}</div></div>
+        <div><span style="font-size:0.75rem;color:var(--text-muted);text-transform:uppercase;">ЩО</span><div style="font-size:1.1rem;font-weight:600;">{{ req.sho }}</div></div>
+        <div><span style="font-size:0.75rem;color:var(--text-muted);text-transform:uppercase;">ПКУ</span><div style="font-size:1.1rem;font-weight:600;">{{ req.pku }}</div></div>
+        <div><span style="font-size:0.75rem;color:var(--text-muted);text-transform:uppercase;">ПУС</span><div style="font-size:1.1rem;font-weight:600;">{{ req.pus }}</div></div>
+        <div><span style="font-size:0.75rem;color:var(--text-muted);text-transform:uppercase;">ПАРН</span><div style="font-size:1.1rem;font-weight:600;">{{ req.parn }}</div></div>
+    </div>
 </div>
 {% endblock %}

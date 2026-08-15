@@ -31,6 +31,12 @@
                     <input type="date" name="request_date" value="{{ req.request_date.strftime('%Y-%m-%d') if req.request_date else '' }}">
                 </div>
                 <div class="form-group">
+                    <label>Дата выдачи ТКП</label>
+                    <input type="date" name="issue_date" value="{{ req.issue_date.strftime('%Y-%m-%d') if req.issue_date else '' }}">
+                </div>
+            </div>
+            <div class="form-grid-2">
+                <div class="form-group">
                     <label>Статус</label>
                     <select name="status">
                         {% for s in statuses %}
@@ -38,6 +44,7 @@
                         {% endfor %}
                     </select>
                 </div>
+                <div></div>
             </div>
         </div>
 
@@ -91,9 +98,27 @@
                     </select>
                 </div>
                 <div class="form-group">
-                    <label>Стоимость (руб.)</label>
+                    <label>Стоимость с НДС (руб.)</label>
                     <input type="number" name="cost" value="{{ req.cost or 0 }}" min="0" step="0.01">
                 </div>
+            </div>
+        </div>
+
+        <!-- Количество оборудования -->
+        <div class="form-section">
+            <h3 class="form-section-title">Количество оборудования</h3>
+            <div style="display:grid; grid-template-columns:repeat(auto-fill,minmax(130px,1fr)); gap:0.75rem;">
+                <div class="form-group"><label>БКТПБ</label><input type="number" name="bktpb" value="{{ req.bktpb }}" min="0" max="100"></div>
+                <div class="form-group"><label>КТПБ</label><input type="number" name="ktpb" value="{{ req.ktpb }}" min="0" max="100"></div>
+                <div class="form-group"><label>КТП</label><input type="number" name="ktp" value="{{ req.ktp }}" min="0" max="100"></div>
+                <div class="form-group"><label>КСО-393</label><input type="number" name="kso_393" value="{{ req.kso_393 }}" min="0" max="100"></div>
+                <div class="form-group"><label>КСО-204</label><input type="number" name="kso_204" value="{{ req.kso_204 }}" min="0" max="100"></div>
+                <div class="form-group"><label>К-104</label><input type="number" name="k_104" value="{{ req.k_104 }}" min="0" max="100"></div>
+                <div class="form-group"><label>К-104М</label><input type="number" name="k_104m" value="{{ req.k_104m }}" min="0" max="100"></div>
+                <div class="form-group"><label>ЩО</label><input type="number" name="sho" value="{{ req.sho }}" min="0" max="100"></div>
+                <div class="form-group"><label>ПКУ</label><input type="number" name="pku" value="{{ req.pku }}" min="0" max="100"></div>
+                <div class="form-group"><label>ПУС</label><input type="number" name="pus" value="{{ req.pus }}" min="0" max="100"></div>
+                <div class="form-group"><label>ПАРН</label><input type="number" name="parn" value="{{ req.parn }}" min="0" max="100"></div>
             </div>
         </div>
 

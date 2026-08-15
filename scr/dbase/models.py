@@ -235,6 +235,9 @@ class Request(BaseID):
     request_date: Mapped[datetime] = mapped_column(
         DateTime, default=lambda: datetime.now(timezone.utc)
     )
+    issue_date: Mapped[Optional[datetime]] = mapped_column(
+        DateTime, nullable=True
+    )
     status: Mapped[RequestStatus] = mapped_column(
         Enum(RequestStatus), default=RequestStatus.ZAPROS, nullable=False
     )
@@ -242,6 +245,19 @@ class Request(BaseID):
     description: Mapped[Optional[str]] = mapped_column(Text, nullable=True)
     notes: Mapped[Optional[str]] = mapped_column(Text, nullable=True)
     tkp_num: Mapped[Optional[str]] = mapped_column(String(50), nullable=True)
+
+    # Оборудование (количество, 0-100)
+    bktpb: Mapped[int] = mapped_column(Integer, default=0, nullable=False)
+    ktpb: Mapped[int] = mapped_column(Integer, default=0, nullable=False)
+    ktp: Mapped[int] = mapped_column(Integer, default=0, nullable=False)
+    kso_393: Mapped[int] = mapped_column(Integer, default=0, nullable=False)
+    kso_204: Mapped[int] = mapped_column(Integer, default=0, nullable=False)
+    k_104: Mapped[int] = mapped_column(Integer, default=0, nullable=False)
+    k_104m: Mapped[int] = mapped_column(Integer, default=0, nullable=False)
+    sho: Mapped[int] = mapped_column(Integer, default=0, nullable=False)
+    pku: Mapped[int] = mapped_column(Integer, default=0, nullable=False)
+    pus: Mapped[int] = mapped_column(Integer, default=0, nullable=False)
+    parn: Mapped[int] = mapped_column(Integer, default=0, nullable=False)
 
     counterparty: Mapped["Counterparty"] = relationship(foreign_keys=[counterparty_id])
     company: Mapped["Organization"] = relationship(foreign_keys=[company_id])
