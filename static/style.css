@@ -24,12 +24,9 @@ body { font-family: 'Segoe UI', system-ui, -apple-system, sans-serif; background
 
 /* Layout */
 .app { display: flex; min-height: 100vh; }
-.sidebar { width: 24px; background: var(--sidebar-bg); color: var(--sidebar-text); padding: 1.5rem 0; display: flex; flex-direction: column; position: fixed; top: 0; left: 0; bottom: 0; z-index: 100; transition: transform var(--transition); overflow: hidden; }
-.sidebar:hover { width: 200px; }
-.sidebar:hover nav a span:not(.icon) { opacity: 1; }
-.sidebar nav a span:not(.icon) { opacity: 0; transition: opacity var(--transition); }
-.sidebar .brand { padding: 0.5rem 0.3rem 0.5rem; font-size: 0.65rem; font-weight: 700; color: #fff; border-bottom: 1px solid rgba(255,255,255,0.1); margin-bottom: 0.5rem; writing-mode: vertical-rl; text-orientation: mixed; text-align: center; letter-spacing: 0.05em; }
-.sidebar:hover .brand { writing-mode: horizontal-tb; text-orientation: initial; font-size: 0.8rem; padding: 0 1rem 1rem; text-align: left; }
+.sidebar { width: 160px; background: var(--sidebar-bg); color: var(--sidebar-text); padding: 1.5rem 0; display: flex; flex-direction: column; position: fixed; top: 0; left: 0; bottom: 0; z-index: 100; }
+.sidebar nav a span:not(.icon) { opacity: 1; }
+.sidebar .brand { padding: 0 1rem 1rem; font-size: 0.8rem; font-weight: 700; color: #fff; border-bottom: 1px solid rgba(255,255,255,0.1); margin-bottom: 0.5rem; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
 .sidebar nav { flex: 1; padding: 0.5rem 0; }
 .sidebar nav a { display: flex; align-items: center; gap: 0.5rem; padding: 0.6rem 1rem; color: var(--sidebar-text); text-decoration: none; font-size: 0.85rem; transition: all var(--transition); white-space: nowrap; }
 .sidebar nav a:hover { background: rgba(255,255,255,0.08); color: #fff; }
@@ -40,7 +37,7 @@ body { font-family: 'Segoe UI', system-ui, -apple-system, sans-serif; background
 .sidebar .user-section .user-email { font-size: 0.75rem; color: var(--sidebar-text); }
 .sidebar .user-section a { display: inline-block; margin-top: 0.5rem; font-size: 0.8rem; color: #f87171; text-decoration: none; }
 .sidebar .user-section a:hover { text-decoration: underline; }
-.main-content { flex: 1; margin-left: 24px; padding: 2rem; min-height: 100vh; }
+.main-content { flex: 1; margin-left: 160px; padding: 2rem; min-height: 100vh; }
 
 /* Header */
 .page-header { display: flex; justify-content: space-between; align-items: center; margin-bottom: 1.5rem; }
@@ -52,7 +49,7 @@ body { font-family: 'Segoe UI', system-ui, -apple-system, sans-serif; background
 .card + .card { margin-top: 1rem; }
 
 /* Tables */
-.table-wrap { background: var(--surface); border-radius: var(--radius); box-shadow: var(--shadow); overflow: hidden; }
+.table-wrap { background: var(--surface); border-radius: var(--radius); box-shadow: var(--shadow); overflow-x: auto; overflow-y: visible; }
 table { width: 100%; border-collapse: collapse; }
 th, td { padding: 0.75rem 1rem; text-align: left; font-size: 0.875rem; }
 th { background: #f8fafc; color: var(--text-muted); font-weight: 600; text-transform: uppercase; font-size: 0.75rem; letter-spacing: 0.05em; border-bottom: 2px solid var(--border); }
