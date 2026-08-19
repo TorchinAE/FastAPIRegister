@@ -250,6 +250,13 @@ class RequestCreateSchema(BaseModel):
     status: RequestStatus = RequestStatus.ZAPROS
     cost: float = Field(0, ge=0)
     issue_date: Optional[datetime] = None
+    incoming_letter_num: Optional[str] = None
+    repeat_tkp: Optional[str] = None
+    invoice_num: Optional[str] = None
+    invoice_date: Optional[datetime] = None
+    factory_order_num: Optional[str] = None
+    factory_order_date: Optional[datetime] = None
+    ship_date: Optional[datetime] = None
     bktpb: int = Field(0, ge=0, le=100)
     ktpb: int = Field(0, ge=0, le=100)
     ktp: int = Field(0, ge=0, le=100)
@@ -268,13 +275,23 @@ class RequestUpdateSchema(BaseModel):
 
     id: int
     counterparty_id: Optional[int] = None
+    company_id: Optional[int] = None
     manager_id: Optional[int] = None
     equipment_id: Optional[int] = None
+    probability_id: Optional[int] = None
+    project_stamp: Optional[str] = None
     description: Optional[str] = None
     notes: Optional[str] = None
     status: Optional[RequestStatus] = None
     request_date: Optional[datetime] = None
     issue_date: Optional[datetime] = None
+    incoming_letter_num: Optional[str] = None
+    repeat_tkp: Optional[str] = None
+    invoice_num: Optional[str] = None
+    invoice_date: Optional[datetime] = None
+    factory_order_num: Optional[str] = None
+    factory_order_date: Optional[datetime] = None
+    ship_date: Optional[datetime] = None
     cost: Optional[float] = Field(None, ge=0)
     bktpb: Optional[int] = Field(None, ge=0, le=100)
     ktpb: Optional[int] = Field(None, ge=0, le=100)
@@ -297,6 +314,8 @@ class RequestResponseSchema(BaseModel):
     company_id: int
     manager_id: int
     equipment_id: Optional[int] = None
+    probability_id: Optional[int] = None
+    project_stamp: Optional[str] = None
     request_date: datetime
     issue_date: Optional[datetime] = None
     status: RequestStatus
@@ -304,6 +323,13 @@ class RequestResponseSchema(BaseModel):
     description: Optional[str] = None
     notes: Optional[str] = None
     tkp_num: Optional[str] = None
+    incoming_letter_num: Optional[str] = None
+    repeat_tkp: Optional[str] = None
+    invoice_num: Optional[str] = None
+    invoice_date: Optional[datetime] = None
+    factory_order_num: Optional[str] = None
+    factory_order_date: Optional[datetime] = None
+    ship_date: Optional[datetime] = None
     bktpb: int = 0
     ktpb: int = 0
     ktp: int = 0
@@ -315,6 +341,73 @@ class RequestResponseSchema(BaseModel):
     pku: int = 0
     pus: int = 0
     parn: int = 0
+    created_by: Optional[str] = None
+
+
+# --- Invoice ---
+
+class InvoiceCreateSchema(BaseModel):
+    model_config = ConfigDict(from_attributes=True)
+
+    request_id: int
+    invoice_num: Optional[str] = None
+    invoice_date: Optional[datetime] = None
+    percent: float = Field(0, ge=0, le=100)
+    amount: float = Field(0, ge=0)
+
+
+class InvoiceUpdateSchema(BaseModel):
+    model_config = ConfigDict(from_attributes=True)
+
+    id: int
+    invoice_num: Optional[str] = None
+    invoice_date: Optional[datetime] = None
+    percent: Optional[float] = Field(None, ge=0, le=100)
+    amount: Optional[float] = Field(None, ge=0)
+
+
+class InvoiceResponseSchema(BaseModel):
+    model_config = ConfigDict(from_attributes=True)
+
+    id: int
+    request_id: int
+    invoice_num: Optional[str] = None
+    invoice_date: datetime
+    percent: float = 0
+    amount: float = 0
+    created_by: Optional[str] = None
+
+
+# --- PaymentItem ---
+
+class PaymentItemCreateSchema(BaseModel):
+    model_config = ConfigDict(from_attributes=True)
+
+    request_id: int
+    payment_type: str
+    amount: float = Field(0, ge=0)
+    percent: float = Field(0, ge=0, le=100)
+    due_date: Optional[datetime] = None
+
+
+class PaymentItemUpdateSchema(BaseModel):
+    model_config = ConfigDict(from_attributes=True)
+
+    id: int
+    amount: Optional[float] = Field(None, ge=0)
+    percent: Optional[float] = Field(None, ge=0, le=100)
+    due_date: Optional[datetime] = None
+
+
+class PaymentItemResponseSchema(BaseModel):
+    model_config = ConfigDict(from_attributes=True)
+
+    id: int
+    request_id: int
+    payment_type: str
+    amount: float = 0
+    percent: float = 0
+    due_date: Optional[datetime] = None
     created_by: Optional[str] = None
 
 

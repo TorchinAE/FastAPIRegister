@@ -4,7 +4,7 @@ from sqlalchemy import select, Result, func
 from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy.orm import selectinload
 
-from scr.dbase.models import Request, RequestStatus, Counterparty
+from scr.dbase.models import Request, RequestStatus, Counterparty, Organization, Probability, Manager, User
 from scr.dbase.schemas.schemas import RequestCreateSchema, RequestUpdateSchema
 
 
@@ -55,9 +55,10 @@ async def get_request_by_id(
     session: AsyncSession, req_id: int
 ) -> Request | None:
     stmt = select(Request).options(
-        selectinload(Request.counterparty),
+        selectinload(Request.counterparty).selectinload(Counterparty.company),
         selectinload(Request.company),
-        selectinload(Request.manager),
+        selectinload(Request.manager).selectinload(Manager.organizations),
+        selectinload(Request.manager).selectinload(Manager.user),
         selectinload(Request.equipment),
     ).where(Request.id == req_id)
     result: Result = await session.execute(stmt)
@@ -85,6 +86,13 @@ async def add_request(
         status=in_req.status,
         cost=in_req.cost,
         issue_date=in_req.issue_date,
+        incoming_letter_num=in_req.incoming_letter_num,
+        repeat_tkp=in_req.repeat_tkp,
+        invoice_num=in_req.invoice_num,
+        invoice_date=in_req.invoice_date,
+        factory_order_num=in_req.factory_order_num,
+        factory_order_date=in_req.factory_order_date,
+        ship_date=in_req.ship_date,
         created_by=created_by,
         bktpb=in_req.bktpb,
         ktpb=in_req.ktpb,
@@ -120,6 +128,14 @@ async def update_request(
         counterparty = await session.get(Counterparty, update_data["counterparty_id"])
         if counterparty:
             check_req.company_id = counterparty.company_id
+
+    # Auto-set probability to 100% when factory_order_num is set
+    if "factory_order_num" in update_data and update_data["factory_order_num"]:
+        stmt = select(Probability).where(Probability.value == 100)
+        result = await session.execute(stmt)
+        prob_100 = result.scalar_one_or_none()
+        if prob_100:
+            check_req.probability_id = prob_100.id
 
     for field, value in update_data.items():
         if field not in ("id", "created_by", "created_at", "tkp_num") and hasattr(check_req, field):

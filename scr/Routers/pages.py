@@ -5,7 +5,8 @@ from sqlalchemy.ext.asyncio import AsyncSession
 
 from scr.dbase.database import db_helper
 from scr.dbase import crud_users, crud_requests, crud_counterparties
-from scr.dbase import crud_organizations, crud_directors, crud_positions, crud_equipment
+from scr.dbase import crud_organizations, crud_directors, crud_positions, crud_equipment, crud_invoices, crud_settings, crud_payments
+from scr.dbase.models import Probability, Manager
 from scr.dbase.models import RequestStatus
 
 templates = Jinja2Templates(directory="templates")
@@ -134,6 +135,13 @@ async def request_create_submit(
         "status": form.get("status", RS.ZAPROS.value),
         "cost": float(form.get("cost", 0)),
         "issue_date": form.get("issue_date") or None,
+        "incoming_letter_num": form.get("incoming_letter_num") or None,
+        "repeat_tkp": form.get("repeat_tkp") or None,
+        "invoice_num": form.get("invoice_num") or None,
+        "invoice_date": form.get("invoice_date") or None,
+        "factory_order_num": form.get("factory_order_num") or None,
+        "factory_order_date": form.get("factory_order_date") or None,
+        "ship_date": form.get("ship_date") or None,
         "bktpb": int(form.get("bktpb", 0)),
         "ktpb": int(form.get("ktpb", 0)),
         "ktp": int(form.get("ktp", 0)),
@@ -192,10 +200,23 @@ async def request_edit_page(
     cps, _ = await crud_counterparties.get_counterparties(session, per_page=100)
     managers_list, _ = await crud_users.get_users(session, per_page=100)
     equipment_list, _ = await crud_equipment.get_equipment_list(session, per_page=100)
-    related, _ = await crud_requests.get_requests(session, counterparty_id=req.counterparty_id, per_page=50)
+    companies_list, _ = await crud_organizations.get_organizations(session, per_page=100)
+    from sqlalchemy.orm import selectinload
+    from sqlalchemy import select as sa_select
+    mgr_result = await session.execute(
+        sa_select(Manager).options(selectinload(Manager.organizations)).order_by(Manager.name)
+    )
+    managers_with_orgs = list(mgr_result.scalars().all())
+    related, _ = await crud_requests.get_requests(session, company_id=req.company_id, per_page=50)
+    invoices = await crud_invoices.get_invoices_by_request(session, req_id)
+    payment_items = await crud_payments.ensure_payment_items(session, req_id)
+    all_settings = await crud_settings.get_all_settings(session)
+    settings_dict = {s.key: s.value for s in all_settings}
+    probs_result = await session.execute(sa_select(Probability).order_by(Probability.id))
+    probabilities = list(probs_result.scalars().all())
     return templates.TemplateResponse(
         "requests/edit.html",
-        {"request": request, "user": user, "req": req, "counterparties": cps, "managers": managers_list, "equipment": equipment_list, "related_requests": related, "statuses": RequestStatus, "active_page": "requests"},
+        {"request": request, "user": user, "req": req, "counterparties": cps, "managers": managers_list, "managers_with_orgs": managers_with_orgs, "equipment": equipment_list, "companies": companies_list, "related_requests": related, "statuses": RequestStatus, "invoices": invoices, "payment_items": payment_items, "settings": settings_dict, "probabilities": probabilities, "active_page": "requests"},
     )
 
 
@@ -214,10 +235,18 @@ async def request_edit_submit(
     data = {"id": req_id}
     if form.get("counterparty_id"):
         data["counterparty_id"] = int(form["counterparty_id"])
-    if form.get("manager_id"):
+    if form.get("company_id"):
+        data["company_id"] = int(form["company_id"])
+    if form.get("contact_id"):
+        data["manager_id"] = int(form["contact_id"])
+    elif form.get("manager_id"):
         data["manager_id"] = int(form["manager_id"])
     if form.get("equipment_id"):
         data["equipment_id"] = int(form["equipment_id"])
+    if form.get("probability_id"):
+        data["probability_id"] = int(form["probability_id"])
+    if form.get("project_stamp") is not None:
+        data["project_stamp"] = form["project_stamp"]
     if form.get("description") is not None:
         data["description"] = form["description"]
     if form.get("notes") is not None:
@@ -228,6 +257,12 @@ async def request_edit_submit(
         data["cost"] = float(form["cost"])
     if form.get("issue_date"):
         data["issue_date"] = form["issue_date"]
+    for text_field in ("incoming_letter_num", "repeat_tkp", "factory_order_num"):
+        if form.get(text_field):
+            data[text_field] = form[text_field]
+    for date_field in ("factory_order_date", "ship_date"):
+        if form.get(date_field):
+            data[date_field] = form[date_field]
     for eq_field in ("bktpb", "ktpb", "ktp", "kso_393", "kso_204", "k_104", "k_104m", "sho", "pku", "pus", "parn"):
         if form.get(eq_field) is not None:
             data[eq_field] = int(form[eq_field])
@@ -674,3 +709,70 @@ async def equipment_delete(
         return JSONResponse({"error": "Оборудование не найдено"}, status_code=404)
     await session.commit()
     return JSONResponse({"ok": True})
+
+
+# --- Settings ---
+@pages_router.get("/settings", response_class=HTMLResponse)
+async def settings_page(
+    request: Request,
+    session: AsyncSession = Depends(db_helper.session_dependency),
+):
+    user = await get_current_user(request, session)
+    if not user:
+        return RedirectResponse("/", status_code=302)
+    all_settings = await crud_settings.get_all_settings(session)
+    return templates.TemplateResponse(
+        "settings/list.html",
+        {"request": request, "user": user, "settings": all_settings, "active_page": "settings"},
+    )
+
+
+@pages_router.get("/invoices", response_class=HTMLResponse)
+async def invoices_page(
+    request: Request,
+    page: int = 1,
+    session: AsyncSession = Depends(db_helper.session_dependency),
+):
+    user = await get_current_user(request, session)
+    if not user:
+        return RedirectResponse("/", status_code=302)
+    from sqlalchemy import select, func, join
+    from sqlalchemy.orm import selectinload
+    from scr.dbase.models import Invoice, Request as ReqModel
+
+    stmt = (
+        select(Invoice)
+        .options(selectinload(Invoice.request).selectinload(ReqModel.manager))
+        .options(selectinload(Invoice.request).selectinload(ReqModel.company))
+        .options(selectinload(Invoice.request).selectinload(ReqModel.equipment))
+        .order_by(Invoice.id.desc())
+    )
+    count_stmt = select(func.count(Invoice.id))
+    total = (await session.execute(count_stmt)).scalar() or 0
+    per_page = 20
+    stmt = stmt.offset((page - 1) * per_page).limit(per_page)
+    result = await session.execute(stmt)
+    items = list(result.scalars().all())
+    pages = (total + per_page - 1) // per_page
+    return templates.TemplateResponse(
+        "invoices/list.html",
+        {"request": request, "user": user, "items": items, "page": page, "pages": pages, "total": total, "active_page": "invoices"},
+    )
+
+
+@pages_router.get("/requests/{req_id}/calc", response_class=HTMLResponse)
+async def request_calc_page(
+    req_id: int,
+    request: Request,
+    session: AsyncSession = Depends(db_helper.session_dependency),
+):
+    user = await get_current_user(request, session)
+    if not user:
+        return RedirectResponse("/", status_code=302)
+    req = await crud_requests.get_request_by_id(session, req_id)
+    if not req:
+        return HTMLResponse("ТКП не найдена", status_code=404)
+    return templates.TemplateResponse(
+        "requests/calc.html",
+        {"request": request, "user": user, "req": req, "active_page": "requests"},
+    )

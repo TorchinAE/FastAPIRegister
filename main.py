@@ -16,6 +16,9 @@ from scr.Routers.requests import req_router
 from scr.Routers.equipment import eq_router
 from scr.Routers.auth import auth_router
 from scr.Routers.users import users_router
+from scr.Routers.invoices import inv_router
+from scr.Routers.payments import pay_router
+from scr.Routers.settings import settings_router
 from scr.Routers.pages import pages_router
 
 
@@ -23,6 +26,15 @@ from scr.Routers.pages import pages_router
 async def lifespan(_: FastAPI):
     async with db_helper.engine.begin() as conn:
         await conn.run_sync(Base.metadata.create_all)
+    # Seed default probabilities
+    from sqlalchemy import select
+    from scr.dbase.models import Probability, DEFAULT_PROBABILITIES
+    async with db_helper.session_factory() as session:
+        for id_, name, value in DEFAULT_PROBABILITIES:
+            existing = await session.get(Probability, id_)
+            if not existing:
+                session.add(Probability(id=id_, name=name, value=value))
+        await session.commit()
     yield
 
 
@@ -48,6 +60,9 @@ app.include_router(org_router)
 app.include_router(cp_router)
 app.include_router(req_router)
 app.include_router(eq_router)
+app.include_router(inv_router)
+app.include_router(pay_router)
+app.include_router(settings_router)
 app.include_router(users_router)
 app.include_router(pages_router)
 
