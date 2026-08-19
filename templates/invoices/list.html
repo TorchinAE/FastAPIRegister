@@ -1,0 +1,77 @@
+{% extends "base.html" %}
+{% block title %}Счета{% endblock %}
+{% block content %}
+<div class="page-header">
+    <h1>Счета</h1>
+    <div class="subtitle">Всего: {{ total }}</div>
+</div>
+
+<div class="table-wrap">
+    <table>
+        <thead>
+            <tr>
+                <th>ID</th>
+                <th>№ ТКП</th>
+                <th>№ счёта</th>
+                <th>Дата счёта</th>
+                <th>Сумма</th>
+                <th>% от заказа</th>
+                <th>Организация</th>
+                <th>Менеджер</th>
+                <th>Оборудование</th>
+            </tr>
+            <tr class="table-filter">
+                <th><input type="text" class="tf-input" data-col="0" placeholder="ID"></th>
+                <th><input type="text" class="tf-input" data-col="1" placeholder="ТКП"></th>
+                <th><input type="text" class="tf-input" data-col="2" placeholder="№ счёта"></th>
+                <th><input type="text" class="tf-input" data-col="3" placeholder="дата"></th>
+                <th><input type="text" class="tf-input" data-col="4" placeholder="сумма"></th>
+                <th><input type="text" class="tf-input" data-col="5" placeholder="%"></th>
+                <th><input type="text" class="tf-input" data-col="6" placeholder="организация"></th>
+                <th><input type="text" class="tf-input" data-col="7" placeholder="менеджер"></th>
+                <th><input type="text" class="tf-input" data-col="8" placeholder="оборудование"></th>
+            </tr>
+        </thead>
+        <tbody>
+            {% for inv in items %}
+            <tr class="clickable-row" onclick="window.location='/requests/{{ inv.request_id }}'">
+                <td>{{ inv.id }}</td>
+                <td><strong>{{ inv.request.tkp_num if inv.request else '-' }}</strong></td>
+                <td>{{ inv.invoice_num or '-' }}</td>
+                <td>{{ inv.invoice_date.strftime('%d.%m.%Y') if inv.invoice_date else '-' }}</td>
+                <td style="text-align:right;white-space:nowrap;">{{ "{:,.2f}".format(inv.amount).replace(",", " ") if inv.amount else '0.00' }}</td>
+                <td>{{ inv.percent }}</td>
+                <td>{{ inv.request.company.name if inv.request and inv.request.company else '-' }}</td>
+                <td>{{ inv.request.manager.name if inv.request and inv.request.manager else '-' }}</td>
+                <td>{{ inv.request.equipment.name if inv.request and inv.request.equipment else '-' }}</td>
+            </tr>
+            {% endfor %}
+            {% if not items %}
+            <tr class="empty-row"><td colspan="9">Нет счетов</td></tr>
+            {% endif %}
+        </tbody>
+    </table>
+</div>
+
+{% if pages > 1 %}
+<div class="pagination">
+    {% for p in range(1, pages + 1) %}
+    <a href="/invoices?page={{ p }}" class="{{ 'active' if p == page else '' }}">{{ p }}</a>
+    {% endfor %}
+</div>
+{% endif %}
+
+<script>
+document.querySelectorAll('.table-filter .tf-input').forEach(input => {
+    input.addEventListener('input', function() {
+        const col = parseInt(this.dataset.col);
+        const val = this.value.toLowerCase();
+        document.querySelectorAll('tbody tr:not(.empty-row)').forEach(row => {
+            const cell = row.cells[col];
+            if (!cell) return;
+            row.style.display = cell.textContent.toLowerCase().includes(val) ? '' : 'none';
+        });
+    });
+});
+</script>
+{% endblock %}

@@ -1,0 +1,16 @@
+{% extends "base.html" %}
+{% block title %}Расчет ТКП #{{ req.id }}{% endblock %}
+{% block content %}
+<div class="page-header">
+    <div>
+        <h1>Расчет ТКП</h1>
+        <div class="subtitle">Код: {{ req.id }} &middot; {{ req.tkp_num or '' }}</div>
+    </div>
+</div>
+<div style="display:flex;gap:0.5rem;margin-bottom:0.75rem;">
+    <a href="/requests/{{ req.id }}" class="btn btn-ghost">← Назад к ТКП</a>
+</div>
+<div class="card">
+    <p style="color:var(--text-muted);">Страница расчета ТКП будет описана позже.</p>
+</div>
+{% endblock %}
