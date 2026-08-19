@@ -108,12 +108,14 @@ async def request_create_page(
     user = await get_current_user(request, session)
     if not user:
         return RedirectResponse("/", status_code=302)
-    cps, _ = await crud_counterparties.get_counterparties(session, per_page=100)
-    equipment_list, _ = await crud_equipment.get_equipment_list(session, per_page=100)
-    return templates.TemplateResponse(
-        "requests/create.html",
-        {"request": request, "user": user, "counterparties": cps, "equipment": equipment_list, "statuses": RequestStatus, "active_page": "requests"},
+    from scr.dbase.schemas.schemas import RequestCreateSchema
+    # Create minimal request with auto-filled fields
+    schema = RequestCreateSchema()
+    new_req = await crud_requests.add_request(
+        session, schema, manager_id=user.id, created_by=user.name, user_city=user.city
     )
+    await session.commit()
+    return RedirectResponse(f"/requests/{new_req.id}", status_code=302)
 
 
 @pages_router.post("/requests/create", response_class=HTMLResponse)
@@ -184,7 +186,7 @@ async def request_detail_page(
     equipment_list, _ = await crud_equipment.get_equipment_list(session, per_page=100)
     companies_list, _ = await crud_organizations.get_organizations(session, per_page=100)
     from sqlalchemy import select as sa_select
-    related, _ = await crud_requests.get_requests(session, company_id=req.company_id, per_page=50)
+    related, _ = await crud_requests.get_requests(session, company_id=req.company_id, per_page=50) if req.company_id else ([], 0)
     invoices = await crud_invoices.get_invoices_by_request(session, req_id)
     payment_items = await crud_payments.ensure_payment_items(session, req_id)
     all_settings = await crud_settings.get_all_settings(session)

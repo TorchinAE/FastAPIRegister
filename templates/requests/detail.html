@@ -7,7 +7,7 @@
         <div class="subtitle">Код: {{ req.id }} &middot; {{ req.tkp_num or '' }}</div>
     </div>
 </div>
-<form id="main-form" method="post" action="/requests/{{ req.id }}" class="edit-form" style="padding:1rem;">
+<form id="main-form" method="post" action="/requests/{{ req.id }}" class="edit-form" style="padding:1rem;" data-is-new="{{ '1' if not req.counterparty_id else '' }}">
 <div style="display:flex;gap:0.5rem;margin-bottom:0.75rem;flex-wrap:wrap;">
     <a href="/requests" class="btn btn-ghost">← Назад к списку</a>
     <a href="/requests/create" class="btn btn-success">+ Новое ТКП</a>
@@ -33,7 +33,7 @@
                 <div class="fg-h"><label>Стоимость с НДС</label><input type="text" name="cost" id="cost-field" value="{{ req.cost or 0 }}" inputmode="decimal" style="width:35ch;"></div>
                 <div class="fg-h"><label>Менеджер</label><select name="manager_id" style="width:35ch;">{% for u in users_list %}<option value="{{ u.id }}" {{ 'selected' if u.id == req.manager_id else '' }}>{{ u.name }}</option>{% endfor %}</select></div>
                 <div class="fg-h"><label>Контакт</label><select name="contact_id" id="contact-select" data-search-select data-add-url="/counterparties" data-add-label="Добавить контакт" style="width:35ch;"><option value="">-- Не выбран --</option>{% for cp in counterparties %}<option value="{{ cp.id }}" data-company="{{ cp.company_id }}" data-company-name="{{ cp.company.name if cp.company else '' }}" data-cp-email="{{ cp.email or '' }}" data-cp-phone="{{ cp.phone or '' }}" data-director="{{ cp.company.director.name if cp.company and cp.company.director else '' }}" data-position="{{ cp.company.director.position.name if cp.company and cp.company.director and cp.company.director.position else '' }}" {{ 'selected' if cp.id == req.counterparty_id else '' }}>{{ cp.name }}</option>{% endfor %}</select></div>
-                <div class="fg-h"><label>Организация</label><select name="company_id" id="company-select" data-search-select data-add-url="/companies/create" data-add-label="Добавить организацию" style="width:35ch;">{% for c in companies %}<option value="{{ c.id }}" {{ 'selected' if c.id == req.company_id else '' }}>{{ c.name }}</option>{% endfor %}</select></div>
+                <div class="fg-h"><label>Организация</label><select name="company_id" id="company-select" data-search-select data-add-url="/companies/create" data-add-label="Добавить организацию" style="width:35ch;"><option value="">-- Не выбрано --</option>{% for c in companies %}<option value="{{ c.id }}" {{ 'selected' if c.id == req.company_id else '' }}>{{ c.name }}</option>{% endfor %}</select></div>
                 <div class="fg-h"><label>Состояние</label><select name="status" style="width:35ch;">{% for s in statuses %}<option value="{{ s.value }}" {{ 'selected' if req.status and req.status.value == s.value else '' }}>{{ s.value }}</option>{% endfor %}</select></div>
                 <div class="fg-h"><label>Вероятность</label><select name="probability_id" id="probability-select" style="width:35ch;"><option value="">-- Не задано --</option>{% for p in probabilities %}<option value="{{ p.id }}" {{ 'selected' if req.probability_id == p.id else '' }}>{{ p.name }}</option>{% endfor %}</select></div>
             </div>
@@ -585,8 +585,11 @@ async function saveInvoice(row) {
 // === Auto-save main form ===
 const mainForm = document.getElementById('main-form');
 let saveTimer = null;
+const isNewRequest = mainForm.dataset.isNew === '1';
+let hasUserChanges = false;
 
 async function autoSaveForm() {
+    if (isNewRequest) hasUserChanges = true;
     const amountInputs = mainForm.querySelectorAll(AMOUNT_SEL);
     amountInputs.forEach(inp => unformatInput(inp));
     const formData = new FormData(mainForm);
@@ -595,11 +598,13 @@ async function autoSaveForm() {
 }
 
 mainForm.addEventListener('input', () => {
+    hasUserChanges = true;
     clearTimeout(saveTimer);
     saveTimer = setTimeout(autoSaveForm, 500);
 });
 
 mainForm.addEventListener('change', () => {
+    hasUserChanges = true;
     clearTimeout(saveTimer);
     saveTimer = setTimeout(autoSaveForm, 300);
 });
@@ -608,6 +613,13 @@ mainForm.addEventListener('submit', e => {
     e.preventDefault();
     clearTimeout(saveTimer);
     autoSaveForm();
+});
+
+// Delete empty new request on page unload
+window.addEventListener('beforeunload', () => {
+    if (isNewRequest && !hasUserChanges) {
+        fetch(`/api/requests/${REQ_ID}`, {method: 'DELETE', keepalive: true});
+    }
 });
 </script>
 {% endblock %}

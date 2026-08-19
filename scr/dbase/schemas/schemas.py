@@ -201,7 +201,8 @@ class EquipmentResponseSchema(BaseModel):
 class RequestCreateSchema(BaseModel):
     model_config = ConfigDict(from_attributes=True)
 
-    counterparty_id: int
+    counterparty_id: Optional[int] = None
+    company_id: Optional[int] = None
     equipment_id: Optional[int] = None
     description: Optional[str] = None
     notes: Optional[str] = None

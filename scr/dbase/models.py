@@ -202,11 +202,11 @@ DEFAULT_PROBABILITIES = [
 
 class Request(BaseID):
     __tablename__ = "requests"
-    counterparty_id: Mapped[int] = mapped_column(
-        ForeignKey("counterparties.id"), nullable=False
+    counterparty_id: Mapped[int | None] = mapped_column(
+        ForeignKey("counterparties.id"), nullable=True
     )
-    company_id: Mapped[int] = mapped_column(
-        ForeignKey("organizations.id"), nullable=False
+    company_id: Mapped[int | None] = mapped_column(
+        ForeignKey("organizations.id"), nullable=True
     )
     manager_id: Mapped[int] = mapped_column(ForeignKey("users.id"), nullable=False)
     equipment_id: Mapped[Optional[int]] = mapped_column(

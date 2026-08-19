@@ -71,13 +71,15 @@ async def add_request(
     created_by: str | None = None,
     user_city: str = "ив",
 ) -> Request:
-    counterparty = await session.get(Counterparty, in_req.counterparty_id)
-    if not counterparty:
-        return None
+    company_id = in_req.company_id
+    if in_req.counterparty_id and not company_id:
+        counterparty = await session.get(Counterparty, in_req.counterparty_id)
+        if counterparty:
+            company_id = counterparty.company_id
 
     req = Request(
         counterparty_id=in_req.counterparty_id,
-        company_id=counterparty.company_id,
+        company_id=company_id,
         manager_id=manager_id,
         equipment_id=in_req.equipment_id,
         description=in_req.description,
