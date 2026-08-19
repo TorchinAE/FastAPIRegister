@@ -32,7 +32,7 @@
                 <div class="fg-h"><label>Оборудование</label><select name="equipment_id" id="equipment-select" data-search-select data-add-url="/equipment" data-add-label="Добавить оборудование" style="width:35ch;"><option value="">-- Не выбрано --</option>{% for eq in equipment %}<option value="{{ eq.id }}" {{ 'selected' if req.equipment_id == eq.id else '' }}>{{ eq.name }}</option>{% endfor %}</select></div>
                 <div class="fg-h"><label>Стоимость с НДС</label><input type="text" name="cost" id="cost-field" value="{{ req.cost or 0 }}" inputmode="decimal" style="width:35ch;"></div>
                 <div class="fg-h"><label>Менеджер</label><select name="manager_id" style="width:35ch;">{% for u in users_list %}<option value="{{ u.id }}" {{ 'selected' if u.id == req.manager_id else '' }}>{{ u.name }}</option>{% endfor %}</select></div>
-                <div class="fg-h"><label>Контакт</label><select name="contact_id" id="contact-select" data-search-select data-add-url="/counterparties" data-add-label="Добавить контакт" style="width:35ch;"><option value="">-- Не выбран --</option>{% for cp in counterparties %}<option value="{{ cp.id }}" data-company="{{ cp.company_id }}" {{ 'selected' if cp.id == req.counterparty_id else '' }}>{{ cp.name }}</option>{% endfor %}</select></div>
+                <div class="fg-h"><label>Контакт</label><select name="contact_id" id="contact-select" data-search-select data-add-url="/counterparties" data-add-label="Добавить контакт" style="width:35ch;"><option value="">-- Не выбран --</option>{% for cp in counterparties %}<option value="{{ cp.id }}" data-company="{{ cp.company_id }}" data-company-name="{{ cp.company.name if cp.company else '' }}" data-cp-email="{{ cp.email or '' }}" data-cp-phone="{{ cp.phone or '' }}" data-director="{{ cp.company.director.name if cp.company and cp.company.director else '' }}" data-position="{{ cp.company.director.position.name if cp.company and cp.company.director and cp.company.director.position else '' }}" {{ 'selected' if cp.id == req.counterparty_id else '' }}>{{ cp.name }}</option>{% endfor %}</select></div>
                 <div class="fg-h"><label>Организация</label><select name="company_id" id="company-select" data-search-select data-add-url="/companies/create" data-add-label="Добавить организацию" style="width:35ch;">{% for c in companies %}<option value="{{ c.id }}" {{ 'selected' if c.id == req.company_id else '' }}>{{ c.name }}</option>{% endfor %}</select></div>
                 <div class="fg-h"><label>Состояние</label><select name="status" style="width:35ch;">{% for s in statuses %}<option value="{{ s.value }}" {{ 'selected' if req.status and req.status.value == s.value else '' }}>{{ s.value }}</option>{% endfor %}</select></div>
                 <div class="fg-h"><label>Вероятность</label><select name="probability_id" id="probability-select" style="width:35ch;"><option value="">-- Не задано --</option>{% for p in probabilities %}<option value="{{ p.id }}" {{ 'selected' if req.probability_id == p.id else '' }}>{{ p.name }}</option>{% endfor %}</select></div>
@@ -153,18 +153,19 @@
         </div>
 
         <div class="form-section">
-            <h3 class="form-section-title">Справка по менеджеру</h3>
-            {% if req.manager %}
-            <div class="info-card">
-                <div class="info-row"><span class="info-label">ID</span><span class="info-value">{{ req.manager.id }}</span></div>
-                <div class="info-row"><span class="info-label">ФИО</span><span class="info-value">{{ req.manager.name }}</span></div>
-                <div class="info-row"><span class="info-label">Email</span><span class="info-value">{{ req.manager.email or '-' }}</span></div>
-                <div class="info-row"><span class="info-label">Телефон</span><span class="info-value">{{ req.manager.phone or '-' }}</span></div>
-                <div class="info-row"><span class="info-label">Город</span><span class="info-value">{{ req.manager.city or '-' }}</span></div>
-                <div class="info-row"><span class="info-label">Подпись</span><span class="info-value">{{ req.manager.signature or '-' }}</span></div>
+            <h3 class="form-section-title">Справка по контакту</h3>
+            {% if req.counterparty %}
+            <div class="info-card" id="contact-info">
+                <div class="info-row"><span class="info-label">ID</span><span class="info-value" data-ci="id">{{ req.counterparty.id }}</span></div>
+                <div class="info-row"><span class="info-label">ФИО</span><span class="info-value" data-ci="name">{{ req.counterparty.name }}</span></div>
+                <div class="info-row"><span class="info-label">Email</span><span class="info-value" data-ci="email">{{ req.counterparty.email or '-' }}</span></div>
+                <div class="info-row"><span class="info-label">Телефон</span><span class="info-value" data-ci="phone">{{ req.counterparty.phone or '-' }}</span></div>
+                <div class="info-row"><span class="info-label">Компания</span><span class="info-value" data-ci="company">{{ req.counterparty.company.name if req.counterparty.company else '-' }}</span></div>
+                <div class="info-row"><span class="info-label">Директор</span><span class="info-value" data-ci="director">{{ req.counterparty.company.director.name if req.counterparty.company and req.counterparty.company.director else '-' }}</span></div>
+                <div class="info-row"><span class="info-label">Должность</span><span class="info-value" data-ci="position">{{ req.counterparty.company.director.position.name if req.counterparty.company and req.counterparty.company.director and req.counterparty.company.director.position else '-' }}</span></div>
             </div>
             {% else %}
-            <p style="color:var(--text-muted);font-size:0.85rem;">Менеджер не назначен</p>
+            <p style="color:var(--text-muted);font-size:0.85rem;" id="contact-info-empty">Контакт не выбран</p>
             {% endif %}
         </div>
     </div>
@@ -214,6 +215,130 @@ function setupAmountInputs(root) {
 }
 setupAmountInputs(document);
 
+// === Searchable select ===
+function initSearchSelect(sel) {
+    const wrapper = document.createElement('div');
+    wrapper.className = 'search-select';
+    sel.parentNode.insertBefore(wrapper, sel);
+    wrapper.appendChild(sel);
+    sel.style.display = 'none';
+
+    const input = document.createElement('input');
+    input.type = 'text';
+    input.className = 'ss-input';
+    input.autocomplete = 'off';
+    input.placeholder = '-- Не выбрано --';
+    wrapper.appendChild(input);
+
+    const clearBtn = document.createElement('span');
+    clearBtn.className = 'ss-clear';
+    clearBtn.innerHTML = '&times;';
+    wrapper.appendChild(clearBtn);
+
+    const dropdown = document.createElement('div');
+    dropdown.className = 'ss-dropdown';
+    wrapper.appendChild(dropdown);
+
+    const addUrl = sel.dataset.addUrl;
+    const addLabel = sel.dataset.addLabel || '+ Добавить...';
+
+    function buildOptions() {
+        dropdown.innerHTML = '';
+        Array.from(sel.options).forEach(opt => {
+            if (!opt.value) return;
+            const div = document.createElement('div');
+            div.className = 'ss-option';
+            div.dataset.value = opt.value;
+            div.textContent = opt.textContent;
+            div.addEventListener('mousedown', e => {
+                e.preventDefault();
+                selectOption(opt.value, opt.textContent);
+            });
+            dropdown.appendChild(div);
+        });
+        if (addUrl) {
+            const addDiv = document.createElement('div');
+            addDiv.className = 'ss-option ss-add';
+            addDiv.textContent = addLabel;
+            addDiv.addEventListener('mousedown', e => {
+                e.preventDefault();
+                pendingAdd = true;
+                window.open(addUrl, '_blank');
+            });
+            dropdown.appendChild(addDiv);
+        }
+    }
+
+    function selectOption(val, text) {
+        sel.value = val;
+        input.value = text || '';
+        clearBtn.style.display = val ? 'block' : 'none';
+        wrapper.classList.remove('open');
+        sel.dispatchEvent(new Event('change', {bubbles: true}));
+    }
+
+    function setDisplayFromSelect() {
+        const opt = sel.options[sel.selectedIndex];
+        if (opt && opt.value) {
+            input.value = opt.textContent;
+            clearBtn.style.display = 'block';
+        } else {
+            input.value = '';
+            clearBtn.style.display = 'none';
+        }
+    }
+
+    function filterOptions() {
+        const q = input.value.toLowerCase();
+        dropdown.querySelectorAll('.ss-option:not(.ss-add)').forEach(div => {
+            const match = div.textContent.toLowerCase().includes(q);
+            div.classList.toggle('ss-hidden', !match);
+        });
+    }
+
+    input.addEventListener('focus', () => {
+        buildOptions();
+        wrapper.classList.add('open');
+        filterOptions();
+    });
+
+    input.addEventListener('input', () => {
+        if (!wrapper.classList.contains('open')) {
+            buildOptions();
+            wrapper.classList.add('open');
+        }
+        filterOptions();
+        sel.value = '';
+        clearBtn.style.display = input.value ? 'block' : 'none';
+    });
+
+    input.addEventListener('blur', () => {
+        setTimeout(() => {
+            wrapper.classList.remove('open');
+            if (!sel.value) setDisplayFromSelect();
+        }, 150);
+    });
+
+    clearBtn.addEventListener('mousedown', e => {
+        e.preventDefault();
+        sel.value = '';
+        input.value = '';
+        clearBtn.style.display = 'none';
+        sel.dispatchEvent(new Event('change', {bubbles: true}));
+        input.focus();
+    });
+
+    setDisplayFromSelect();
+}
+
+document.querySelectorAll('[data-search-select]').forEach(initSearchSelect);
+
+// Reload page when returning from "add in new tab"
+let pendingAdd = false;
+window.addEventListener('focus', () => {
+    if (pendingAdd) { pendingAdd = false; location.reload(); }
+});
+
 function openFolderTKP() {
     if (!SERVER_ADDR) { alert('Не задан адрес_сервера в настройках'); return; }
     const tmp = document.createElement('textarea');
@@ -241,9 +366,34 @@ function toggleZZButton() {
 }
 toggleZZButton();
 
-// Contact -> Organization auto-fill
+// Contact -> Organization auto-fill + update sidebar
 document.getElementById('contact-select').addEventListener('change', function() {
     const opt = this.options[this.selectedIndex];
+    // Update sidebar
+    const infoCard = document.getElementById('contact-info');
+    if (opt.value) {
+        const html = `
+            <div class="info-row"><span class="info-label">ID</span><span class="info-value">${opt.value}</span></div>
+            <div class="info-row"><span class="info-label">ФИО</span><span class="info-value">${opt.textContent}</span></div>
+            <div class="info-row"><span class="info-label">Email</span><span class="info-value">${opt.dataset.cpEmail || '-'}</span></div>
+            <div class="info-row"><span class="info-label">Телефон</span><span class="info-value">${opt.dataset.cpPhone || '-'}</span></div>
+            <div class="info-row"><span class="info-label">Компания</span><span class="info-value">${opt.dataset.companyName || '-'}</span></div>
+            <div class="info-row"><span class="info-label">Директор</span><span class="info-value">${opt.dataset.director || '-'}</span></div>
+            <div class="info-row"><span class="info-label">Должность</span><span class="info-value">${opt.dataset.position || '-'}</span></div>`;
+        if (infoCard) {
+            infoCard.innerHTML = html;
+        } else {
+            const section = document.getElementById('contact-info-empty');
+            if (section) {
+                const card = document.createElement('div');
+                card.className = 'info-card';
+                card.id = 'contact-info';
+                card.innerHTML = html;
+                section.replaceWith(card);
+            }
+        }
+    }
+    // Auto-fill organization
     if (!opt.value) return;
     const companyId = opt.dataset.company;
     if (companyId) {

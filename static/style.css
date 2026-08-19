@@ -242,3 +242,18 @@ form { background: var(--surface); padding: 1.5rem; border-radius: var(--radius)
     .fg-2col { grid-template-columns: 1fr; }
     .fg-h label { flex: 0 0 120px; }
 }
+
+/* Searchable select */
+.search-select { position: relative; flex: 1; min-width: 0; }
+.search-select .ss-input { width: 100%; padding: 0.35rem 0.5rem; font-size: 0.85rem; border: 1.5px solid var(--border); border-radius: 4px; background: #fff; color: var(--text); outline: none; font-family: inherit; cursor: text; }
+.search-select .ss-input:focus { border-color: var(--primary); box-shadow: 0 0 0 2px rgba(79,70,229,0.12); }
+.search-select .ss-clear { position: absolute; right: 6px; top: 50%; transform: translateY(-50%); background: none; border: none; color: var(--text-muted); cursor: pointer; font-size: 1rem; padding: 0 4px; line-height: 1; display: none; }
+.search-select .ss-clear:hover { color: var(--text); }
+.search-select .ss-dropdown { display: none; position: absolute; top: 100%; left: 0; right: 0; background: #fff; border: 1.5px solid var(--border); border-top: none; border-radius: 0 0 4px 4px; max-height: 220px; overflow-y: auto; z-index: 50; box-shadow: 0 4px 12px rgba(0,0,0,0.1); }
+.search-select .ss-option { padding: 0.4rem 0.6rem; font-size: 0.82rem; cursor: pointer; color: var(--text); }
+.search-select .ss-option:hover { background: #eef2ff; }
+.search-select .ss-option.ss-add { color: var(--success); font-weight: 600; border-top: 1px solid var(--border); }
+.search-select .ss-option.ss-add:hover { background: #f0fdf4; }
+.search-select .ss-option.ss-hidden { display: none; }
+.search-select.open .ss-dropdown { display: block; }
+.search-select.open .ss-input { border-radius: 4px 4px 0 0; }

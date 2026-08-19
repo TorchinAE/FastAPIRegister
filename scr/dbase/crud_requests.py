@@ -4,7 +4,7 @@ from sqlalchemy import select, Result, func
 from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy.orm import selectinload
 
-from scr.dbase.models import Request, RequestStatus, Counterparty, Organization, Probability, User
+from scr.dbase.models import Request, RequestStatus, Counterparty, Organization, Directors, Probability, User
 from scr.dbase.schemas.schemas import RequestCreateSchema, RequestUpdateSchema
 
 
@@ -55,7 +55,7 @@ async def get_request_by_id(
     session: AsyncSession, req_id: int
 ) -> Request | None:
     stmt = select(Request).options(
-        selectinload(Request.counterparty).selectinload(Counterparty.company),
+        selectinload(Request.counterparty).selectinload(Counterparty.company).selectinload(Organization.director).selectinload(Directors.position),
         selectinload(Request.company),
         selectinload(Request.manager),
         selectinload(Request.equipment),

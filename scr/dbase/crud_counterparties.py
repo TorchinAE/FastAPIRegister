@@ -2,7 +2,7 @@ from sqlalchemy import select, Result, func
 from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy.orm import selectinload
 
-from scr.dbase.models import Counterparty
+from scr.dbase.models import Counterparty, Organization, Directors
 from scr.dbase.schemas.schemas import CounterpartyCreateSchema, CounterpartyUpdateSchema
 
 
@@ -13,7 +13,9 @@ async def get_counterparties(
     page: int = 1,
     per_page: int = 20,
 ) -> tuple[list[Counterparty], int]:
-    stmt = select(Counterparty).options(selectinload(Counterparty.company)).order_by(Counterparty.name)
+    stmt = select(Counterparty).options(
+        selectinload(Counterparty.company).selectinload(Organization.director).selectinload(Directors.position)
+    ).order_by(Counterparty.name)
     count_stmt = select(func.count(Counterparty.id))
 
     if company_id:
@@ -33,7 +35,9 @@ async def get_counterparties(
 async def get_counterparty_by_id(
     session: AsyncSession, cp_id: int
 ) -> Counterparty | None:
-    stmt = select(Counterparty).options(selectinload(Counterparty.company)).where(Counterparty.id == cp_id)
+    stmt = select(Counterparty).options(
+        selectinload(Counterparty.company).selectinload(Organization.director).selectinload(Directors.position)
+    ).where(Counterparty.id == cp_id)
     result: Result = await session.execute(stmt)
     return result.scalar_one_or_none()
 
