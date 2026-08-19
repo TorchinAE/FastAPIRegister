@@ -193,18 +193,26 @@ form { background: var(--surface); padding: 1.5rem; border-radius: var(--radius)
 .current-row td { background: #eef2ff !important; font-weight: 600; }
 
 /* Invoice rows */
-.invoice-row { display: flex; gap: 0.5rem; align-items: end; padding: 0.35rem 0; border-bottom: 1px solid var(--border); flex-wrap: wrap; }
+.invoice-row { display: flex; gap: 0.4rem; align-items: end; padding: 0.35rem 0; border-bottom: 1px solid var(--border); flex-wrap: nowrap; }
 .invoice-row:last-child { border-bottom: none; }
-.invoice-row .fg-h { gap: 0.25rem; }
+.invoice-row .fg-h { gap: 0.2rem; }
 .invoice-row .fg-h label { flex: 0 0 auto; font-size: 0.75rem; }
 .invoice-row .fg-h input { padding: 0.3rem 0.4rem; font-size: 0.82rem; }
 .invoice-row .btn-icon { margin-bottom: 0.15rem; }
 
 /* Payment rows */
-.payment-row { display: flex; gap: 0.5rem; align-items: end; padding: 0.3rem 0; border-bottom: 1px solid var(--border); flex-wrap: wrap; }
+.payment-row { display: flex; gap: 0.4rem; align-items: end; padding: 0.35rem 0; border-bottom: 1px solid var(--border); flex-wrap: nowrap; }
 .payment-row:last-child { border-bottom: none; }
-.payment-row > .fg-h:first-child { flex: 0 0 100px; }
-.payment-row > .fg-h:first-child label { font-size: 0.8rem; font-weight: 600; color: var(--text); }
+.payment-row > .fg-h:first-child { flex: 0 0 110px; align-self: center; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.payment-row > .fg-h:first-child label { font-size: 0.75rem; font-weight: 400; color: var(--text); text-align: left; width: auto; }
+.payment-row .fg-h { gap: 0.2rem; flex: 0 0 auto; align-items: center; }
+.payment-row .fg-h label { flex: 0 0 auto; font-size: 0.75rem; text-align: left; width: auto; }
+.payment-row .fg-h input { padding: 0.3rem 0.4rem; font-size: 0.82rem; width: 100%; }
+.payment-row > .fg-h:nth-child(2) { flex: 0 0 140px; }
+.payment-row > .fg-h:nth-child(3) { flex: 0 0 100px; }
+.payment-row > .fg-h:nth-child(4) { flex: 0 0 160px; }
+.payment-row > .fg-h:nth-child(5) { flex: 0 0 140px; }
+.payment-row > .fg-h:nth-child(6) { flex: 0 0 160px; }
 
 /* Compact edit layout */
 .edit-compact { display: grid; grid-template-columns: 1fr 260px; gap: 1rem; align-items: start; }

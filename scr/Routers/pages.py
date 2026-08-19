@@ -179,24 +179,6 @@ async def request_detail_page(
     req = await crud_requests.get_request_by_id(session, req_id)
     if not req:
         return HTMLResponse("ТКП не найдена", status_code=404)
-    return templates.TemplateResponse(
-        "requests/detail.html",
-        {"request": request, "user": user, "req": req, "active_page": "requests"},
-    )
-
-
-@pages_router.get("/requests/{req_id}/edit", response_class=HTMLResponse)
-async def request_edit_page(
-    req_id: int,
-    request: Request,
-    session: AsyncSession = Depends(db_helper.session_dependency),
-):
-    user = await get_current_user(request, session)
-    if not user:
-        return RedirectResponse("/", status_code=302)
-    req = await crud_requests.get_request_by_id(session, req_id)
-    if not req:
-        return HTMLResponse("ТКП не найдена", status_code=404)
     cps, _ = await crud_counterparties.get_counterparties(session, per_page=100)
     managers_list, _ = await crud_users.get_users(session, per_page=100)
     equipment_list, _ = await crud_equipment.get_equipment_list(session, per_page=100)
@@ -215,12 +197,12 @@ async def request_edit_page(
     probs_result = await session.execute(sa_select(Probability).order_by(Probability.id))
     probabilities = list(probs_result.scalars().all())
     return templates.TemplateResponse(
-        "requests/edit.html",
+        "requests/detail.html",
         {"request": request, "user": user, "req": req, "counterparties": cps, "managers": managers_list, "managers_with_orgs": managers_with_orgs, "equipment": equipment_list, "companies": companies_list, "related_requests": related, "statuses": RequestStatus, "invoices": invoices, "payment_items": payment_items, "settings": settings_dict, "probabilities": probabilities, "active_page": "requests"},
     )
 
 
-@pages_router.post("/requests/{req_id}/edit", response_class=HTMLResponse)
+@pages_router.post("/requests/{req_id}", response_class=HTMLResponse)
 async def request_edit_submit(
     req_id: int,
     request: Request,
@@ -270,7 +252,7 @@ async def request_edit_submit(
     schema = RequestUpdateSchema(**data)
     await crud_requests.update_request(session, schema)
     await session.commit()
-    return RedirectResponse(f"/requests/{req_id}/edit", status_code=302)
+    return RedirectResponse(f"/requests/{req_id}", status_code=302)
 
 
 # --- Counterparties ---

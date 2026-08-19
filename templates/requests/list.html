@@ -71,7 +71,7 @@
         </thead>
         <tbody>
             {% for req in items %}
-            <tr class="clickable-row" onclick="window.location='/requests/{{ req.id }}/edit'">
+            <tr class="clickable-row" onclick="window.location='/requests/{{ req.id }}'">
                 <td><strong>#{{ req.id }}</strong></td>
                 <td>{{ req.tkp_num or '-' }}</td>
                 <td data-sort="{{ req.request_date.strftime('%Y%m%d') if req.request_date else '' }}">{{ req.request_date.strftime('%d.%m.%Y') if req.request_date else '-' }}</td>
@@ -88,7 +88,7 @@
                 </td>
                 <td>{{ req.equipment.name if req.equipment else '-' }}</td>
                 <td class="desc-cell">{{ req.description or '-' }}</td>
-                <td>{{ req.cost or 0 }}</td>
+                <td style="text-align:right;white-space:nowrap;">{{ "{:,.2f}".format(req.cost).replace(",", " ") if req.cost else '0.00' }}</td>
                 <td>{{ req.bktpb }}</td>
                 <td>{{ req.ktpb }}</td>
                 <td>{{ req.ktp }}</td>

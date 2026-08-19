@@ -307,6 +307,8 @@ class Invoice(BaseID):
     )
     percent: Mapped[float] = mapped_column(Numeric(5, 2), default=0)
     amount: Mapped[float] = mapped_column(Numeric(12, 2), default=0)
+    paid_amount: Mapped[float] = mapped_column(Numeric(12, 2), default=0, nullable=False)
+    paid_date: Mapped[Optional[datetime]] = mapped_column(DateTime, nullable=True)
 
     request: Mapped["Request"] = relationship(back_populates="invoices")
 
@@ -321,6 +323,8 @@ class PaymentItem(BaseID):
     amount: Mapped[float] = mapped_column(Numeric(12, 2), default=0)
     percent: Mapped[float] = mapped_column(Numeric(5, 2), default=0)
     due_date: Mapped[Optional[datetime]] = mapped_column(DateTime, nullable=True)
+    paid_amount: Mapped[float] = mapped_column(Numeric(12, 2), default=0, nullable=False)
+    paid_date: Mapped[Optional[datetime]] = mapped_column(DateTime, nullable=True)
 
     request: Mapped["Request"] = relationship(back_populates="payment_items")
 

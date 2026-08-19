@@ -354,6 +354,8 @@ class InvoiceCreateSchema(BaseModel):
     invoice_date: Optional[datetime] = None
     percent: float = Field(0, ge=0, le=100)
     amount: float = Field(0, ge=0)
+    paid_amount: float = Field(0, ge=0)
+    paid_date: Optional[datetime] = None
 
 
 class InvoiceUpdateSchema(BaseModel):
@@ -364,6 +366,8 @@ class InvoiceUpdateSchema(BaseModel):
     invoice_date: Optional[datetime] = None
     percent: Optional[float] = Field(None, ge=0, le=100)
     amount: Optional[float] = Field(None, ge=0)
+    paid_amount: Optional[float] = Field(None, ge=0)
+    paid_date: Optional[datetime] = None
 
 
 class InvoiceResponseSchema(BaseModel):
@@ -375,6 +379,8 @@ class InvoiceResponseSchema(BaseModel):
     invoice_date: datetime
     percent: float = 0
     amount: float = 0
+    paid_amount: float = 0
+    paid_date: Optional[datetime] = None
     created_by: Optional[str] = None
 
 
@@ -388,6 +394,8 @@ class PaymentItemCreateSchema(BaseModel):
     amount: float = Field(0, ge=0)
     percent: float = Field(0, ge=0, le=100)
     due_date: Optional[datetime] = None
+    paid_amount: float = Field(0, ge=0)
+    paid_date: Optional[datetime] = None
 
 
 class PaymentItemUpdateSchema(BaseModel):
@@ -397,6 +405,8 @@ class PaymentItemUpdateSchema(BaseModel):
     amount: Optional[float] = Field(None, ge=0)
     percent: Optional[float] = Field(None, ge=0, le=100)
     due_date: Optional[datetime] = None
+    paid_amount: Optional[float] = Field(None, ge=0)
+    paid_date: Optional[datetime] = None
 
 
 class PaymentItemResponseSchema(BaseModel):
@@ -408,6 +418,8 @@ class PaymentItemResponseSchema(BaseModel):
     amount: float = 0
     percent: float = 0
     due_date: Optional[datetime] = None
+    paid_amount: float = 0
+    paid_date: Optional[datetime] = None
     created_by: Optional[str] = None
 
 
