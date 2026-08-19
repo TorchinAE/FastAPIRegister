@@ -4,7 +4,7 @@ from sqlalchemy import select, Result, func
 from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy.orm import selectinload
 
-from scr.dbase.models import Request, RequestStatus, Counterparty, Organization, Probability, Manager, User
+from scr.dbase.models import Request, RequestStatus, Counterparty, Organization, Probability, User
 from scr.dbase.schemas.schemas import RequestCreateSchema, RequestUpdateSchema
 
 
@@ -57,8 +57,7 @@ async def get_request_by_id(
     stmt = select(Request).options(
         selectinload(Request.counterparty).selectinload(Counterparty.company),
         selectinload(Request.company),
-        selectinload(Request.manager).selectinload(Manager.organizations),
-        selectinload(Request.manager).selectinload(Manager.user),
+        selectinload(Request.manager),
         selectinload(Request.equipment),
     ).where(Request.id == req_id)
     result: Result = await session.execute(stmt)
@@ -123,13 +122,11 @@ async def update_request(
         return None
 
     update_data = upd_req.model_dump(exclude_unset=True)
-    # If counterparty changed, auto-update company_id
     if "counterparty_id" in update_data:
         counterparty = await session.get(Counterparty, update_data["counterparty_id"])
         if counterparty:
             check_req.company_id = counterparty.company_id
 
-    # Auto-set probability to 100% when factory_order_num is set
     if "factory_order_num" in update_data and update_data["factory_order_num"]:
         stmt = select(Probability).where(Probability.value == 100)
         result = await session.execute(stmt)

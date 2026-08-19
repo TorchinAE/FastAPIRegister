@@ -29,11 +29,11 @@
                 <div class="fg-h"><label>Повтор ТКП</label><input type="text" name="repeat_tkp" value="{{ req.repeat_tkp or '' }}" style="width:35ch;"></div>
                 <div class="fg-h"><label>№ ТКП</label><input type="text" value="{{ req.tkp_num or '-' }}" disabled style="width:35ch;"></div>
                 <div class="fg-h"><label>Дата выдачи ТКП</label><input type="date" name="issue_date" value="{{ req.issue_date.strftime('%Y-%m-%d') if req.issue_date else '' }}" style="width:35ch;"></div>
-                <div class="fg-h"><label>Оборудование</label><select name="equipment_id" style="width:35ch;"><option value="">-- Не выбрано --</option>{% for eq in equipment %}<option value="{{ eq.id }}" {{ 'selected' if req.equipment_id == eq.id else '' }}>{{ eq.name }}</option>{% endfor %}</select></div>
+                <div class="fg-h"><label>Оборудование</label><select name="equipment_id" id="equipment-select" data-search-select data-add-url="/equipment" data-add-label="Добавить оборудование" style="width:35ch;"><option value="">-- Не выбрано --</option>{% for eq in equipment %}<option value="{{ eq.id }}" {{ 'selected' if req.equipment_id == eq.id else '' }}>{{ eq.name }}</option>{% endfor %}</select></div>
                 <div class="fg-h"><label>Стоимость с НДС</label><input type="text" name="cost" id="cost-field" value="{{ req.cost or 0 }}" inputmode="decimal" style="width:35ch;"></div>
-                <div class="fg-h"><label>Менеджер</label><select name="manager_id" style="width:35ch;">{% for m in managers %}<option value="{{ m.id }}" {{ 'selected' if m.id == req.manager_id else '' }}>{{ m.name }}</option>{% endfor %}</select></div>
-                <div class="fg-h"><label>Контакт</label><select name="contact_id" id="contact-select" style="width:35ch;"><option value="">-- Не выбран --</option>{% for m in managers_with_orgs %}<option value="{{ m.id }}" data-orgs="{{ m.organizations | map(attribute='id') | join(',') }}" {{ 'selected' if m.id == req.manager_id else '' }}>{{ m.name }}</option>{% endfor %}</select></div>
-                <div class="fg-h"><label>Организация</label><select name="company_id" id="company-select" style="width:35ch;">{% for c in companies %}<option value="{{ c.id }}" {{ 'selected' if c.id == req.company_id else '' }}>{{ c.name }}</option>{% endfor %}</select></div>
+                <div class="fg-h"><label>Менеджер</label><select name="manager_id" style="width:35ch;">{% for u in users_list %}<option value="{{ u.id }}" {{ 'selected' if u.id == req.manager_id else '' }}>{{ u.name }}</option>{% endfor %}</select></div>
+                <div class="fg-h"><label>Контакт</label><select name="contact_id" id="contact-select" data-search-select data-add-url="/counterparties" data-add-label="Добавить контакт" style="width:35ch;"><option value="">-- Не выбран --</option>{% for cp in counterparties %}<option value="{{ cp.id }}" data-company="{{ cp.company_id }}" {{ 'selected' if cp.id == req.counterparty_id else '' }}>{{ cp.name }}</option>{% endfor %}</select></div>
+                <div class="fg-h"><label>Организация</label><select name="company_id" id="company-select" data-search-select data-add-url="/companies/create" data-add-label="Добавить организацию" style="width:35ch;">{% for c in companies %}<option value="{{ c.id }}" {{ 'selected' if c.id == req.company_id else '' }}>{{ c.name }}</option>{% endfor %}</select></div>
                 <div class="fg-h"><label>Состояние</label><select name="status" style="width:35ch;">{% for s in statuses %}<option value="{{ s.value }}" {{ 'selected' if req.status and req.status.value == s.value else '' }}>{{ s.value }}</option>{% endfor %}</select></div>
                 <div class="fg-h"><label>Вероятность</label><select name="probability_id" id="probability-select" style="width:35ch;"><option value="">-- Не задано --</option>{% for p in probabilities %}<option value="{{ p.id }}" {{ 'selected' if req.probability_id == p.id else '' }}>{{ p.name }}</option>{% endfor %}</select></div>
             </div>
@@ -160,12 +160,8 @@
                 <div class="info-row"><span class="info-label">ФИО</span><span class="info-value">{{ req.manager.name }}</span></div>
                 <div class="info-row"><span class="info-label">Email</span><span class="info-value">{{ req.manager.email or '-' }}</span></div>
                 <div class="info-row"><span class="info-label">Телефон</span><span class="info-value">{{ req.manager.phone or '-' }}</span></div>
-                <div class="info-row"><span class="info-label">Организация</span><span class="info-value">{{ req.manager.organizations | map(attribute='name') | join(', ') if req.manager.organizations else '-' }}</span></div>
-                {% if req.manager.user %}
-                <div class="info-row"><span class="info-label">Пользователь</span><span class="info-value">{{ req.manager.user.name }}</span></div>
-                <div class="info-row"><span class="info-label">Город</span><span class="info-value">{{ req.manager.user.city or '-' }}</span></div>
-                <div class="info-row"><span class="info-label">Подпись</span><span class="info-value">{{ req.manager.user.signature or '-' }}</span></div>
-                {% endif %}
+                <div class="info-row"><span class="info-label">Город</span><span class="info-value">{{ req.manager.city or '-' }}</span></div>
+                <div class="info-row"><span class="info-label">Подпись</span><span class="info-value">{{ req.manager.signature or '-' }}</span></div>
             </div>
             {% else %}
             <p style="color:var(--text-muted);font-size:0.85rem;">Менеджер не назначен</p>
@@ -249,10 +245,17 @@ toggleZZButton();
 document.getElementById('contact-select').addEventListener('change', function() {
     const opt = this.options[this.selectedIndex];
     if (!opt.value) return;
-    const orgs = opt.dataset.orgs;
-    if (orgs) {
-        const firstOrg = orgs.split(',')[0];
-        document.getElementById('company-select').value = firstOrg;
+    const companyId = opt.dataset.company;
+    if (companyId) {
+        document.getElementById('company-select').value = companyId;
+        const companyWrapper = document.getElementById('company-select').closest('.search-select');
+        if (companyWrapper) {
+            const inp = companyWrapper.querySelector('.ss-input');
+            const sel = companyWrapper.querySelector('select');
+            const optEl = sel.options[sel.selectedIndex];
+            inp.value = optEl ? optEl.textContent : '';
+            companyWrapper.querySelector('.ss-clear').style.display = inp.value ? 'block' : 'none';
+        }
     }
 });
 

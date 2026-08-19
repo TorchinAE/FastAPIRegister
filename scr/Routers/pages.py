@@ -6,7 +6,7 @@ from sqlalchemy.ext.asyncio import AsyncSession
 from scr.dbase.database import db_helper
 from scr.dbase import crud_users, crud_requests, crud_counterparties
 from scr.dbase import crud_organizations, crud_directors, crud_positions, crud_equipment, crud_invoices, crud_settings, crud_payments
-from scr.dbase.models import Probability, Manager
+from scr.dbase.models import Probability
 from scr.dbase.models import RequestStatus
 
 templates = Jinja2Templates(directory="templates")
@@ -157,9 +157,9 @@ async def request_create_submit(
     if form.get("equipment_id"):
         data["equipment_id"] = int(form["equipment_id"])
 
-    # Find manager by user email
-    mgr, _ = await crud_users.get_users(session, search=user.email, per_page=1)
-    manager_id = mgr[0].id if mgr else 1
+    # Find user by email to set as manager
+    users_list, _ = await crud_users.get_users(session, search=user.email, per_page=1)
+    manager_id = users_list[0].id if users_list else 1
 
     schema = RequestCreateSchema(**data)
     await crud_requests.add_request(session, schema, manager_id=manager_id, created_by=user.name, user_city=user.city)
@@ -180,15 +180,10 @@ async def request_detail_page(
     if not req:
         return HTMLResponse("ТКП не найдена", status_code=404)
     cps, _ = await crud_counterparties.get_counterparties(session, per_page=100)
-    managers_list, _ = await crud_users.get_users(session, per_page=100)
+    users_list, _ = await crud_users.get_users(session, per_page=100)
     equipment_list, _ = await crud_equipment.get_equipment_list(session, per_page=100)
     companies_list, _ = await crud_organizations.get_organizations(session, per_page=100)
-    from sqlalchemy.orm import selectinload
     from sqlalchemy import select as sa_select
-    mgr_result = await session.execute(
-        sa_select(Manager).options(selectinload(Manager.organizations)).order_by(Manager.name)
-    )
-    managers_with_orgs = list(mgr_result.scalars().all())
     related, _ = await crud_requests.get_requests(session, company_id=req.company_id, per_page=50)
     invoices = await crud_invoices.get_invoices_by_request(session, req_id)
     payment_items = await crud_payments.ensure_payment_items(session, req_id)
@@ -198,7 +193,7 @@ async def request_detail_page(
     probabilities = list(probs_result.scalars().all())
     return templates.TemplateResponse(
         "requests/detail.html",
-        {"request": request, "user": user, "req": req, "counterparties": cps, "managers": managers_list, "managers_with_orgs": managers_with_orgs, "equipment": equipment_list, "companies": companies_list, "related_requests": related, "statuses": RequestStatus, "invoices": invoices, "payment_items": payment_items, "settings": settings_dict, "probabilities": probabilities, "active_page": "requests"},
+        {"request": request, "user": user, "req": req, "counterparties": cps, "users_list": users_list, "equipment": equipment_list, "companies": companies_list, "related_requests": related, "statuses": RequestStatus, "invoices": invoices, "payment_items": payment_items, "settings": settings_dict, "probabilities": probabilities, "active_page": "requests"},
     )
 
 
@@ -215,13 +210,11 @@ async def request_edit_submit(
     from scr.dbase.schemas.schemas import RequestUpdateSchema
 
     data = {"id": req_id}
-    if form.get("counterparty_id"):
-        data["counterparty_id"] = int(form["counterparty_id"])
+    if form.get("contact_id"):
+        data["counterparty_id"] = int(form["contact_id"])
     if form.get("company_id"):
         data["company_id"] = int(form["company_id"])
-    if form.get("contact_id"):
-        data["manager_id"] = int(form["contact_id"])
-    elif form.get("manager_id"):
+    if form.get("manager_id"):
         data["manager_id"] = int(form["manager_id"])
     if form.get("equipment_id"):
         data["equipment_id"] = int(form["equipment_id"])
@@ -313,11 +306,10 @@ async def counterparties_detail_page(
     reqs, _ = await crud_requests.get_requests(session, counterparty_id=cp_id, per_page=100)
     companies, _ = await crud_organizations.get_organizations(session, per_page=100)
     directors, _ = await crud_directors.get_dirs(session, per_page=100)
-    managers_list, _ = await crud_users.get_users(session, per_page=100)
     return templates.TemplateResponse(
         "counterparties/detail.html",
         {"request": request, "user": user, "cp": cp, "reqs": reqs, "statuses": RequestStatus,
-         "companies": companies, "directors": directors, "managers": managers_list, "active_page": "counterparties"},
+         "companies": companies, "directors": directors, "active_page": "counterparties"},
     )
 
 
@@ -389,10 +381,9 @@ async def companies_create_page(
     if not user:
         return RedirectResponse("/", status_code=302)
     directors, _ = await crud_directors.get_dirs(session, per_page=100)
-    managers_list, _ = await crud_users.get_users(session, per_page=100)
     return templates.TemplateResponse(
         "companies/create.html",
-        {"request": request, "user": user, "directors": directors, "managers": managers_list, "back_to": back_to, "active_page": "companies"},
+        {"request": request, "user": user, "directors": directors, "back_to": back_to, "active_page": "companies"},
     )
 
 
@@ -410,11 +401,10 @@ async def companies_edit_page(
     if not org:
         return HTMLResponse("Компания не найдена", status_code=404)
     directors, _ = await crud_directors.get_dirs(session, per_page=100)
-    managers_list, _ = await crud_users.get_users(session, per_page=100)
     reqs, _ = await crud_requests.get_requests(session, company_id=org_id, per_page=100)
     return templates.TemplateResponse(
         "companies/edit.html",
-        {"request": request, "user": user, "org": org, "directors": directors, "all_managers": managers_list, "reqs": reqs, "back_to": back_to, "active_page": "companies"},
+        {"request": request, "user": user, "org": org, "directors": directors, "reqs": reqs, "back_to": back_to, "active_page": "companies"},
     )
 
 
@@ -718,7 +708,7 @@ async def invoices_page(
     user = await get_current_user(request, session)
     if not user:
         return RedirectResponse("/", status_code=302)
-    from sqlalchemy import select, func, join
+    from sqlalchemy import select, func
     from sqlalchemy.orm import selectinload
     from scr.dbase.models import Invoice, Request as ReqModel
 

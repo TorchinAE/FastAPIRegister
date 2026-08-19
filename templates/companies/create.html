@@ -37,17 +37,6 @@
                 </select>
                 <a href="#" id="editDirectorLink" class="btn btn-ghost btn-sm" style="margin-top:0.35rem;font-size:0.8rem;display:none">Изменить данные директора</a>
             </div>
-            <div class="form-group">
-                <label>Менеджеры</label>
-                <div style="display:flex;flex-direction:column;gap:0.5rem">
-                    {% for m in managers %}
-                    <label style="display:flex;align-items:center;gap:0.5rem;font-size:0.9rem;cursor:pointer">
-                        <input type="checkbox" name="manager_ids" value="{{ m.id }}">
-                        {{ m.name }}
-                    </label>
-                    {% endfor %}
-                </div>
-            </div>
         </div>
         <div class="actions">
             <button type="submit" class="btn btn-primary">Создать</button>
@@ -83,14 +72,12 @@ document.getElementById('newCompanyForm').addEventListener('submit', async funct
     const fd = new FormData(this);
     const dirId = fd.get('director_id');
     if (!dirId) { showToast('Выберите директора'); return; }
-    const managerIds = fd.getAll('manager_ids').map(Number);
     const data = {
         name: fd.get('name'),
         inn: fd.get('inn') || null,
         address: fd.get('address') || null,
         server_address_slug: fd.get('server_address_slug'),
         director_id: parseInt(dirId),
-        manager_ids: managerIds,
     };
     try {
         const resp = await fetch('/api/companies/', {

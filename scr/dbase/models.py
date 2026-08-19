@@ -3,7 +3,7 @@ import enum
 from datetime import datetime, timezone
 from typing import Optional, List
 
-from sqlalchemy import String, DateTime, ForeignKey, Integer, Text, Enum, Table, Column, Numeric
+from sqlalchemy import String, DateTime, ForeignKey, Integer, Text, Enum, Numeric
 from sqlalchemy.orm import DeclarativeBase, Mapped, mapped_column, relationship
 
 
@@ -72,7 +72,7 @@ class BaseID(Base):
         onupdate=lambda: datetime.now(timezone.utc),
     )
     changed_by_id: Mapped[int | None] = mapped_column(
-        ForeignKey("managers.id"), nullable=True
+        ForeignKey("users.id"), nullable=True
     )
 
 
@@ -89,40 +89,6 @@ class User(Base):
         DateTime, default=lambda: datetime.now(timezone.utc)
     )
 
-    managers: Mapped[List["Manager"]] = relationship(back_populates="user")
-
-
-organization_managers = Table(
-    "organization_managers",
-    Base.metadata,
-    Column("organization_id", Integer, ForeignKey("organizations.id"), primary_key=True),
-    Column("manager_id", Integer, ForeignKey("managers.id"), primary_key=True),
-)
-
-
-class Manager(BaseID):
-    __tablename__ = "managers"
-    name: Mapped[str] = mapped_column(String(50), unique=True, nullable=False)
-    email: Mapped[str] = mapped_column(String(50), nullable=False)
-    phone: Mapped[str] = mapped_column(String(20), nullable=False)
-    user_id: Mapped[int | None] = mapped_column(ForeignKey("users.id"), nullable=True)
-    organizations: Mapped[List["Organization"]] = relationship(
-        back_populates="managers", secondary=organization_managers
-    )
-    user: Mapped[Optional["User"]] = relationship(back_populates="managers", foreign_keys=[user_id])
-
-    def __repr__(self) -> str:
-        return (
-            f"Manager(id={self.id}, "
-            f"name='{self.name}', "
-            f"phone='{self.phone}', "
-            f"email='{self.email}')"
-        )
-
-    @property
-    def short_name(self) -> str:
-        return get_short_name(self.name)
-
 
 class Organization(BaseID):
     __tablename__ = "organizations"
@@ -135,23 +101,18 @@ class Organization(BaseID):
     director_id: Mapped[int] = mapped_column(ForeignKey("directors.id"), nullable=False)
 
     director: Mapped["Directors"] = relationship(back_populates="organizations")
-    managers: Mapped[List["Manager"]] = relationship(
-        back_populates="organizations", secondary=organization_managers
-    )
     counterparties: Mapped[List["Counterparty"]] = relationship(
         back_populates="company"
     )
 
     def __repr__(self) -> str:
         director_name = self.director.name if self.director else "None"
-        manager_names = [m.name for m in self.managers] if self.managers else []
         return (
             f"Organization(id={self.id}, "
             f"name='{self.name}', "
             f"inn='{self.inn}', "
             f"director='{director_name}', "
-            f"address='{self.address}', "
-            f"managers={manager_names})"
+            f"address='{self.address}')"
         )
 
 
@@ -247,7 +208,7 @@ class Request(BaseID):
     company_id: Mapped[int] = mapped_column(
         ForeignKey("organizations.id"), nullable=False
     )
-    manager_id: Mapped[int] = mapped_column(ForeignKey("managers.id"), nullable=False)
+    manager_id: Mapped[int] = mapped_column(ForeignKey("users.id"), nullable=False)
     equipment_id: Mapped[Optional[int]] = mapped_column(
         ForeignKey("equipment.id"), nullable=True
     )
@@ -291,7 +252,7 @@ class Request(BaseID):
 
     counterparty: Mapped["Counterparty"] = relationship(foreign_keys=[counterparty_id])
     company: Mapped["Organization"] = relationship(foreign_keys=[company_id])
-    manager: Mapped["Manager"] = relationship(foreign_keys=[manager_id])
+    manager: Mapped["User"] = relationship(foreign_keys=[manager_id])
     equipment: Mapped[Optional["Equipment"]] = relationship(foreign_keys=[equipment_id])
     probability: Mapped[Optional["Probability"]] = relationship(foreign_keys=[probability_id])
     invoices: Mapped[List["Invoice"]] = relationship(back_populates="request", cascade="all, delete-orphan")

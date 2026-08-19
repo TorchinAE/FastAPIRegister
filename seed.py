@@ -2,7 +2,7 @@
 import asyncio
 from scr.dbase.database import db_helper
 from scr.dbase.models import (
-    User, Manager, Positions, Directors, Organization, Counterparty, Request, RequestStatus,
+    User, Positions, Directors, Organization, Counterparty, Request, RequestStatus,
 )
 from scr.dbase.crud_users import hash_password
 
@@ -10,15 +10,10 @@ from scr.dbase.crud_users import hash_password
 async def seed():
     async with db_helper.session_factory() as session:
         # --- Users ---
-        user = User(name="Иванов Иван Иванович", email="ivan@test.ru", hashed_password=hash_password("123456"))
-        user2 = User(name="Петрова Мария Сергеевна", email="maria@test.ru", hashed_password=hash_password("123456"))
-        session.add_all([user, user2])
-
-        # --- Managers ---
-        mgr1 = Manager(name="Сидоров Алексей Петрович", email="sidorov@company.ru", phone="+79001112233", city="мск", created_by="Иванов И.И.")
-        mgr2 = Manager(name="Козлова Елена Викторовна", email="kozlova@company.ru", phone="+79004445566", city="спб", created_by="Иванов И.И.")
-        mgr3 = Manager(name="Новиков Дмитрий Олегович", email="novikov@company.ru", phone="+79007778899", city="екб", created_by="Мария П.")
-        session.add_all([mgr1, mgr2, mgr3])
+        user1 = User(name="Иванов Иван Иванович", email="ivan@test.ru", hashed_password=hash_password("123456"), city="мск")
+        user2 = User(name="Петрова Мария Сергеевна", email="maria@test.ru", hashed_password=hash_password("123456"), city="спб")
+        user3 = User(name="Сидоров Алексей Петрович", email="sidorov@company.ru", hashed_password=hash_password("123456"), city="екб")
+        session.add_all([user1, user2, user3])
         await session.flush()
 
         # --- Positions ---
@@ -38,10 +33,10 @@ async def seed():
         await session.flush()
 
         # --- Organizations (Companies) ---
-        org1 = Organization(name='ООО "ЭнергоПром"', inn="7701234567", address="г. Москва, ул. Ленина, д. 10", server_address_slug="/02_сторонние_заказчики", director_id=dir1.id, manager_id=mgr1.id, created_by="Иванов И.И.")
-        org2 = Organization(name='АО "ТехноСтрой"', inn="7802345678", address="г. Санкт-Петербург, пр. Невский, д. 25", server_address_slug="/02_сторонние_заказчики", director_id=dir2.id, manager_id=mgr2.id, created_by="Иванов И.И.")
-        org3 = Organization(name='ООО "УралЭнерго"', inn="6603456789", address="г. Екатеринбург, ул. Мира, д. 5", server_address_slug="/01_основные_заказчики", director_id=dir3.id, manager_id=mgr3.id, created_by="Мария П.")
-        org4 = Organization(name='ПАО "СибЭлектро"', inn="5404567890", address="г. Новосибирск, ул. Красная, д. 100", server_address_slug="/02_сторонние_заказчики", director_id=dir4.id, manager_id=mgr1.id, created_by="Мария П.")
+        org1 = Organization(name='ООО "ЭнергоПром"', inn="7701234567", address="г. Москва, ул. Ленина, д. 10", server_address_slug="/02_сторонние_заказчики", director_id=dir1.id, created_by="Иванов И.И.")
+        org2 = Organization(name='АО "ТехноСтрой"', inn="7802345678", address="г. Санкт-Петербург, пр. Невский, д. 25", server_address_slug="/02_сторонние_заказчики", director_id=dir2.id, created_by="Иванов И.И.")
+        org3 = Organization(name='ООО "УралЭнерго"', inn="6603456789", address="г. Екатеринбург, ул. Мира, д. 5", server_address_slug="/01_основные_заказчики", director_id=dir3.id, created_by="Мария П.")
+        org4 = Organization(name='ПАО "СибЭлектро"', inn="5404567890", address="г. Новосибирск, ул. Красная, д. 100", server_address_slug="/02_сторонние_заказчики", director_id=dir4.id, created_by="Мария П.")
         session.add_all([org1, org2, org3, org4])
         await session.flush()
 
@@ -56,42 +51,42 @@ async def seed():
 
         # --- Requests ---
         req1 = Request(
-            counterparty_id=cp1.id, company_id=org1.id, manager_id=mgr1.id,
+            counterparty_id=cp1.id, company_id=org1.id, manager_id=user1.id,
             status=RequestStatus.ZAPROS, description="Запрос на поставку КТПБ-1000",
             notes="Срочный заказ", created_by="Иванов И.И.",
             bktpb=2, ktpb=5, ktp=3, kso_393=1, kso_204=0,
             k_104=0, k_104m=0, sho=1, pku=0, pus=0, parn=0,
         )
         req2 = Request(
-            counterparty_id=cp2.id, company_id=org2.id, manager_id=mgr2.id,
+            counterparty_id=cp2.id, company_id=org2.id, manager_id=user2.id,
             status=RequestStatus.TENDER, description="Тендер на электромонтажные работы",
             notes="Тендер до 25.09", created_by="Иванов И.И.",
             bktpb=0, ktpb=2, ktp=1, kso_393=0, kso_204=3,
             k_104=2, k_104m=1, sho=0, pku=1, pus=0, parn=0,
         )
         req3 = Request(
-            counterparty_id=cp3.id, company_id=org3.id, manager_id=mgr3.id,
+            counterparty_id=cp3.id, company_id=org3.id, manager_id=user3.id,
             status=RequestStatus.DOC_PROCESSING, description="Оформление договора на КСО-393",
             notes="", created_by="Мария П.",
             bktpb=1, ktpb=0, ktp=0, kso_393=4, kso_204=0,
             k_104=0, k_104m=0, sho=2, pku=0, pus=1, parn=0,
         )
         req4 = Request(
-            counterparty_id=cp4.id, company_id=org4.id, manager_id=mgr1.id,
+            counterparty_id=cp4.id, company_id=org4.id, manager_id=user1.id,
             status=RequestStatus.ORDER, description="Заказ на поставку ЩО-12",
             notes="Доставка до конца месяца", created_by="Мария П.",
             bktpb=0, ktpb=1, ktp=2, kso_393=0, kso_204=1,
             k_104=0, k_104m=0, sho=5, pku=2, pus=0, parn=1,
         )
         req5 = Request(
-            counterparty_id=cp5.id, company_id=org1.id, manager_id=mgr1.id,
+            counterparty_id=cp5.id, company_id=org1.id, manager_id=user1.id,
             status=RequestStatus.WAITING_PAYMENT, description="Ожидание оплаты за ПКУ-10",
             notes="Счёт выставлен 01.08", created_by="Иванов И.И.",
             bktpb=0, ktpb=0, ktp=0, kso_393=0, kso_204=0,
             k_104=1, k_104m=0, sho=0, pku=3, pus=0, parn=0,
         )
         req6 = Request(
-            counterparty_id=cp1.id, company_id=org1.id, manager_id=mgr1.id,
+            counterparty_id=cp1.id, company_id=org1.id, manager_id=user1.id,
             status=RequestStatus.NOT_ACTUAL, description="Не актуально — клиент отказался",
             notes="", created_by="Иванов И.И.",
             bktpb=0, ktpb=0, ktp=0, kso_393=0, kso_204=0,
@@ -102,11 +97,11 @@ async def seed():
 
         # Generate tkp_num
         for req in [req1, req2, req3, req4, req5, req6]:
-            mgr = await session.get(Manager, req.manager_id)
-            req.tkp_num = f"{req.id}-{mgr.city}"
+            u = await session.get(User, req.manager_id)
+            req.tkp_num = f"{req.id}-{u.city}"
 
         await session.commit()
-        print("Seed complete: 2 users, 3 managers, 4 positions, 4 directors, 4 companies, 5 counterparties, 6 requests")
+        print("Seed complete: 3 users, 4 positions, 4 directors, 4 companies, 5 counterparties, 6 requests")
 
 
 asyncio.run(seed())

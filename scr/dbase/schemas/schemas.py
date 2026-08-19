@@ -66,39 +66,6 @@ class PositionResponseSchema(BaseModel):
     created_by: Optional[str] = None
 
 
-# --- Manager ---
-
-class ManagerCreateSchema(BaseModel):
-    model_config = ConfigDict(from_attributes=True)
-
-    name: str
-    email: str
-    phone: str
-    user_id: Optional[int] = None
-
-
-class ManagerUpdateSchema(BaseModel):
-    model_config = ConfigDict(from_attributes=True)
-
-    id: int
-    name: Optional[str] = None
-    email: Optional[str] = None
-    phone: Optional[str] = None
-    user_id: Optional[int] = None
-
-
-class ManagerResponseSchema(BaseModel):
-    model_config = ConfigDict(from_attributes=True)
-
-    id: int
-    name: str
-    short_name: str
-    email: str
-    phone: str
-    user_id: Optional[int] = None
-    created_by: Optional[str] = None
-
-
 # --- Organization (Company) ---
 
 class OrganizationAddSchema(BaseModel):
@@ -109,7 +76,6 @@ class OrganizationAddSchema(BaseModel):
     address: Optional[str] = None
     server_address_slug: str = "/02_сторонние_заказчики"
     director_id: int
-    manager_ids: list[int] = []
 
 
 class OrganizationUpdateSchema(BaseModel):
@@ -121,13 +87,6 @@ class OrganizationUpdateSchema(BaseModel):
     address: Optional[str] = None
     server_address_slug: Optional[str] = None
     director_id: Optional[int] = None
-    manager_ids: Optional[list[int]] = None
-
-
-class ManagerShort(BaseModel):
-    model_config = ConfigDict(from_attributes=True)
-    id: int
-    name: str
 
 
 class OrganizationResponseSchema(BaseModel):
@@ -139,7 +98,6 @@ class OrganizationResponseSchema(BaseModel):
     address: Optional[str] = None
     server_address_slug: str
     director_id: int
-    managers: list[ManagerShort] = []
     created_by: Optional[str] = None
 
 
