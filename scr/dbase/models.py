@@ -220,6 +220,25 @@ class Equipment(BaseID):
         return f"Equipment(id={self.id}, name='{self.name}')"
 
 
+class Probability(Base):
+    __tablename__ = "probabilities"
+    id: Mapped[int] = mapped_column(primary_key=True)
+    name: Mapped[str] = mapped_column(String(20), unique=True, nullable=False)
+    value: Mapped[int] = mapped_column(Integer, nullable=False)
+
+    def __repr__(self) -> str:
+        return f"Probability(id={self.id}, name='{self.name}', value={self.value})"
+
+
+DEFAULT_PROBABILITIES = [
+    (1, "30%", 30),
+    (2, "50%", 50),
+    (3, "80%", 80),
+    (4, "95%", 95),
+    (5, "100%", 100),
+]
+
+
 class Request(BaseID):
     __tablename__ = "requests"
     counterparty_id: Mapped[int] = mapped_column(
@@ -232,6 +251,10 @@ class Request(BaseID):
     equipment_id: Mapped[Optional[int]] = mapped_column(
         ForeignKey("equipment.id"), nullable=True
     )
+    probability_id: Mapped[Optional[int]] = mapped_column(
+        ForeignKey("probabilities.id"), nullable=True
+    )
+    project_stamp: Mapped[Optional[str]] = mapped_column(String(200), nullable=True)
     request_date: Mapped[datetime] = mapped_column(
         DateTime, default=lambda: datetime.now(timezone.utc)
     )
@@ -245,6 +268,13 @@ class Request(BaseID):
     description: Mapped[Optional[str]] = mapped_column(Text, nullable=True)
     notes: Mapped[Optional[str]] = mapped_column(Text, nullable=True)
     tkp_num: Mapped[Optional[str]] = mapped_column(String(50), nullable=True)
+    incoming_letter_num: Mapped[Optional[str]] = mapped_column(String(100), nullable=True)
+    repeat_tkp: Mapped[Optional[str]] = mapped_column(String(100), nullable=True)
+    invoice_num: Mapped[Optional[str]] = mapped_column(String(100), nullable=True)
+    invoice_date: Mapped[Optional[datetime]] = mapped_column(DateTime, nullable=True)
+    factory_order_num: Mapped[Optional[str]] = mapped_column(String(100), nullable=True)
+    factory_order_date: Mapped[Optional[datetime]] = mapped_column(DateTime, nullable=True)
+    ship_date: Mapped[Optional[datetime]] = mapped_column(DateTime, nullable=True)
 
     # Оборудование (количество, 0-100)
     bktpb: Mapped[int] = mapped_column(Integer, default=0, nullable=False)
@@ -263,3 +293,39 @@ class Request(BaseID):
     company: Mapped["Organization"] = relationship(foreign_keys=[company_id])
     manager: Mapped["Manager"] = relationship(foreign_keys=[manager_id])
     equipment: Mapped[Optional["Equipment"]] = relationship(foreign_keys=[equipment_id])
+    probability: Mapped[Optional["Probability"]] = relationship(foreign_keys=[probability_id])
+    invoices: Mapped[List["Invoice"]] = relationship(back_populates="request", cascade="all, delete-orphan")
+    payment_items: Mapped[List["PaymentItem"]] = relationship(back_populates="request", cascade="all, delete-orphan")
+
+
+class Invoice(BaseID):
+    __tablename__ = "invoices"
+    request_id: Mapped[int] = mapped_column(ForeignKey("requests.id"), nullable=False)
+    invoice_num: Mapped[Optional[str]] = mapped_column(String(100), nullable=True)
+    invoice_date: Mapped[datetime] = mapped_column(
+        DateTime, default=lambda: datetime.now(timezone.utc)
+    )
+    percent: Mapped[float] = mapped_column(Numeric(5, 2), default=0)
+    amount: Mapped[float] = mapped_column(Numeric(12, 2), default=0)
+
+    request: Mapped["Request"] = relationship(back_populates="invoices")
+
+
+PAYMENT_TYPES = ["предоплата", "доплата-1", "доплата-2", "доплата-3", "отсрочка"]
+
+
+class PaymentItem(BaseID):
+    __tablename__ = "payment_items"
+    request_id: Mapped[int] = mapped_column(ForeignKey("requests.id"), nullable=False)
+    payment_type: Mapped[str] = mapped_column(String(50), nullable=False)
+    amount: Mapped[float] = mapped_column(Numeric(12, 2), default=0)
+    percent: Mapped[float] = mapped_column(Numeric(5, 2), default=0)
+    due_date: Mapped[Optional[datetime]] = mapped_column(DateTime, nullable=True)
+
+    request: Mapped["Request"] = relationship(back_populates="payment_items")
+
+
+class Setting(Base):
+    __tablename__ = "settings"
+    key: Mapped[str] = mapped_column(String(100), primary_key=True)
+    value: Mapped[str] = mapped_column(Text, nullable=False, default="")
