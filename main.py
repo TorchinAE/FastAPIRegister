@@ -20,6 +20,8 @@ from scr.Routers.invoices import inv_router
 from scr.Routers.payments import pay_router
 from scr.Routers.settings import settings_router
 from scr.Routers.equipment_sections import es_router
+from scr.Routers.calc_products import cp_router as calc_prod_router
+from scr.Routers.calc_items import ci_router
 from scr.Routers.pages import pages_router
 
 
@@ -70,6 +72,8 @@ app.include_router(inv_router)
 app.include_router(pay_router)
 app.include_router(settings_router)
 app.include_router(es_router)
+app.include_router(calc_prod_router)
+app.include_router(ci_router)
 app.include_router(users_router)
 app.include_router(pages_router)
 

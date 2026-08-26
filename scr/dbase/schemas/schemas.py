@@ -222,6 +222,85 @@ class EquipmentSectionResponseSchema(BaseModel):
     created_by: Optional[str] = None
 
 
+# --- CalcProduct ---
+
+class CalcProductComponentSchema(BaseModel):
+    equipment_id: int
+    quantity: int = Field(1, ge=1)
+
+
+class CalcProductCreateSchema(BaseModel):
+    model_config = ConfigDict(from_attributes=True)
+
+    name: str
+    section_id: Optional[int] = None
+    components: List[CalcProductComponentSchema] = []
+
+
+class CalcProductUpdateSchema(BaseModel):
+    model_config = ConfigDict(from_attributes=True)
+
+    id: int
+    name: Optional[str] = None
+    section_id: Optional[int] = None
+    components: Optional[List[CalcProductComponentSchema]] = None
+
+
+class CalcProductResponseSchema(BaseModel):
+    model_config = ConfigDict(from_attributes=True)
+
+    id: int
+    name: str
+    section_id: Optional[int] = None
+    section_name: Optional[str] = None
+    is_composite: bool = False
+    created_by: Optional[str] = None
+
+
+class CalcProductDetailSchema(BaseModel):
+    model_config = ConfigDict(from_attributes=True)
+
+    id: int
+    name: str
+    section_id: Optional[int] = None
+    section_name: Optional[str] = None
+    components: List = []
+    created_by: Optional[str] = None
+
+
+# --- CalcItem ---
+
+class CalcItemCreateSchema(BaseModel):
+    model_config = ConfigDict(from_attributes=True)
+
+    request_id: int
+    calc_type: str
+    product_id: int
+    quantity: int = Field(1, ge=1)
+
+
+class CalcItemUpdateSchema(BaseModel):
+    model_config = ConfigDict(from_attributes=True)
+
+    id: int
+    quantity: Optional[int] = Field(None, ge=1)
+    sort_order: Optional[int] = None
+
+
+class CalcItemResponseSchema(BaseModel):
+    model_config = ConfigDict(from_attributes=True)
+
+    id: int
+    request_id: int
+    calc_type: str
+    product_id: int
+    product_name: str
+    is_composite: bool = False
+    quantity: int
+    sort_order: int
+    created_by: Optional[str] = None
+
+
 # --- Request ---
 
 class RequestCreateSchema(BaseModel):

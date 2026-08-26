@@ -193,6 +193,29 @@ class EquipmentSection(BaseID):
 DEFAULT_EQUIPMENT_SECTIONS = ["ВА", "Schnaider", "IEK", "EKF", "CHINT", "ESQ", "ТТ04", "ТТ62"]
 
 
+class CalcProduct(BaseID):
+    __tablename__ = "calc_products"
+    name: Mapped[str] = mapped_column(String(200), nullable=False)
+    section_id: Mapped[Optional[int]] = mapped_column(
+        ForeignKey("equipment_sections.id"), nullable=True
+    )
+
+    section: Mapped[Optional["EquipmentSection"]] = relationship(foreign_keys=[section_id])
+    components: Mapped[List["CalcProductComponent"]] = relationship(
+        back_populates="product", cascade="all, delete-orphan"
+    )
+
+
+class CalcProductComponent(BaseID):
+    __tablename__ = "calc_product_components"
+    product_id: Mapped[int] = mapped_column(ForeignKey("calc_products.id"), nullable=False)
+    equipment_id: Mapped[int] = mapped_column(ForeignKey("equipment.id"), nullable=False)
+    quantity: Mapped[int] = mapped_column(Integer, default=1, nullable=False)
+
+    product: Mapped["CalcProduct"] = relationship(back_populates="components")
+    equipment: Mapped["Equipment"] = relationship(foreign_keys=[equipment_id])
+
+
 class Probability(Base):
     __tablename__ = "probabilities"
     id: Mapped[int] = mapped_column(primary_key=True)
@@ -300,6 +323,18 @@ class PaymentItem(BaseID):
     paid_date: Mapped[Optional[datetime]] = mapped_column(DateTime, nullable=True)
 
     request: Mapped["Request"] = relationship(back_populates="payment_items")
+
+
+class CalcItem(BaseID):
+    __tablename__ = "calc_items"
+    request_id: Mapped[int] = mapped_column(ForeignKey("requests.id"), nullable=False)
+    calc_type: Mapped[str] = mapped_column(String(50), nullable=False)
+    product_id: Mapped[int] = mapped_column(ForeignKey("calc_products.id"), nullable=False)
+    quantity: Mapped[int] = mapped_column(Integer, default=1, nullable=False)
+    sort_order: Mapped[int] = mapped_column(Integer, default=0, nullable=False)
+
+    request: Mapped["Request"] = relationship(foreign_keys=[request_id])
+    product: Mapped["CalcProduct"] = relationship(foreign_keys=[product_id])
 
 
 class Setting(Base):

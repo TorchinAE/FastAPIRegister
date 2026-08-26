@@ -1,5 +1,5 @@
 {% extends "base.html" %}
-{% block title %}Расчёт Корпуса — {{ req.tkp_num or req.id }}{% endblock %}
+{% block title %}Расчёт Корпуса — {{ req.tkp_num or rp.id }}{% endblock %}
 {% block content %}
 <div class="page-header">
     <div>
@@ -8,7 +8,7 @@
     </div>
 </div>
 <div style="display:flex;gap:0.5rem;margin-bottom:0.75rem;">
-    <a href="/requests/{{ req.id }}/calc" class="btn btn-ghost">← Назад к расчётам</a>
+    <a href="/requests/{{ rp.id }}/calc" class="btn btn-ghost">← Назад к расчётам</a>
 </div>
 <div class="card">
     <p style="color:var(--text-muted);">Страница расчёта Корпуса будет описана позже.</p>
