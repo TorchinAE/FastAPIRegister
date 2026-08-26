@@ -1,0 +1,119 @@
+{% extends "base.html" %}
+{% block title %}Редактирование {{ org.name }}{% endblock %}
+{% block content %}
+<div class="page-header">
+    <div>
+        <h1>{{ org.name }}</h1>
+        <div class="subtitle">Компания #{{ org.id }}</div>
+    </div>
+    <a href="{{ back_to or '/companies' }}" class="btn btn-ghost">← Назад</a>
+</div>
+
+<div class="card" style="margin-bottom:1.5rem">
+    <form id="editCompanyForm">
+        <input type="hidden" name="id" value="{{ org.id }}">
+        <div class="form-row" style="grid-template-columns: 1fr 1fr 1fr;">
+            <div class="form-group">
+                <label>Название</label>
+                <input type="text" name="name" value="{{ org.name }}" required style="width:100%;min-width:0">
+            </div>
+            <div class="form-group">
+                <label>ИНН</label>
+                <input type="text" name="inn" value="{{ org.inn or '' }}" pattern="[0-9]*" inputmode="numeric" maxlength="12" style="width:100%;min-width:0">
+            </div>
+            <div class="form-group">
+                <label>Адрес</label>
+                <input type="text" name="address" value="{{ org.address or '' }}" style="width:100%;min-width:0">
+            </div>
+            <div class="form-group">
+                <label>Slug сервера</label>
+                <input type="text" name="server_address_slug" value="{{ org.server_address_slug }}" style="width:100%;min-width:0">
+            </div>
+            <div class="form-group">
+                <label>Директор</label>
+                <select name="director_id" id="directorSelect" required style="width:100%;min-width:0">
+                    {% for d in directors %}
+                    <option value="{{ d.id }}" {{ 'selected' if d.id == org.director_id else '' }}>{{ d.name }}</option>
+                    {% endfor %}
+                </select>
+                <a href="/directors/{{ org.director_id }}?back_to=/companies/{{ org.id }}/edit" id="editDirectorLink" class="btn btn-ghost btn-sm" style="margin-top:0.35rem;font-size:0.8rem">Изменить данные директора</a>
+            </div>
+        </div>
+        <div class="actions">
+            <button type="submit" class="btn btn-primary">Сохранить</button>
+        </div>
+    </form>
+</div>
+
+<div class="card">
+    <h3 style="margin-bottom:1rem">ТКП ({{ reqs|length }})</h3>
+    {% if reqs %}
+    <div class="table-wrap" style="box-shadow:none">
+        <table>
+            <thead>
+                <tr><th>ТКП</th><th>Дата</th><th>Статус</th><th>Описание</th></tr>
+            </thead>
+            <tbody>
+                {% for r in reqs %}
+                <tr style="cursor:pointer" onclick="location.href='/requests/{{ r.id }}'">
+                    <td>{{ r.tkp_num or '-' }}</td>
+                    <td>{{ r.request_date.strftime('%d.%m.%Y') }}</td>
+                    <td><span class="badge badge-new">{{ r.status.value }}</span></td>
+                    <td>{{ r.description or '-' }}</td>
+                </tr>
+                {% endfor %}
+            </tbody>
+        </table>
+    </div>
+    {% else %}
+    <p style="color:var(--text-muted);font-style:italic">Нет ТКП</p>
+    {% endif %}
+</div>
+
+<div id="toast" class="toast" style="display:none"></div>
+{% endblock %}
+
+{% block scripts %}
+<script>
+const dirSelect = document.getElementById('directorSelect');
+const dirLink = document.getElementById('editDirectorLink');
+dirSelect.addEventListener('change', function() {
+    dirLink.href = '/directors/' + this.value + '?back_to=/companies/{{ org.id }}/edit';
+});
+
+document.querySelector('[name="inn"]').addEventListener('input', function() {
+    this.value = this.value.replace(/[^0-9]/g, '');
+});
+
+document.getElementById('editCompanyForm').addEventListener('submit', async function(e) {
+    e.preventDefault();
+    const fd = new FormData(this);
+    const data = {
+        id: parseInt(fd.get('id')),
+        name: fd.get('name'),
+        inn: fd.get('inn') || null,
+        address: fd.get('address') || null,
+        server_address_slug: fd.get('server_address_slug'),
+        director_id: parseInt(fd.get('director_id')),
+    };
+    const resp = await fetch('/api/companies/', {
+        method: 'PATCH',
+        headers: {'Content-Type': 'application/json'},
+        body: JSON.stringify(data),
+    });
+    if (resp.ok) {
+        showToast('Сохранено');
+    } else {
+        const err = await resp.json();
+        showToast('Ошибка: ' + (err.detail || 'не удалось сохранить'));
+    }
+});
+
+function showToast(msg) {
+    const t = document.getElementById('toast');
+    t.textContent = msg;
+    t.style.display = 'block';
+    setTimeout(() => t.style.display = 'none', 2500);
+}
+</script>
+{% endblock %}

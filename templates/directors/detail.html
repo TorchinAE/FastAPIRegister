@@ -1,0 +1,90 @@
+{% extends "base.html" %}
+{% block title %}Директор {{ dir.name }}{% endblock %}
+{% block content %}
+<div class="page-header">
+    <div>
+        <h1>{{ dir.name }}</h1>
+        <div class="subtitle">Директор #{{ dir.id }}</div>
+    </div>
+    <a href="{{ back_to or '/directors' }}" class="btn btn-ghost">← Назад</a>
+</div>
+
+<div class="card">
+    <form id="editDirForm">
+        <input type="hidden" name="id" value="{{ dir.id }}">
+        <div class="form-row" style="grid-template-columns: 1fr 1fr 1fr;">
+            <div class="form-group">
+                <label>Имя</label>
+                <input type="text" name="name" value="{{ dir.name }}" required style="width:100%;min-width:0">
+            </div>
+            <div class="form-group">
+                <label>Email</label>
+                <input type="email" name="email" value="{{ dir.email or '' }}" style="width:100%;min-width:0">
+            </div>
+            <div class="form-group">
+                <label>Телефон</label>
+                <input type="text" name="phone" value="{{ dir.phone or '' }}" style="width:100%;min-width:0">
+            </div>
+            <div class="form-group">
+                <label>Должность</label>
+                <select name="position_id" required style="width:100%;min-width:0">
+                    {% for p in positions %}
+                    <option value="{{ p.id }}" {{ 'selected' if p.id == dir.position_id else '' }}>{{ p.name }}</option>
+                    {% endfor %}
+                </select>
+            </div>
+        </div>
+        {% if dir.organizations %}
+        <div class="form-row" style="grid-template-columns:1fr;margin-top:0.5rem;">
+            <div class="form-group">
+                <label>Организации</label>
+                <div style="padding:0.5rem 0;">
+                    {% for org in dir.organizations %}
+                    <a href="/companies/{{ org.id }}" style="display:inline-block;margin:0.2rem 0.4rem 0.2rem 0;padding:0.25rem 0.6rem;background:var(--bg-secondary, #f0f0f0);border-radius:4px;text-decoration:none;color:inherit;">{{ org.name }}</a>
+                    {% endfor %}
+                </div>
+            </div>
+        </div>
+        {% endif %}
+        <div class="actions">
+            <button type="submit" class="btn btn-primary">Сохранить</button>
+        </div>
+    </form>
+</div>
+
+<div id="toast" class="toast" style="display:none"></div>
+{% endblock %}
+
+{% block scripts %}
+<script>
+document.getElementById('editDirForm').addEventListener('submit', async function(e) {
+    e.preventDefault();
+    const fd = new FormData(this);
+    const data = {
+        id: parseInt(fd.get('id')),
+        name: fd.get('name'),
+        email: fd.get('email') || null,
+        phone: fd.get('phone') || null,
+        position_id: parseInt(fd.get('position_id')),
+    };
+    const resp = await fetch('/api/directors/', {
+        method: 'PATCH',
+        headers: {'Content-Type': 'application/json'},
+        body: JSON.stringify(data),
+    });
+    if (resp.ok) {
+        showToast('Сохранено');
+    } else {
+        const err = await resp.json();
+        showToast('Ошибка: ' + (err.detail || 'не удалось сохранить'));
+    }
+});
+
+function showToast(msg) {
+    const t = document.getElementById('toast');
+    t.textContent = msg;
+    t.style.display = 'block';
+    setTimeout(() => t.style.display = 'none', 2500);
+}
+</script>
+{% endblock %}

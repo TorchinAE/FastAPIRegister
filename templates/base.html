@@ -1,0 +1,52 @@
+<!DOCTYPE html>
+<html lang="ru">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>{% block title %}Регистрация ТКП{% endblock %}</title>
+    <link rel="stylesheet" href="/static/style.css">
+</head>
+<body>
+    <button class="hamburger" onclick="toggleSidebar()">&#9776;</button>
+    <div class="overlay" id="overlay" onclick="toggleSidebar()"></div>
+    <div class="app">
+        <aside class="sidebar" id="sidebar">
+            <div class="brand">Регистрация ТКП</div>
+            <nav>
+                <a href="/requests" class="{{ 'active' if active_page == 'requests' else '' }}"><span class="icon">&#9993;</span> <span>ТКП</span></a>
+                <a href="/invoices" class="{{ 'active' if active_page == 'invoices' else '' }}"><span class="icon">&#9781;</span> <span>Счета</span></a>
+                <a href="/counterparties" class="{{ 'active' if active_page == 'counterparties' else '' }}"><span class="icon">&#9823;</span> <span>Контрагенты</span></a>
+                <a href="/companies" class="{{ 'active' if active_page == 'companies' else '' }}"><span class="icon">&#9960;</span> <span>Компании</span></a>
+                <a href="/equipment" class="{{ 'active' if active_page == 'equipment' else '' }}"><span class="icon">&#9881;</span> <span>Оборудование</span></a>
+                <a href="/users" class="{{ 'active' if active_page == 'users' else '' }}"><span class="icon">&#9824;</span> <span>Пользователи</span></a>
+                <a href="/directors" class="{{ 'active' if active_page == 'directors' else '' }}"><span class="icon">&#9733;</span> <span>Директора</span></a>
+                <a href="/positions" class="{{ 'active' if active_page == 'positions' else '' }}"><span class="icon">&#9830;</span> <span>Должности</span></a>
+                <a href="/settings" class="{{ 'active' if active_page == 'settings' else '' }}"><span class="icon">&#9776;</span> <span>Настройки</span></a>
+            </nav>
+            {% if user %}
+            <div class="user-section">
+                <div class="user-name">{{ user.name }}</div>
+                <div class="user-email">{{ user.email }}</div>
+                <a href="/logout">Выйти</a>
+            </div>
+            {% endif %}
+        </aside>
+        <main class="main-content fade-in">
+            {% block content %}{% endblock %}
+        </main>
+    </div>
+    <script>
+        function toggleSidebar() {
+            document.getElementById('sidebar').classList.toggle('open');
+            document.getElementById('overlay').classList.toggle('open');
+        }
+        document.addEventListener('keydown', e => {
+            if (e.key === 'Escape') {
+                document.getElementById('sidebar').classList.remove('open');
+                document.getElementById('overlay').classList.remove('open');
+            }
+        });
+    </script>
+    {% block scripts %}{% endblock %}
+</body>
+</html>

@@ -1,0 +1,100 @@
+{% extends "base.html" %}
+{% block title %}Директора{% endblock %}
+{% block content %}
+<div class="page-header">
+    <div>
+        <h1>Директора</h1>
+        <div class="subtitle">Всего: {{ total }}</div>
+    </div>
+</div>
+<form method="post" action="/directors" style="display:flex; gap:0.75rem; align-items:flex-end; margin-bottom:1rem; padding:1rem 1.25rem; flex-wrap:wrap;">
+    <div class="form-group" style="flex:2; min-width:180px; margin-bottom:0;">
+        <label>Имя</label>
+        <input type="text" name="name" placeholder="ФИО директора" required>
+    </div>
+    <div class="form-group" style="flex:1; min-width:140px; margin-bottom:0;">
+        <label>Email</label>
+        <input type="email" name="email" placeholder="email@example.com">
+    </div>
+    <div class="form-group" style="flex:1; min-width:120px; margin-bottom:0;">
+        <label>Телефон</label>
+        <input type="text" name="phone" placeholder="+7...">
+    </div>
+    <div class="form-group" style="flex:1; min-width:140px; margin-bottom:0;">
+        <label>Должность</label>
+        <select name="position_id" required>
+            <option value="">-- выбрать --</option>
+            {% for pos in positions %}
+            <option value="{{ pos.id }}">{{ pos.name }}</option>
+            {% endfor %}
+        </select>
+    </div>
+    <button type="submit" class="btn btn-success" style="height:38px;">Добавить директора</button>
+</form>
+<div class="table-wrap">
+    <table id="dataTable">
+        <thead>
+            <tr><th>ID</th><th>Имя</th><th>Email</th><th>Телефон</th><th>Должность</th><th>Организации</th><th></th></tr>
+            <tr class="table-filter">
+                <th><input type="text" data-col="0" data-min="1" placeholder="Фильтр..." class="tf-input"></th>
+                <th><input type="text" data-col="1" placeholder="Фильтр..." class="tf-input"></th>
+                <th><input type="text" data-col="2" placeholder="Фильтр..." class="tf-input"></th>
+                <th><input type="text" data-col="3" placeholder="Фильтр..." class="tf-input"></th>
+                <th><input type="text" data-col="4" placeholder="Фильтр..." class="tf-input"></th>
+                <th><input type="text" data-col="5" placeholder="Фильтр..." class="tf-input"></th>
+                <th></th>
+            </tr>
+        </thead>
+        <tbody>
+            {% for item in items %}
+            <tr style="cursor:pointer" onclick="location.href='/directors/{{ item.id }}'">
+                <td><strong>{{ item.id }}</strong></td>
+                <td>{{ item.name }}</td>
+                <td>{{ item.email or '-' }}</td>
+                <td>{{ item.phone or '-' }}</td>
+                <td>{{ item.position.name if item.position else '-' }}</td>
+                <td>{% for org in item.organizations %}<a href="/companies/{{ org.id }}" onclick="event.stopPropagation()" style="display:inline-block;margin:0.1rem 0.3rem 0.1rem 0;padding:0.15rem 0.4rem;background:var(--bg-secondary, #f0f0f0);border-radius:3px;text-decoration:none;color:inherit;font-size:0.85em;">{{ org.name }}</a>{% endfor %}</td>
+                <td style="text-align:center;width:40px">
+                    <button class="btn btn-danger btn-sm btn-icon" title="Удалить" onclick="event.stopPropagation(); deleteDir({{ item.id }}, this)">&#10005;</button>
+                </td>
+            </tr>
+            {% endfor %}
+            {% if not items %}<tr class="empty-row"><td colspan="7">Нет директоров</td></tr>{% endif %}
+        </tbody>
+    </table>
+</div>
+{% if pages > 1 %}
+<div class="pagination">
+    {% for p in range(1, pages + 1) %}
+    <a href="/directors?page={{ p }}" class="{{ 'active' if p == page else '' }}">{{ p }}</a>
+    {% endfor %}
+</div>
+{% endif %}
+<div id="toast" class="toast" style="display:none"></div>
+{% endblock %}
+
+{% block scripts %}
+<script>
+async function deleteDir(id, btn) {
+    if (!confirm('Удалить директора?')) return;
+    const resp = await fetch(`/directors/${id}/delete`, {method: 'DELETE'});
+    if (resp.ok) { btn.closest('tr').remove(); showToast('Удалён'); } else { showToast('Ошибка удаления'); }
+}
+function showToast(msg) {
+    const t = document.getElementById('toast'); t.textContent = msg;
+    t.style.display = 'block'; setTimeout(() => t.style.display = 'none', 2500);
+}
+document.querySelectorAll('.tf-input').forEach(input => {
+    input.addEventListener('input', function() {
+        const col = parseInt(this.dataset.col);
+        const minLen = parseInt(this.dataset.min) || 3;
+        const val = this.value.toLowerCase();
+        document.querySelectorAll('#dataTable tbody tr:not(.empty-row)').forEach(row => {
+            if (val.length < minLen) { row.style.display = ''; return; }
+            const cell = row.cells[col];
+            row.style.display = cell && cell.textContent.toLowerCase().includes(val) ? '' : 'none';
+        });
+    });
+});
+</script>
+{% endblock %}

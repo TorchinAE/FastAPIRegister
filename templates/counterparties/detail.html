@@ -1,0 +1,154 @@
+{% extends "base.html" %}
+{% block title %}Контрагент {{ cp.name }}{% endblock %}
+{% block content %}
+<div class="page-header">
+    <div>
+        <h1>{{ cp.name }}</h1>
+        <div class="subtitle">Контрагент #{{ cp.id }}</div>
+    </div>
+    <a href="/counterparties" class="btn btn-ghost">← Назад</a>
+</div>
+
+<div class="card" style="margin-bottom:1.5rem">
+    <h3 style="margin-bottom:1rem">Данные контрагента</h3>
+    <form id="editCpForm">
+        <input type="hidden" name="id" value="{{ cp.id }}">
+        <div class="form-row" style="grid-template-columns: 1fr 1fr 1fr 1fr;">
+            <div class="form-group">
+                <label>Имя</label>
+                <input type="text" name="name" value="{{ cp.name }}" required style="width:100%;min-width:0">
+            </div>
+            <div class="form-group">
+                <label>Email</label>
+                <input type="email" name="email" value="{{ cp.email }}" required style="width:100%;min-width:0">
+            </div>
+            <div class="form-group">
+                <label>Телефон</label>
+                <input type="text" name="phone" value="{{ cp.phone or '' }}" style="width:100%;min-width:0">
+            </div>
+            <div class="form-group">
+                <label>Компания</label>
+                <select name="company_id" id="companySelect" required style="width:100%;min-width:0">
+                    {% for c in companies %}
+                    <option value="{{ c.id }}" {{ 'selected' if c.id == cp.company_id else '' }}>{{ c.name }}</option>
+                    {% endfor %}
+                </select>
+                <div style="display:flex;flex-direction:column;gap:0.35rem;margin-top:0.35rem">
+                    <a href="/companies/{{ cp.company_id }}/edit?back_to=/counterparties/{{ cp.id }}" id="editCompanyLink" class="btn btn-ghost btn-sm" style="font-size:0.8rem">Изменить данные компании</a>
+                    <a href="/companies/create?back_to=/counterparties/{{ cp.id }}" class="btn btn-ghost btn-sm" style="font-size:0.8rem">+ Новая компания</a>
+                </div>
+            </div>
+        </div>
+        <div class="actions">
+            <button type="submit" class="btn btn-primary">Сохранить</button>
+            <button type="button" class="btn btn-danger" onclick="deleteCp()">Удалить</button>
+        </div>
+    </form>
+</div>
+
+<div class="card">
+    <h3 style="margin-bottom:1rem">Запросы ({{ reqs|length }})</h3>
+    {% if reqs %}
+    <div class="table-wrap" style="box-shadow:none">
+        <table>
+            <thead>
+                <tr>
+                    <th>ТКП</th>
+                    <th>Дата</th>
+                    <th>Статус</th>
+                    <th>Описание</th>
+                </tr>
+            </thead>
+            <tbody>
+                {% for r in reqs %}
+                <tr style="cursor:pointer" onclick="location.href='/requests/{{ r.id }}'">
+                    <td>{{ r.tkp_num or '-' }}</td>
+                    <td>{{ r.request_date.strftime('%d.%m.%Y') }}</td>
+                    <td><span class="badge badge-new">{{ r.status.value }}</span></td>
+                    <td>{{ r.description or '-' }}</td>
+                </tr>
+                {% endfor %}
+            </tbody>
+        </table>
+    </div>
+    {% else %}
+    <p style="color:var(--text-muted);font-style:italic">Нет запросов</p>
+    {% endif %}
+</div>
+
+<div id="toast" class="toast" style="display:none"></div>
+{% endblock %}
+
+{% block scripts %}
+<script>
+// Update "edit company" link when select changes
+document.getElementById('companySelect').addEventListener('change', function() {
+    document.getElementById('editCompanyLink').href = '/companies/' + this.value + '/edit?back_to=/counterparties/{{ cp.id }}';
+});
+
+// Auto-select company if passed via query param (after creating new company)
+const params = new URLSearchParams(window.location.search);
+const newCompanyId = params.get('company_id');
+if (newCompanyId) {
+    const sel = document.getElementById('companySelect');
+    // Check if option exists
+    let found = false;
+    for (const opt of sel.options) {
+        if (opt.value === newCompanyId) { found = true; break; }
+    }
+    if (!found) {
+        // Fetch company name and add option
+        fetch('/api/companies/' + newCompanyId).then(r => r.json()).then(c => {
+            const opt = document.createElement('option');
+            opt.value = c.id;
+            opt.textContent = c.name;
+            sel.insertBefore(opt, sel.firstChild);
+            sel.value = c.id;
+        });
+    } else {
+        sel.value = newCompanyId;
+    }
+    // Clean URL
+    window.history.replaceState({}, '', '/counterparties/{{ cp.id }}');
+}
+
+document.getElementById('editCpForm').addEventListener('submit', async function(e) {
+    e.preventDefault();
+    const fd = new FormData(this);
+    const data = {
+        id: parseInt(fd.get('id')),
+        name: fd.get('name'),
+        email: fd.get('email'),
+        phone: fd.get('phone') || null,
+        company_id: parseInt(fd.get('company_id')),
+    };
+    const resp = await fetch('/api/counterparties/', {
+        method: 'PATCH',
+        headers: {'Content-Type': 'application/json'},
+        body: JSON.stringify(data),
+    });
+    if (resp.ok) {
+        showToast('Сохранено');
+    } else {
+        showToast('Ошибка сохранения');
+    }
+});
+
+async function deleteCp() {
+    if (!confirm('Удалить контрагента {{ cp.name }}?')) return;
+    const resp = await fetch('/counterparties/{{ cp.id }}/delete', {method: 'DELETE'});
+    if (resp.ok) {
+        window.location.href = '/counterparties';
+    } else {
+        showToast('Ошибка удаления');
+    }
+}
+
+function showToast(msg) {
+    const t = document.getElementById('toast');
+    t.textContent = msg;
+    t.style.display = 'block';
+    setTimeout(() => t.style.display = 'none', 2500);
+}
+</script>
+{% endblock %}

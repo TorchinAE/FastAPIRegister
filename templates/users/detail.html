@@ -1,0 +1,109 @@
+{% extends "base.html" %}
+{% block title %}Пользователь {{ target.name }}{% endblock %}
+{% block content %}
+<div class="page-header">
+    <div>
+        <h1>{{ target.name }}</h1>
+        <div class="subtitle">Пользователь #{{ target.id }}</div>
+    </div>
+    <a href="{{ back_to or '/users' }}" class="btn btn-ghost">← Назад</a>
+</div>
+
+<div class="card">
+    <form id="editUserForm">
+        <input type="hidden" name="id" value="{{ target.id }}">
+        <div class="form-row" style="grid-template-columns: 1fr 1fr 1fr;">
+            <div class="form-group">
+                <label>Имя</label>
+                <input type="text" name="name" value="{{ target.name }}" required style="width:100%;min-width:0">
+            </div>
+            <div class="form-group">
+                <label>Email</label>
+                <input type="email" name="email" value="{{ target.email }}" required style="width:100%;min-width:0">
+            </div>
+            <div class="form-group">
+                <label>Город</label>
+                <input type="text" name="city" value="{{ target.city }}" style="width:100%;min-width:0">
+            </div>
+        </div>
+        <div class="form-row" style="grid-template-columns: 1fr 1fr;">
+            <div class="form-group">
+                <label>Подпись</label>
+                <input type="text" name="signature" value="{{ target.signature or '' }}" placeholder="Подпись" style="width:100%;min-width:0">
+            </div>
+        </div>
+        <div class="actions">
+            <button type="submit" class="btn btn-primary">Сохранить</button>
+        </div>
+    </form>
+</div>
+
+<div id="toast" class="toast" style="display:none"></div>
+
+{% if user_requests %}
+<div class="card" style="margin-top:1.5rem;">
+    <h2 style="margin-bottom:0.75rem;">ТКП пользователя</h2>
+    <div class="table-wrap">
+        <table>
+            <thead>
+                <tr><th>#</th><th>ТКП</th><th>Дата</th><th>Статус</th><th>Организация</th><th>Оборудование</th><th style="text-align:right">Стоимость</th></tr>
+            </thead>
+            <tbody>
+                {% for req in user_requests %}
+                <tr style="cursor:pointer" onclick="location.href='/requests/{{ req.id }}'">
+                    <td><strong>{{ req.id }}</strong></td>
+                    <td>{{ req.tkp_num or '-' }}</td>
+                    <td>{{ req.request_date.strftime('%d.%m.%Y') if req.request_date else '-' }}</td>
+                    <td>
+                        {% set status = req.status.value if req.status else '' %}
+                        {% if status == 'запрос' %}<span class="badge badge-new">{{ status }}</span>
+                        {% elif status == 'тендер' %}<span class="badge badge-progress">{{ status }}</span>
+                        {% elif status == 'заказ' %}<span class="badge badge-done">{{ status }}</span>
+                        {% elif status == 'не актуально' %}<span class="badge badge-cancel">{{ status }}</span>
+                        {% else %}<span class="badge">{{ status or '-' }}</span>{% endif %}
+                    </td>
+                    <td>{{ req.company.name if req.company else '-' }}</td>
+                    <td>{{ req.equipment.name if req.equipment else '-' }}</td>
+                    <td style="text-align:right;white-space:nowrap;">{{ "{:,.2f}".format(req.cost).replace(",", " ") if req.cost else '0.00' }}</td>
+                </tr>
+                {% endfor %}
+            </tbody>
+        </table>
+    </div>
+</div>
+{% endif %}
+{% endblock %}
+
+{% block scripts %}
+<script>
+document.getElementById('editUserForm').addEventListener('submit', async function(e) {
+    e.preventDefault();
+    const fd = new FormData(this);
+    const data = {
+        id: parseInt(fd.get('id')),
+        name: fd.get('name'),
+        email: fd.get('email'),
+        city: fd.get('city') || 'ив',
+        signature: fd.get('signature') || null,
+    };
+    const resp = await fetch('/api/users/' + data.id, {
+        method: 'PATCH',
+        headers: {'Content-Type': 'application/json'},
+        body: JSON.stringify(data),
+    });
+    if (resp.ok) {
+        showToast('Сохранено');
+    } else {
+        const err = await resp.json();
+        showToast('Ошибка: ' + (err.detail || 'не удалось сохранить'));
+    }
+});
+
+function showToast(msg) {
+    const t = document.getElementById('toast');
+    t.textContent = msg;
+    t.style.display = 'block';
+    setTimeout(() => t.style.display = 'none', 2500);
+}
+</script>
+{% endblock %}

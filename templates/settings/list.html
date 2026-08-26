@@ -1,0 +1,53 @@
+{% extends "base.html" %}
+{% block title %}Настройки{% endblock %}
+{% block content %}
+<div class="page-header">
+    <h1>Настройки</h1>
+</div>
+
+<div class="card">
+    <div class="table-wrap">
+        <table>
+            <thead><tr><th style="width:30%;">Настройка</th><th>Значение</th><th style="width:120px;"></th></tr></thead>
+            <tbody id="settings-body">
+                {% for s in settings %}
+                <tr data-key="{{ s.key }}">
+                    <td><input type="text" value="{{ s.key }}" data-field="key" readonly style="width:100%;padding:0.45rem 0.6rem;border:1.5px solid var(--border);border-radius:6px;font-size:0.875rem;font-family:inherit;background:#f8fafc;"></td>
+                    <td><input type="text" value="{{ s.value }}" data-field="value" style="width:100%;padding:0.45rem 0.6rem;border:1.5px solid var(--border);border-radius:6px;font-size:0.875rem;font-family:inherit;"></td>
+                    <td style="text-align:center;"><button class="btn btn-primary btn-sm" onclick="saveRow(this)">Сохранить</button></td>
+                </tr>
+                {% endfor %}
+            </tbody>
+        </table>
+    </div>
+    <button class="btn btn-success btn-sm" onclick="addRow()" style="margin-top:0.75rem;">+ Добавить настройку</button>
+</div>
+
+<script>
+async function saveRow(btn) {
+    const tr = btn.closest('tr');
+    const key = tr.querySelector('[data-field="key"]').value.trim();
+    const value = tr.querySelector('[data-field="value"]').value;
+    if (!key) return;
+    await fetch('/api/settings/', {
+        method: 'PUT',
+        headers: {'Content-Type': 'application/json'},
+        body: JSON.stringify({key, value})
+    });
+    tr.dataset.key = key;
+    tr.querySelector('[data-field="key"]').readOnly = true;
+}
+
+function addRow() {
+    const tbody = document.getElementById('settings-body');
+    const tr = document.createElement('tr');
+    tr.innerHTML = `
+        <td><input type="text" value="" data-field="key" placeholder="ключ" style="width:100%;padding:0.45rem 0.6rem;border:1.5px solid var(--border);border-radius:6px;font-size:0.875rem;font-family:inherit;"></td>
+        <td><input type="text" value="" data-field="value" placeholder="значение" style="width:100%;padding:0.45rem 0.6rem;border:1.5px solid var(--border);border-radius:6px;font-size:0.875rem;font-family:inherit;"></td>
+        <td style="text-align:center;"><button class="btn btn-primary btn-sm" onclick="saveRow(this)">Сохранить</button></td>
+    `;
+    tbody.appendChild(tr);
+    tr.querySelector('[data-field="key"]').focus();
+}
+</script>
+{% endblock %}

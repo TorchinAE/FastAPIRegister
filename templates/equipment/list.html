@@ -1,0 +1,75 @@
+{% extends "base.html" %}
+{% block title %}Оборудование{% endblock %}
+{% block content %}
+<div class="page-header">
+    <div>
+        <h1>Оборудование</h1>
+        <div class="subtitle">Всего: {{ total }}</div>
+    </div>
+</div>
+<form method="post" action="/equipment" style="display:flex; gap:0.75rem; align-items:flex-end; margin-bottom:1rem; padding:1rem 1.25rem;">
+    <div class="form-group" style="flex:1; margin-bottom:0;">
+        <label>Название</label>
+        <input type="text" name="name" placeholder="Название оборудования" required>
+    </div>
+    <button type="submit" class="btn btn-success" style="height:38px;">Добавить</button>
+</form>
+<div class="table-wrap">
+    <table id="dataTable">
+        <thead>
+            <tr><th>ID</th><th>Название</th><th></th></tr>
+            <tr class="table-filter">
+                <th><input type="text" data-col="0" data-min="1" placeholder="Фильтр..." class="tf-input"></th>
+                <th><input type="text" data-col="1" placeholder="Фильтр..." class="tf-input"></th>
+                <th></th>
+            </tr>
+        </thead>
+        <tbody>
+            {% for item in items %}
+            <tr style="cursor:pointer" onclick="location.href='/equipment/{{ item.id }}'">
+                <td><strong>{{ item.id }}</strong></td>
+                <td>{{ item.name }}</td>
+                <td style="text-align:center;width:40px">
+                    <button class="btn btn-danger btn-sm btn-icon" title="Удалить" onclick="event.stopPropagation(); deleteEq({{ item.id }}, this)">&#10005;</button>
+                </td>
+            </tr>
+            {% endfor %}
+            {% if not items %}<tr class="empty-row"><td colspan="3">Нет оборудования</td></tr>{% endif %}
+        </tbody>
+    </table>
+</div>
+{% if pages > 1 %}
+<div class="pagination">
+    {% for p in range(1, pages + 1) %}
+    <a href="/equipment?page={{ p }}" class="{{ 'active' if p == page else '' }}">{{ p }}</a>
+    {% endfor %}
+</div>
+{% endif %}
+<div id="toast" class="toast" style="display:none"></div>
+{% endblock %}
+
+{% block scripts %}
+<script>
+async function deleteEq(id, btn) {
+    if (!confirm('Удалить оборудование?')) return;
+    const resp = await fetch(`/api/equipment/${id}`, {method: 'DELETE'});
+    if (resp.ok) { btn.closest('tr').remove(); showToast('Удалено'); } else { showToast('Ошибка удаления'); }
+}
+function showToast(msg) {
+    const t = document.getElementById('toast'); t.textContent = msg;
+    t.style.display = 'block'; setTimeout(() => t.style.display = 'none', 2500);
+}
+document.querySelectorAll('.tf-input').forEach(input => {
+    input.addEventListener('input', function() {
+        const col = parseInt(this.dataset.col);
+        const minLen = parseInt(this.dataset.min) || 3;
+        const val = this.value.toLowerCase();
+        document.querySelectorAll('#dataTable tbody tr:not(.empty-row)').forEach(row => {
+            if (val.length < minLen) { row.style.display = ''; return; }
+            const cell = row.cells[col];
+            row.style.display = cell && cell.textContent.toLowerCase().includes(val) ? '' : 'none';
+        });
+    });
+});
+</script>
+{% endblock %}

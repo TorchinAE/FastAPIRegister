@@ -1,0 +1,225 @@
+{% extends "base.html" %}
+{% block title %}Реестр ТКП{% endblock %}
+{% block content %}
+<div class="page-header" style="gap:1rem; flex-wrap:wrap;">
+    <div style="display:flex; align-items:center; gap:0.75rem;">
+        <a href="/requests/create" class="btn btn-success">+ Создать ТКП</a>
+        <button type="button" class="btn btn-ghost" onclick="resetFilters()">Сбросить фильтры</button>
+        <button type="button" class="btn btn-ghost" onclick="exportToExcel()">Выгрузить в Excel</button>
+        <h1>Реестр ТКП</h1>
+    </div>
+    <span class="subtitle">Всего: {{ total }}</span>
+</div>
+<div class="table-wrap" style="overflow-x:auto;">
+    <table id="dataTable">
+        <thead>
+            <tr>
+                <th>ID</th>
+                <th>ТКП</th>
+                <th>Дата заявки</th>
+                <th>Дата выдачи</th>
+                <th>Менеджер</th>
+                <th>Компания</th>
+                <th>Статус</th>
+                <th>Оборудование</th>
+                <th>Описание</th>
+                <th>Стоимость с НДС</th>
+                <th>БКТПБ</th>
+                <th>КТПБ</th>
+                <th>КТП</th>
+                <th>КСО-393</th>
+                <th>КСО-204</th>
+                <th>К-104</th>
+                <th>К-104М</th>
+                <th>ЩО</th>
+                <th>ПКУ</th>
+                <th>ПУС</th>
+                <th>ПАРН</th>
+            </tr>
+            <tr class="table-filter">
+                <th><input type="text" data-col="0" data-min="1" placeholder="..." class="tf-input"></th>
+                <th><input type="text" data-col="1" data-min="1" placeholder="..." class="tf-input"></th>
+                <th style="white-space:nowrap;">
+                    <div style="display:flex;flex-direction:column;gap:2px;">
+                        <input type="date" data-col="2" data-type="date-from" class="tf-input tf-date" title="С">
+                        <input type="date" data-col="2" data-type="date-to" class="tf-input tf-date" title="По">
+                    </div>
+                </th>
+                <th style="white-space:nowrap;">
+                    <div style="display:flex;flex-direction:column;gap:2px;">
+                        <input type="date" data-col="3" data-type="date-from" class="tf-input tf-date" title="С">
+                        <input type="date" data-col="3" data-type="date-to" class="tf-input tf-date" title="По">
+                    </div>
+                </th>
+                <th><input type="text" data-col="4" placeholder="..." class="tf-input"></th>
+                <th><input type="text" data-col="5" placeholder="..." class="tf-input"></th>
+                <th><input type="text" data-col="6" placeholder="..." class="tf-input"></th>
+                <th><input type="text" data-col="7" placeholder="..." class="tf-input"></th>
+                <th><input type="text" data-col="8" placeholder="..." class="tf-input"></th>
+                <th><input type="text" data-col="9" data-min="1" placeholder="..." class="tf-input"></th>
+                <th><input type="text" data-col="10" data-min="1" placeholder="..." class="tf-input"></th>
+                <th><input type="text" data-col="11" data-min="1" placeholder="..." class="tf-input"></th>
+                <th><input type="text" data-col="12" data-min="1" placeholder="..." class="tf-input"></th>
+                <th><input type="text" data-col="13" data-min="1" placeholder="..." class="tf-input"></th>
+                <th><input type="text" data-col="14" data-min="1" placeholder="..." class="tf-input"></th>
+                <th><input type="text" data-col="15" data-min="1" placeholder="..." class="tf-input"></th>
+                <th><input type="text" data-col="16" data-min="1" placeholder="..." class="tf-input"></th>
+                <th><input type="text" data-col="17" data-min="1" placeholder="..." class="tf-input"></th>
+                <th><input type="text" data-col="18" data-min="1" placeholder="..." class="tf-input"></th>
+                <th><input type="text" data-col="19" data-min="1" placeholder="..." class="tf-input"></th>
+                <th><input type="text" data-col="20" data-min="1" placeholder="..." class="tf-input"></th>
+            </tr>
+        </thead>
+        <tbody>
+            {% for req in items %}
+            <tr class="clickable-row" onclick="window.location='/requests/{{ req.id }}'">
+                <td><strong>#{{ req.id }}</strong></td>
+                <td>{{ req.tkp_num or '-' }}</td>
+                <td data-sort="{{ req.request_date.strftime('%Y%m%d') if req.request_date else '' }}">{{ req.request_date.strftime('%d.%m.%Y') if req.request_date else '-' }}</td>
+                <td data-sort="{{ req.issue_date.strftime('%Y%m%d') if req.issue_date else '' }}">{{ req.issue_date.strftime('%d.%m.%Y') if req.issue_date else '-' }}</td>
+                <td>{{ req.manager.name if req.manager else '-' }}</td>
+                <td>{{ req.company.name if req.company else '-' }}</td>
+                <td>
+                    {% set status = req.status.value if req.status else '' %}
+                    {% if status == 'запрос' %}<span class="badge badge-new">{{ status }}</span>
+                    {% elif status == 'тендер' %}<span class="badge badge-progress">{{ status }}</span>
+                    {% elif status == 'заказ' %}<span class="badge badge-done">{{ status }}</span>
+                    {% elif status == 'не актуально' %}<span class="badge badge-cancel">{{ status }}</span>
+                    {% else %}<span class="badge">{{ status or '-' }}</span>{% endif %}
+                </td>
+                <td>{{ req.equipment.name if req.equipment else '-' }}</td>
+                <td class="desc-cell">{{ req.description or '-' }}</td>
+                <td style="text-align:right;white-space:nowrap;">{{ "{:,.2f}".format(req.cost).replace(",", " ") if req.cost else '0.00' }}</td>
+                <td>{{ req.bktpb }}</td>
+                <td>{{ req.ktpb }}</td>
+                <td>{{ req.ktp }}</td>
+                <td>{{ req.kso_393 }}</td>
+                <td>{{ req.kso_204 }}</td>
+                <td>{{ req.k_104 }}</td>
+                <td>{{ req.k_104m }}</td>
+                <td>{{ req.sho }}</td>
+                <td>{{ req.pku }}</td>
+                <td>{{ req.pus }}</td>
+                <td>{{ req.parn }}</td>
+            </tr>
+            {% endfor %}
+            {% if not items %}
+            <tr class="empty-row"><td colspan="21">Нет ТКП</td></tr>
+            {% endif %}
+        </tbody>
+    </table>
+</div>
+{% if pages > 1 %}
+<div class="pagination">
+    {% for p in range(1, pages + 1) %}
+    <a href="/requests?page={{ p }}" class="{{ 'active' if p == page else '' }}">{{ p }}</a>
+    {% endfor %}
+</div>
+{% endif %}
+{% endblock %}
+
+{% block scripts %}
+<style>
+#dataTable th, #dataTable td { white-space: nowrap; padding: 0.5rem 0.75rem; vertical-align: middle; }
+#dataTable td.desc-cell {
+    max-width: 42ch; min-width: 30ch; width: 42ch;
+    white-space: normal !important;
+    word-wrap: break-word;
+    line-height: 1.35;
+    max-height: 2.7em;
+    overflow: hidden;
+    vertical-align: middle;
+}
+.tf-date { padding: 0.3rem 0.4rem !important; font-size: 0.78rem !important; width: auto !important; min-width: 0; }
+</style>
+<script src="https://cdn.sheetjs.com/xlsx-0.20.3/package/dist/xlsx.full.min.js"></script>
+<script>
+function resetFilters() {
+    document.querySelectorAll('#dataTable .tf-input').forEach(input => { input.value = ''; });
+    document.querySelectorAll('#dataTable tbody tr').forEach(row => { row.style.display = ''; });
+}
+document.querySelectorAll('.tf-input:not(.tf-date)').forEach(input => {
+    input.addEventListener('input', function() {
+        const col = parseInt(this.dataset.col);
+        const minLen = parseInt(this.dataset.min) || 2;
+        const val = this.value.toLowerCase();
+        document.querySelectorAll('#dataTable tbody tr:not(.empty-row)').forEach(row => {
+            if (val.length < minLen) { row.style.display = ''; return; }
+            const cell = row.cells[col];
+            const cellText = cell ? (cell.textContent || cell.innerText) : '';
+            row.style.display = cell && cellText.toLowerCase().includes(val) ? '' : 'none';
+        });
+    });
+});
+
+// Date period filtering
+document.querySelectorAll('.tf-date').forEach(input => {
+    input.addEventListener('change', function() {
+        const col = parseInt(this.dataset.col);
+        const type = this.dataset.type;
+        const row = this.closest('tr');
+        const fromInput = row.querySelector(`input[data-col="${col}"][data-type="date-from"]`);
+        const toInput = row.querySelector(`input[data-col="${col}"][data-type="date-to"]`);
+        const fromVal = fromInput ? fromInput.value : '';
+        const toVal = toInput ? toInput.value : '';
+
+        document.querySelectorAll('#dataTable tbody tr:not(.empty-row)').forEach(tr => {
+            const cell = tr.cells[col];
+            if (!cell) return;
+            const sortAttr = cell.dataset.sort || '';
+            if (!fromVal && !toVal) { tr.style.display = ''; return; }
+            if (!sortAttr || sortAttr === '-') { tr.style.display = 'none'; return; }
+            let show = true;
+            if (fromVal && sortAttr < fromVal.replace(/-/g, '')) show = false;
+            if (toVal && sortAttr > toVal.replace(/-/g, '')) show = false;
+            tr.style.display = show ? '' : 'none';
+        });
+    });
+});
+
+function exportToExcel() {
+    const table = document.getElementById('dataTable');
+    const headers = [];
+    table.querySelectorAll('thead tr:first-child th').forEach(th => headers.push(th.textContent.trim()));
+
+    const rows = [];
+    table.querySelectorAll('tbody tr:not(.empty-row)').forEach(tr => {
+        if (tr.style.display === 'none') return;
+        const row = [];
+        tr.querySelectorAll('td').forEach(td => {
+            let val = td.textContent.trim();
+            const num = parseFloat(val.replace(/\s/g, '').replace(',', '.'));
+            if (!isNaN(num) && val.match(/^[\d\s.,]+$/)) {
+                row.push(num);
+            } else {
+                row.push(val);
+            }
+        });
+        rows.push(row);
+    });
+
+    if (rows.length === 0) {
+        alert('Нет данных для выгрузки');
+        return;
+    }
+
+    const ws = XLSX.utils.aoa_to_sheet([headers, ...rows]);
+    const colWidths = headers.map((h, i) => {
+        let maxLen = h.length;
+        rows.forEach(r => {
+            const cell = r[i];
+            if (cell != null) {
+                const len = String(cell).length;
+                if (len > maxLen) maxLen = len;
+            }
+        });
+        return { wch: Math.min(maxLen + 2, 40) };
+    });
+    ws['!cols'] = colWidths;
+
+    const wb = XLSX.utils.book_new();
+    XLSX.utils.book_append_sheet(wb, ws, 'Реестр ТКП');
+    XLSX.writeFile(wb, 'Реестр_ТКП.xlsx');
+}
+</script>
+{% endblock %}
