@@ -8,31 +8,20 @@
     </div>
     <span class="subtitle">Всего: {{ total }}</span>
 </div>
-<form method="post" action="/equipment" style="display:flex; gap:0.75rem; align-items:flex-end; margin-bottom:1rem; padding:1rem 1.25rem; flex-wrap:wrap;">
-    <div class="form-group" style="flex:2; min-width:180px; margin-bottom:0;">
+<form method="post" action="/equipment" style="display:flex; gap:0.75rem; align-items:flex-end; margin-bottom:1rem; padding:1rem 1.25rem;">
+    <div class="form-group" style="flex:1; margin-bottom:0;">
         <label>Название</label>
         <input type="text" name="name" placeholder="Название оборудования" required>
-    </div>
-    <div class="form-group" style="flex:1; min-width:140px; margin-bottom:0;">
-        <label>Секция</label>
-        <select name="section_id">
-            <option value="">-- без секции --</option>
-            {% for s in sections %}
-            <option value="{{ s.id }}">{{ s.name }}</option>
-            {% endfor %}
-        </select>
     </div>
     <button type="submit" class="btn btn-success" style="height:38px;">Добавить</button>
 </form>
 <div class="table-wrap">
     <table id="dataTable">
         <thead>
-            <tr><th>ID</th><th>Название</th><th>Секция</th><th>Тип</th><th></th></tr>
+            <tr><th>ID</th><th>Название</th><th></th></tr>
             <tr class="table-filter">
                 <th><input type="text" data-col="0" data-min="1" placeholder="Фильтр..." class="tf-input"></th>
                 <th><input type="text" data-col="1" placeholder="Фильтр..." class="tf-input"></th>
-                <th><input type="text" data-col="2" placeholder="Фильтр..." class="tf-input"></th>
-                <th></th>
                 <th></th>
             </tr>
         </thead>
@@ -41,14 +30,12 @@
             <tr style="cursor:pointer" onclick="location.href='/equipment/{{ item.id }}'">
                 <td><strong>{{ item.id }}</strong></td>
                 <td>{{ item.name }}</td>
-                <td>{{ item.section.name if item.section else '-' }}</td>
-                <td>{% if item.is_composite %}<span class="badge badge-progress">Составное</span>{% else %}<span class="badge badge-done">Простое</span>{% endif %}</td>
                 <td style="text-align:center;width:40px">
                     <button class="btn btn-danger btn-sm btn-icon" title="Удалить" onclick="event.stopPropagation(); deleteEq({{ item.id }}, this)">&#10005;</button>
                 </td>
             </tr>
             {% endfor %}
-            {% if not items %}<tr class="empty-row"><td colspan="5">Нет оборудования</td></tr>{% endif %}
+            {% if not items %}<tr class="empty-row"><td colspan="3">Нет оборудования</td></tr>{% endif %}
         </tbody>
     </table>
 </div>

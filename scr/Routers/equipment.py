@@ -6,8 +6,6 @@ from scr.dbase.schemas.schemas import (
     EquipmentCreateSchema,
     EquipmentUpdateSchema,
     EquipmentResponseSchema,
-    CompositionItemSchema,
-    CompositionResponseSchema,
     PaginatedResponse,
 )
 
@@ -27,15 +25,12 @@ async def add_equipment(
 @eq_router.get("/", response_model=PaginatedResponse)
 async def read_equipment(
     search: str | None = Query(None),
-    section_id: int | None = Query(None),
-    is_composite: bool | None = Query(None),
     page: int = Query(1, ge=1),
     per_page: int = Query(20, ge=1, le=100),
     session: AsyncSession = Depends(db_helper.session_dependency),
 ):
     items, total = await crud_equipment.get_equipment_list(
-        session=session, search=search, section_id=section_id,
-        is_composite=is_composite, page=page, per_page=per_page
+        session=session, search=search, page=page, per_page=per_page
     )
     return PaginatedResponse(
         items=[EquipmentResponseSchema.model_validate(i) for i in items],
@@ -77,28 +72,3 @@ async def delete_equipment(
         raise HTTPException(status_code=404, detail="Оборудование не найдено")
     await session.commit()
     return {"message": "Оборудование удалено"}
-
-
-@eq_router.get("/{eq_id}/composition", response_model=list[CompositionResponseSchema])
-async def get_composition(
-    eq_id: int, session: AsyncSession = Depends(db_helper.session_dependency)
-):
-    comps = await crud_equipment.get_composition(session, eq_id)
-    return [CompositionResponseSchema(
-        id=c.id, parent_id=c.parent_id, child_id=c.child_id,
-        quantity=c.quantity, child_name=c.child.name if c.child else None
-    ) for c in comps]
-
-
-@eq_router.put("/{eq_id}/composition")
-async def set_composition(
-    eq_id: int, components: list[CompositionItemSchema],
-    session: AsyncSession = Depends(db_helper.session_dependency)
-):
-    result = await crud_equipment.set_composition(
-        session, eq_id, [c.model_dump() for c in components]
-    )
-    if not result:
-        raise HTTPException(status_code=404, detail="Оборудование не найдено")
-    await session.commit()
-    return {"ok": True}
