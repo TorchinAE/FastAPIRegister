@@ -38,6 +38,10 @@
                 </select>
                 <a href="/directors/{{ org.director_id }}?back_to=/companies/{{ org.id }}/edit" id="editDirectorLink" class="btn btn-ghost btn-sm" style="margin-top:0.35rem;font-size:0.8rem">Изменить данные директора</a>
             </div>
+            <div class="form-group">
+                <label>Рентабельность (%)</label>
+                <input type="number" name="rentability" value="{{ org.rentability if org.rentability is not none else '' }}" step="0.01" min="0" max="100" style="width:100%;min-width:0">
+            </div>
         </div>
         <div class="actions">
             <button type="submit" class="btn btn-primary">Сохранить</button>
@@ -95,6 +99,7 @@ document.getElementById('editCompanyForm').addEventListener('submit', async func
         address: fd.get('address') || null,
         server_address_slug: fd.get('server_address_slug'),
         director_id: parseInt(fd.get('director_id')),
+        rentability: fd.get('rentability') ? parseFloat(fd.get('rentability')) : null,
     };
     const resp = await fetch('/api/companies/', {
         method: 'PATCH',

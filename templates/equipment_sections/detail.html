@@ -1,0 +1,40 @@
+{% extends "base.html" %}
+{% block title %}Секция: {{ section.name }}{% endblock %}
+{% block content %}
+<div class="page-header">
+    <div>
+        <h1>Редактирование секции</h1>
+        <div class="subtitle">ID: {{ section.id }}</div>
+    </div>
+</div>
+<div style="display:flex;gap:0.5rem;margin-bottom:0.75rem;">
+    <a href="/equipment-sections" class="btn btn-ghost">← Назад</a>
+</div>
+<div class="card">
+    <form method="post" action="/equipment-sections/{{ section.id }}" style="box-shadow:none;padding:0;background:none;">
+        <div class="form-group">
+            <label>Название</label>
+            <input type="text" name="name" value="{{ section.name }}" required>
+        </div>
+        <div class="actions">
+            <button type="submit" class="btn btn-success">Сохранить</button>
+            <button type="button" class="btn btn-danger" onclick="deleteEs()">Удалить</button>
+        </div>
+    </form>
+</div>
+<div id="toast" class="toast" style="display:none"></div>
+{% endblock %}
+
+{% block scripts %}
+<script>
+async function deleteEs() {
+    if (!confirm('Удалить секцию?')) return;
+    const resp = await fetch(`/api/equipment-sections/{{ section.id }}`, {method: 'DELETE'});
+    if (resp.ok) { window.location = '/equipment-sections'; } else { showToast('Ошибка удаления'); }
+}
+function showToast(msg) {
+    const t = document.getElementById('toast'); t.textContent = msg;
+    t.style.display = 'block'; setTimeout(() => t.style.display = 'none', 2500);
+}
+</script>
+{% endblock %}

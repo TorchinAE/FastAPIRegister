@@ -99,6 +99,7 @@ class Organization(BaseID):
         String(200), nullable=False, default="/02_сторонние_заказчики"
     )
     director_id: Mapped[int] = mapped_column(ForeignKey("directors.id"), nullable=False)
+    rentability: Mapped[Optional[float]] = mapped_column(Numeric(5, 2), nullable=True, default=0)
 
     director: Mapped["Directors"] = relationship(back_populates="organizations")
     counterparties: Mapped[List["Counterparty"]] = relationship(
@@ -179,6 +180,17 @@ class Equipment(BaseID):
 
     def __repr__(self) -> str:
         return f"Equipment(id={self.id}, name='{self.name}')"
+
+
+class EquipmentSection(BaseID):
+    __tablename__ = "equipment_sections"
+    name: Mapped[str] = mapped_column(String(100), unique=True, nullable=False)
+
+    def __repr__(self) -> str:
+        return f"EquipmentSection(id={self.id}, name='{self.name}')"
+
+
+DEFAULT_EQUIPMENT_SECTIONS = ["ВА", "Schnaider", "IEK", "EKF", "CHINT", "ESQ", "ТТ04", "ТТ62"]
 
 
 class Probability(Base):

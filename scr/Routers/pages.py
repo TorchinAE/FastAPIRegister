@@ -5,7 +5,7 @@ from sqlalchemy.ext.asyncio import AsyncSession
 
 from scr.dbase.database import db_helper
 from scr.dbase import crud_users, crud_requests, crud_counterparties
-from scr.dbase import crud_organizations, crud_directors, crud_positions, crud_equipment, crud_invoices, crud_settings, crud_payments
+from scr.dbase import crud_organizations, crud_directors, crud_positions, crud_equipment, crud_invoices, crud_settings, crud_payments, crud_equipment_sections
 from scr.dbase.models import Probability
 from scr.dbase.models import RequestStatus
 
@@ -368,6 +368,8 @@ async def companies_create_submit(
             "address": form.get("address") or None,
             "director_id": int(form["director_id"]),
         }
+        if form.get("rentability"):
+            data["rentability"] = float(form["rentability"])
         await crud_organizations.add_organization(session, OrganizationAddSchema(**data), created_by=user.name)
         await session.commit()
     return RedirectResponse("/companies", status_code=302)
@@ -752,3 +754,110 @@ async def request_calc_page(
         "requests/calc.html",
         {"request": request, "user": user, "req": req, "active_page": "requests"},
     )
+
+
+# --- Calc sub-pages (stubs) ---
+CALC_TEMPLATES = {
+    "tkp": "Расчёт ТКП",
+    "corpus": "Расчёт Корпуса",
+    "k104": "Расчёт К-104",
+    "kso": "Расчёт КСО-204(393)",
+    "sho": "Расчёт ЩО-70",
+    "ktp": "Расчёт КТП",
+    "pku": "Расчёт ПКУ(ПУС)",
+    "rsh": "Расчёт РШ",
+    "contract": "Договор",
+    "spec": "Спецификация",
+}
+
+
+@pages_router.get("/requests/{req_id}/calc/{calc_type}", response_class=HTMLResponse)
+async def request_calc_sub_page(
+    req_id: int,
+    calc_type: str,
+    request: Request,
+    session: AsyncSession = Depends(db_helper.session_dependency),
+):
+    user = await get_current_user(request, session)
+    if not user:
+        return RedirectResponse("/", status_code=302)
+    if calc_type not in CALC_TEMPLATES:
+        return HTMLResponse("Страница не найдена", status_code=404)
+    req = await crud_requests.get_request_by_id(session, req_id)
+    if not req:
+        return HTMLResponse("ТКП не найдена", status_code=404)
+    return templates.TemplateResponse(
+        f"requests/calc_{calc_type}.html",
+        {"request": request, "user": user, "req": req, "active_page": "requests"},
+    )
+
+
+# --- Equipment Sections ---
+@pages_router.get("/equipment-sections", response_class=HTMLResponse)
+async def equipment_sections_page(
+    request: Request,
+    page: int = 1,
+    session: AsyncSession = Depends(db_helper.session_dependency),
+):
+    user = await get_current_user(request, session)
+    if not user:
+        return RedirectResponse("/", status_code=302)
+    items, total = await crud_equipment_sections.get_all_sections(session, page=page)
+    per_page = 20
+    return templates.TemplateResponse(
+        "equipment_sections/list.html",
+        {"request": request, "user": user, "items": items, "page": page, "pages": (total + per_page - 1) // per_page, "total": total, "active_page": "equipment_sections"},
+    )
+
+
+@pages_router.post("/equipment-sections", response_class=HTMLResponse)
+async def equipment_sections_create_submit(
+    request: Request,
+    session: AsyncSession = Depends(db_helper.session_dependency),
+):
+    user = await get_current_user(request, session)
+    if not user:
+        return RedirectResponse("/", status_code=302)
+    form = await request.form()
+    name = form.get("name", "").strip()
+    if name:
+        from scr.dbase.schemas.schemas import EquipmentSectionCreateSchema
+        await crud_equipment_sections.add_section(session, EquipmentSectionCreateSchema(name=name), created_by=user.name)
+        await session.commit()
+    return RedirectResponse("/equipment-sections", status_code=302)
+
+
+@pages_router.get("/equipment-sections/{section_id}", response_class=HTMLResponse)
+async def equipment_sections_detail_page(
+    section_id: int,
+    request: Request,
+    session: AsyncSession = Depends(db_helper.session_dependency),
+):
+    user = await get_current_user(request, session)
+    if not user:
+        return RedirectResponse("/", status_code=302)
+    section = await crud_equipment_sections.get_section_by_id(session, section_id)
+    if not section:
+        return HTMLResponse("Секция не найдена", status_code=404)
+    return templates.TemplateResponse(
+        "equipment_sections/detail.html",
+        {"request": request, "user": user, "section": section, "active_page": "equipment_sections"},
+    )
+
+
+@pages_router.post("/equipment-sections/{section_id}", response_class=HTMLResponse)
+async def equipment_sections_edit_submit(
+    section_id: int,
+    request: Request,
+    session: AsyncSession = Depends(db_helper.session_dependency),
+):
+    user = await get_current_user(request, session)
+    if not user:
+        return RedirectResponse("/", status_code=302)
+    form = await request.form()
+    name = form.get("name", "").strip()
+    if name:
+        from scr.dbase.schemas.schemas import EquipmentSectionUpdateSchema
+        await crud_equipment_sections.update_section(session, EquipmentSectionUpdateSchema(id=section_id, name=name))
+        await session.commit()
+    return RedirectResponse("/equipment-sections", status_code=302)

@@ -7,10 +7,89 @@
         <div class="subtitle">Код: {{ req.id }} &middot; {{ req.tkp_num or '' }}</div>
     </div>
 </div>
-<div style="display:flex;gap:0.5rem;margin-bottom:0.75rem;">
+<div style="display:flex;gap:0.5rem;margin-bottom:1rem;flex-wrap:wrap;">
     <a href="/requests/{{ req.id }}" class="btn btn-ghost">← Назад к ТКП</a>
+    <button type="button" class="btn btn-ghost" onclick="openFolderTKP()">Открыть папку ТКП</button>
 </div>
-<div class="card">
-    <p style="color:var(--text-muted);">Страница расчета ТКП будет описана позже.</p>
+
+<div class="card" style="margin-bottom:1rem;">
+    <div style="display:grid;grid-template-columns:1fr 1fr;gap:0.5rem 2rem;font-size:0.9rem;">
+        <div>
+            <div style="margin-bottom:0.3rem;"><span style="color:var(--text-muted);font-weight:600;">№ ТКП:</span> {{ req.tkp_num or '-' }}</div>
+            <div style="margin-bottom:0.3rem;"><span style="color:var(--text-muted);font-weight:600;">Менеджер:</span> {{ req.manager.name if req.manager else '-' }}</div>
+            <div style="margin-bottom:0.3rem;"><span style="color:var(--text-muted);font-weight:600;">Организация:</span> {{ req.company.name if req.company else '-' }}</div>
+            <div style="margin-bottom:0.3rem;"><span style="color:var(--text-muted);font-weight:600;">Директор:</span> {{ req.company.director.name if req.company and req.company.director else '-' }}</div>
+            <div style="margin-bottom:0.3rem;"><span style="color:var(--text-muted);font-weight:600;">Контрагент:</span> {{ req.counterparty.name if req.counterparty else '-' }}</div>
+            <div style="margin-bottom:0.3rem;"><span style="color:var(--text-muted);font-weight:600;">Телефон контрагента:</span> {{ req.counterparty.phone if req.counterparty and req.counterparty.phone else '-' }}</div>
+            <div style="display:flex;align-items:center;gap:0.4rem;">
+                <span style="color:var(--text-muted);font-weight:600;">Рентабельность:</span>
+                <input type="number" id="rentabilityInput" value="{{ req.company.rentability if req.company and req.company.rentability is not none else 15 }}" step="0.01" min="0" max="100" style="width:80px;padding:0.25rem 0.4rem;border:1.5px solid var(--border);border-radius:4px;font-size:0.9rem;text-align:right;">
+                <span>%</span>
+                <span id="rentStatus" style="font-size:0.75rem;color:var(--success);display:none;">&#10003;</span>
+            </div>
+        </div>
+        <div>
+            <span style="color:var(--text-muted);font-weight:600;">Объект:</span>
+            <div style="margin-top:0.3rem;padding:0.6rem;background:#f8fafc;border-radius:6px;min-height:80px;white-space:pre-wrap;line-height:1.5;">{{ req.description or '-' }}</div>
+        </div>
+    </div>
 </div>
+
+<h2 style="font-size:1rem;font-weight:700;margin-bottom:0.75rem;color:var(--text);">Расчёты</h2>
+<div style="display:grid;grid-template-columns:repeat(auto-fill,minmax(180px,1fr));gap:0.75rem;margin-bottom:1.5rem;">
+    <a href="/requests/{{ req.id }}/calc/tkp" class="btn btn-ghost" style="justify-content:center;padding:1rem;">ТКП</a>
+    <a href="/requests/{{ req.id }}/calc/corpus" class="btn btn-ghost" style="justify-content:center;padding:1rem;">Корпуса</a>
+    <a href="/requests/{{ req.id }}/calc/k104" class="btn btn-ghost" style="justify-content:center;padding:1rem;">К-104</a>
+    <a href="/requests/{{ req.id }}/calc/kso" class="btn btn-ghost" style="justify-content:center;padding:1rem;">КСО-204(393)</a>
+    <a href="/requests/{{ req.id }}/calc/sho" class="btn btn-ghost" style="justify-content:center;padding:1rem;">ЩО-70</a>
+    <a href="/requests/{{ req.id }}/calc/ktp" class="btn btn-ghost" style="justify-content:center;padding:1rem;">КТП</a>
+    <a href="/requests/{{ req.id }}/calc/pku" class="btn btn-ghost" style="justify-content:center;padding:1rem;">ПКУ(ПУС)</a>
+    <a href="/requests/{{ req.id }}/calc/rsh" class="btn btn-ghost" style="justify-content:center;padding:1rem;">РШ</a>
+</div>
+
+<h2 style="font-size:1rem;font-weight:700;margin-bottom:0.75rem;color:var(--text);">Документы</h2>
+<div style="display:flex;gap:0.75rem;flex-wrap:wrap;">
+    <a href="/requests/{{ req.id }}/calc/contract" class="btn btn-ghost">Договор</a>
+    <a href="/requests/{{ req.id }}/calc/spec" class="btn btn-ghost">Спецификация</a>
+</div>
+{% endblock %}
+
+{% block scripts %}
+<script>
+const rentInput = document.getElementById('rentabilityInput');
+const rentStatus = document.getElementById('rentStatus');
+let rentTimer = null;
+rentInput.addEventListener('input', function() {
+    clearTimeout(rentTimer);
+    rentTimer = setTimeout(saveRentability, 800);
+});
+async function saveRentability() {
+    const val = parseFloat(rentInput.value);
+    if (isNaN(val) || val < 0 || val > 100) return;
+    try {
+        const resp = await fetch('/api/companies/', {
+            method: 'PATCH',
+            headers: {'Content-Type': 'application/json'},
+            body: JSON.stringify({ id: {{ req.company_id }}, rentability: val }),
+        });
+        if (resp.ok) {
+            rentStatus.style.display = 'inline';
+            setTimeout(() => rentStatus.style.display = 'none', 2000);
+        }
+    } catch(e) {}
+}
+
+async function openFolderTKP() {
+    try {
+        const resp = await fetch('/api/settings/');
+        const settings = await resp.json();
+        const serverAddr = settings.find(s => s.key === 'server_address');
+        if (!serverAddr) { alert('Адрес сервера не настроен'); return; }
+        const slug = '{{ req.company.server_address_slug if req.company else "/02_сторонние_заказчики" }}';
+        const tkpNum = '{{ req.tkp_num or "" }}';
+        const path = serverAddr.value + slug + '/' + tkpNum;
+        window.open('file:///' + path.replace(/\\/g, '/'), '_blank');
+    } catch(e) { alert('Ошибка открытия папки'); }
+}
+</script>
 {% endblock %}

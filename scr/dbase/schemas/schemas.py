@@ -76,6 +76,7 @@ class OrganizationAddSchema(BaseModel):
     address: Optional[str] = None
     server_address_slug: str = "/02_сторонние_заказчики"
     director_id: int
+    rentability: Optional[float] = None
 
 
 class OrganizationUpdateSchema(BaseModel):
@@ -87,6 +88,7 @@ class OrganizationUpdateSchema(BaseModel):
     address: Optional[str] = None
     server_address_slug: Optional[str] = None
     director_id: Optional[int] = None
+    rentability: Optional[float] = None
 
 
 class OrganizationResponseSchema(BaseModel):
@@ -98,6 +100,7 @@ class OrganizationResponseSchema(BaseModel):
     address: Optional[str] = None
     server_address_slug: str
     director_id: int
+    rentability: Optional[float] = None
     created_by: Optional[str] = None
 
 
@@ -189,6 +192,29 @@ class EquipmentUpdateSchema(BaseModel):
 
 
 class EquipmentResponseSchema(BaseModel):
+    model_config = ConfigDict(from_attributes=True)
+
+    id: int
+    name: str
+    created_by: Optional[str] = None
+
+
+# --- EquipmentSection ---
+
+class EquipmentSectionCreateSchema(BaseModel):
+    model_config = ConfigDict(from_attributes=True)
+
+    name: str
+
+
+class EquipmentSectionUpdateSchema(BaseModel):
+    model_config = ConfigDict(from_attributes=True)
+
+    id: int
+    name: Optional[str] = None
+
+
+class EquipmentSectionResponseSchema(BaseModel):
     model_config = ConfigDict(from_attributes=True)
 
     id: int

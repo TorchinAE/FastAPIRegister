@@ -60,7 +60,7 @@ async def get_request_by_id(
 ) -> Request | None:
     stmt = select(Request).options(
         selectinload(Request.counterparty).selectinload(Counterparty.company).selectinload(Organization.director).selectinload(Directors.position),
-        selectinload(Request.company),
+        selectinload(Request.company).selectinload(Organization.director),
         selectinload(Request.manager),
         selectinload(Request.equipment),
     ).where(Request.id == req_id)

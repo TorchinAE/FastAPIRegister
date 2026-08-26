@@ -1,0 +1,16 @@
+{% extends "base.html" %}
+{% block title %}Договор — {{ req.tkp_num or req.id }}{% endblock %}
+{% block content %}
+<div class="page-header">
+    <div>
+        <h1>Договор</h1>
+        <div class="subtitle">{{ req.tkp_num or '' }} &middot; {{ req.description or '' }}</div>
+    </div>
+</div>
+<div style="display:flex;gap:0.5rem;margin-bottom:0.75rem;">
+    <a href="/requests/{{ req.id }}/calc" class="btn btn-ghost">← Назад к расчётам</a>
+</div>
+<div class="card">
+    <p style="color:var(--text-muted);">Страница договора будет описана позже.</p>
+</div>
+{% endblock %}
