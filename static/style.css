@@ -76,14 +76,14 @@ tr { transition: background var(--transition); }
 .btn { display: inline-flex; align-items: center; gap: 0.4rem; padding: 0.5rem 1rem; border: none; border-radius: 6px; cursor: pointer; font-size: 0.85rem; font-weight: 500; text-decoration: none; color: #fff; transition: all var(--transition); }
 .btn:hover { transform: translateY(-1px); box-shadow: var(--shadow-md); }
 .btn:active { transform: translateY(0); }
-.btn-primary { background: var(--primary); }
-.btn-primary:hover { background: var(--primary-hover); }
+.btn-primary { background: var(--success); }
+.btn-primary:hover { background: var(--success-hover); }
 .btn-success { background: var(--success); }
 .btn-success:hover { background: var(--success-hover); }
 .btn-danger { background: var(--danger); }
 .btn-danger:hover { background: var(--danger-hover); }
-.btn-ghost { background: transparent; color: var(--text-muted); border: 1px solid var(--border); }
-.btn-ghost:hover { background: #f8fafc; color: var(--text); }
+.btn-ghost { background: var(--success); color: #fff; border: 1px solid var(--success); }
+.btn-ghost:hover { background: var(--success-hover); color: #fff; }
 .btn-sm { padding: 0.35rem 0.7rem; font-size: 0.8rem; }
 .btn-icon { padding: 0.4rem; width: 32px; height: 32px; justify-content: center; }
 

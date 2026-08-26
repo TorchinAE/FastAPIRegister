@@ -1,11 +1,12 @@
 {% extends "base.html" %}
 {% block title %}Должности{% endblock %}
 {% block content %}
-<div class="page-header">
-    <div>
+<div class="page-header" style="gap:1rem; flex-wrap:wrap;">
+    <div style="display:flex; align-items:center; gap:0.75rem;">
+        <button type="button" class="btn btn-ghost" onclick="exportToExcel()">Выгрузить в Excel</button>
         <h1>Должности</h1>
-        <div class="subtitle">Всего: {{ total }}</div>
     </div>
+    <span class="subtitle">Всего: {{ total }}</span>
 </div>
 <form method="post" action="/positions" style="display:flex; gap:0.75rem; align-items:flex-end; margin-bottom:1rem; padding:1rem 1.25rem;">
     <div class="form-group" style="flex:1; margin-bottom:0;">
@@ -49,6 +50,7 @@
 {% endblock %}
 
 {% block scripts %}
+<script src="/static/xlsx.full.min.js"></script>
 <script>
 async function deletePos(id, btn) {
     if (!confirm('Удалить должность?')) return;
@@ -71,5 +73,28 @@ document.querySelectorAll('.tf-input').forEach(input => {
         });
     });
 });
+function exportToExcel() {
+    const table = document.getElementById('dataTable');
+    const headers = [];
+    table.querySelectorAll('thead tr:first-child th').forEach(th => { if (th.textContent.trim()) headers.push(th.textContent.trim()); });
+    const rows = [];
+    table.querySelectorAll('tbody tr:not(.empty-row)').forEach(tr => {
+        if (tr.style.display === 'none') return;
+        const row = [];
+        for (let i = 0; i < headers.length; i++) {
+            const td = tr.cells[i];
+            let val = td ? td.textContent.trim() : '';
+            const num = parseFloat(val.replace(/\s/g, '').replace(',', '.'));
+            if (!isNaN(num) && /^[\d\s.,]+$/.test(val)) row.push(num); else row.push(val);
+        }
+        rows.push(row);
+    });
+    if (rows.length === 0) { alert('Нет данных для выгрузки'); return; }
+    const ws = XLSX.utils.aoa_to_sheet([headers, ...rows]);
+    ws['!cols'] = headers.map((h, i) => { let m = h.length; rows.forEach(r => { const c = r[i]; if (c != null && String(c).length > m) m = String(c).length; }); return { wch: Math.min(m + 2, 40) }; });
+    const wb = XLSX.utils.book_new();
+    XLSX.utils.book_append_sheet(wb, ws, 'Должности');
+    XLSX.writeFile(wb, 'Должности.xlsx');
+}
 </script>
 {% endblock %}

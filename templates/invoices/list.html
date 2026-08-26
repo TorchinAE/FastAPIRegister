@@ -1,13 +1,16 @@
 {% extends "base.html" %}
 {% block title %}Счета{% endblock %}
 {% block content %}
-<div class="page-header">
-    <h1>Счета</h1>
-    <div class="subtitle">Всего: {{ total }}</div>
+<div class="page-header" style="gap:1rem; flex-wrap:wrap;">
+    <div style="display:flex; align-items:center; gap:0.75rem;">
+        <button type="button" class="btn btn-ghost" onclick="exportToExcel()">Выгрузить в Excel</button>
+        <h1>Счета</h1>
+    </div>
+    <span class="subtitle">Всего: {{ total }}</span>
 </div>
 
 <div class="table-wrap">
-    <table>
+    <table id="dataTable">
         <thead>
             <tr>
                 <th>ID</th>
@@ -61,6 +64,7 @@
 </div>
 {% endif %}
 
+<script src="/static/xlsx.full.min.js"></script>
 <script>
 document.querySelectorAll('.table-filter .tf-input').forEach(input => {
     input.addEventListener('input', function() {
@@ -73,5 +77,28 @@ document.querySelectorAll('.table-filter .tf-input').forEach(input => {
         });
     });
 });
+function exportToExcel() {
+    const table = document.getElementById('dataTable');
+    const headers = [];
+    table.querySelectorAll('thead tr:first-child th').forEach(th => { if (th.textContent.trim()) headers.push(th.textContent.trim()); });
+    const rows = [];
+    table.querySelectorAll('tbody tr:not(.empty-row)').forEach(tr => {
+        if (tr.style.display === 'none') return;
+        const row = [];
+        for (let i = 0; i < headers.length; i++) {
+            const td = tr.cells[i];
+            let val = td ? td.textContent.trim() : '';
+            const num = parseFloat(val.replace(/\s/g, '').replace(',', '.'));
+            if (!isNaN(num) && /^[\d\s.,]+$/.test(val)) row.push(num); else row.push(val);
+        }
+        rows.push(row);
+    });
+    if (rows.length === 0) { alert('Нет данных для выгрузки'); return; }
+    const ws = XLSX.utils.aoa_to_sheet([headers, ...rows]);
+    ws['!cols'] = headers.map((h, i) => { let m = h.length; rows.forEach(r => { const c = r[i]; if (c != null && String(c).length > m) m = String(c).length; }); return { wch: Math.min(m + 2, 40) }; });
+    const wb = XLSX.utils.book_new();
+    XLSX.utils.book_append_sheet(wb, ws, 'Счета');
+    XLSX.writeFile(wb, 'Счета.xlsx');
+}
 </script>
 {% endblock %}
