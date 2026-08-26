@@ -182,6 +182,8 @@ class EquipmentCreateSchema(BaseModel):
     model_config = ConfigDict(from_attributes=True)
 
     name: str
+    section_id: Optional[int] = None
+    is_composite: bool = False
 
 
 class EquipmentUpdateSchema(BaseModel):
@@ -189,6 +191,8 @@ class EquipmentUpdateSchema(BaseModel):
 
     id: int
     name: Optional[str] = None
+    section_id: Optional[int] = None
+    is_composite: Optional[bool] = None
 
 
 class EquipmentResponseSchema(BaseModel):
@@ -196,6 +200,66 @@ class EquipmentResponseSchema(BaseModel):
 
     id: int
     name: str
+    section_id: Optional[int] = None
+    is_composite: bool = False
+    created_by: Optional[str] = None
+
+
+# --- Equipment Composition ---
+
+class CompositionItemSchema(BaseModel):
+    child_id: int
+    quantity: int = Field(1, ge=1)
+
+
+class EquipmentCompositionSchema(BaseModel):
+    parent_id: int
+    components: List[CompositionItemSchema]
+
+
+class CompositionResponseSchema(BaseModel):
+    model_config = ConfigDict(from_attributes=True)
+
+    id: int
+    parent_id: int
+    child_id: int
+    quantity: int
+    child_name: Optional[str] = None
+
+
+# --- CalcItem ---
+
+class CalcItemCreateSchema(BaseModel):
+    model_config = ConfigDict(from_attributes=True)
+
+    request_id: int
+    calc_type: str
+    equipment_id: int
+    quantity: int = Field(1, ge=1)
+    custom_name: Optional[str] = None
+
+
+class CalcItemUpdateSchema(BaseModel):
+    model_config = ConfigDict(from_attributes=True)
+
+    id: int
+    quantity: Optional[int] = Field(None, ge=1)
+    custom_name: Optional[str] = None
+    sort_order: Optional[int] = None
+
+
+class CalcItemResponseSchema(BaseModel):
+    model_config = ConfigDict(from_attributes=True)
+
+    id: int
+    request_id: int
+    calc_type: str
+    equipment_id: int
+    equipment_name: Optional[str] = None
+    is_composite: bool = False
+    quantity: int
+    custom_name: Optional[str] = None
+    sort_order: int
     created_by: Optional[str] = None
 
 

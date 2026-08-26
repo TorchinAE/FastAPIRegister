@@ -177,6 +177,17 @@ class Counterparty(BaseID):
 class Equipment(BaseID):
     __tablename__ = "equipment"
     name: Mapped[str] = mapped_column(String(100), nullable=False)
+    section_id: Mapped[Optional[int]] = mapped_column(
+        ForeignKey("equipment_sections.id"), nullable=True
+    )
+    is_composite: Mapped[bool] = mapped_column(default=False, nullable=False)
+
+    section: Mapped[Optional["EquipmentSection"]] = relationship(foreign_keys=[section_id])
+    components: Mapped[List["EquipmentComposition"]] = relationship(
+        foreign_keys="EquipmentComposition.parent_id",
+        back_populates="parent",
+        cascade="all, delete-orphan",
+    )
 
     def __repr__(self) -> str:
         return f"Equipment(id={self.id}, name='{self.name}')"
@@ -191,6 +202,16 @@ class EquipmentSection(BaseID):
 
 
 DEFAULT_EQUIPMENT_SECTIONS = ["ВА", "Schnaider", "IEK", "EKF", "CHINT", "ESQ", "ТТ04", "ТТ62"]
+
+
+class EquipmentComposition(BaseID):
+    __tablename__ = "equipment_composition"
+    parent_id: Mapped[int] = mapped_column(ForeignKey("equipment.id"), nullable=False)
+    child_id: Mapped[int] = mapped_column(ForeignKey("equipment.id"), nullable=False)
+    quantity: Mapped[int] = mapped_column(Integer, default=1, nullable=False)
+
+    parent: Mapped["Equipment"] = relationship(foreign_keys=[parent_id])
+    child: Mapped["Equipment"] = relationship(foreign_keys=[child_id])
 
 
 class Probability(Base):
@@ -300,6 +321,19 @@ class PaymentItem(BaseID):
     paid_date: Mapped[Optional[datetime]] = mapped_column(DateTime, nullable=True)
 
     request: Mapped["Request"] = relationship(back_populates="payment_items")
+
+
+class CalcItem(BaseID):
+    __tablename__ = "calc_items"
+    request_id: Mapped[int] = mapped_column(ForeignKey("requests.id"), nullable=False)
+    calc_type: Mapped[str] = mapped_column(String(50), nullable=False)
+    equipment_id: Mapped[int] = mapped_column(ForeignKey("equipment.id"), nullable=False)
+    quantity: Mapped[int] = mapped_column(Integer, default=1, nullable=False)
+    custom_name: Mapped[Optional[str]] = mapped_column(String(200), nullable=True)
+    sort_order: Mapped[int] = mapped_column(Integer, default=0, nullable=False)
+
+    request: Mapped["Request"] = relationship(foreign_keys=[request_id])
+    equipment: Mapped["Equipment"] = relationship(foreign_keys=[equipment_id])
 
 
 class Setting(Base):
