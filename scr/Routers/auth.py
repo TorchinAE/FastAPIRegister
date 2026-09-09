@@ -3,10 +3,9 @@ from sqlalchemy.ext.asyncio import AsyncSession
 from scr.dbase.database import db_helper
 from scr.dbase import crud_users
 from scr.dbase.schemas.schemas import UserCreate, UserLogin, UserResponse
+from scr.constants import SESSION_KEY
 
 auth_router = APIRouter(prefix="/api/auth", tags=["Auth"])
-
-SESSION_KEY = "user_email"
 
 
 @auth_router.post("/register", response_model=UserResponse)

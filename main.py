@@ -31,7 +31,8 @@ async def lifespan(_: FastAPI):
         await conn.run_sync(Base.metadata.create_all)
     # Seed default probabilities
     from sqlalchemy import select
-    from scr.dbase.models import Probability, DEFAULT_PROBABILITIES, EquipmentSection, DEFAULT_EQUIPMENT_SECTIONS
+    from scr.dbase.models import Probability, EquipmentSection
+    from scr.constants import DEFAULT_PROBABILITIES, DEFAULT_EQUIPMENT_SECTIONS
     async with db_helper.session_factory() as session:
         for id_, name, value in DEFAULT_PROBABILITIES:
             existing = await session.get(Probability, id_)

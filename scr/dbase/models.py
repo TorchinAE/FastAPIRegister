@@ -190,9 +190,6 @@ class EquipmentSection(BaseID):
         return f"EquipmentSection(id={self.id}, name='{self.name}')"
 
 
-DEFAULT_EQUIPMENT_SECTIONS = ["ВА", "Schnaider", "IEK", "EKF", "CHINT", "ESQ", "ТТ04", "ТТ62"]
-
-
 class CalcProduct(BaseID):
     __tablename__ = "calc_products"
     name: Mapped[str] = mapped_column(String(200), nullable=False)
@@ -224,15 +221,6 @@ class Probability(Base):
 
     def __repr__(self) -> str:
         return f"Probability(id={self.id}, name='{self.name}', value={self.value})"
-
-
-DEFAULT_PROBABILITIES = [
-    (1, "30%", 30),
-    (2, "50%", 50),
-    (3, "80%", 80),
-    (4, "95%", 95),
-    (5, "100%", 100),
-]
 
 
 class Request(BaseID):
@@ -307,9 +295,6 @@ class Invoice(BaseID):
     paid_date: Mapped[Optional[datetime]] = mapped_column(DateTime, nullable=True)
 
     request: Mapped["Request"] = relationship(back_populates="invoices")
-
-
-PAYMENT_TYPES = ["предоплата", "доплата-1", "доплата-2", "доплата-3", "отсрочка"]
 
 
 class PaymentItem(BaseID):

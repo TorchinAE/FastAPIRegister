@@ -15,7 +15,7 @@
     </div>
     <div class="form-group" style="flex:1; min-width:140px; margin-bottom:0;">
         <label>Email</label>
-        <input type="email" name="email" placeholder="email@ekta.ru" required>
+        <input type="email" name="email" placeholder="email@ivn.ruelta.ru" required>
     </div>
     <div class="form-group" style="flex:1; min-width:100px; margin-bottom:0;">
         <label>Город</label>
@@ -27,6 +27,7 @@
     </div>
     <button type="submit" class="btn btn-success" style="height:38px;">Добавить пользователя</button>
 </form>
+{% if error %}<div class="alert alert-error" style="margin-bottom:1rem;">{{ error }}</div>{% endif %}
 <div class="table-wrap">
     <table id="dataTable">
         <thead>

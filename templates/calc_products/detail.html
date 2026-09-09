@@ -1,0 +1,42 @@
+{% extends "base.html" %}
+{% block title %}{{ product.name }}{% endblock %}
+{% block content %}
+<div class="page-header" style="gap:1rem; flex-wrap:wrap;">
+    <div style="display:flex; align-items:center; gap:0.75rem;">
+        <a href="/calc-products/{{ 'composite' if is_composite else 'source' }}" class="btn btn-ghost">← Назад</a>
+        <h1>{{ product.name }}</h1>
+    </div>
+    <span class="subtitle">ID: {{ product.id }}</span>
+</div>
+<div style="padding:1rem 1.25rem;">
+    <div style="margin-bottom:1rem;">
+        <strong>Секция:</strong> {{ product.section.name if product.section else '—' }}
+    </div>
+    <div style="margin-bottom:1rem;">
+        <strong>Тип:</strong> {{ 'Составное' if is_composite else 'Исходное' }}
+    </div>
+    {% if is_composite %}
+    <h2 style="margin-bottom:0.5rem;">Компоненты</h2>
+    <div class="table-wrap">
+        <table>
+            <thead>
+                <tr>
+                    <th>ID</th>
+                    <th>Оборудование</th>
+                    <th>Количество</th>
+                </tr>
+            </thead>
+            <tbody>
+                {% for comp in product.components %}
+                <tr>
+                    <td><strong>{{ comp.id }}</strong></td>
+                    <td>{{ comp.equipment.name if comp.equipment else '—' }}</td>
+                    <td>{{ comp.quantity }}</td>
+                </tr>
+                {% endfor %}
+            </tbody>
+        </table>
+    </div>
+    {% endif %}
+</div>
+{% endblock %}

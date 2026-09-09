@@ -7,7 +7,7 @@ from scr.dbase.schemas.schemas import CalcProductCreateSchema, CalcProductUpdate
 
 
 async def get_products(session: AsyncSession, section_id: int = None, search: str = None,
-                       page: int = 1, per_page: int = 20) -> tuple[list[CalcProduct], int]:
+                       page: int = 1, per_page: int = 20, is_composite: bool = None) -> tuple[list[CalcProduct], int]:
     stmt = select(CalcProduct).options(selectinload(CalcProduct.components)).order_by(CalcProduct.name)
     count_stmt = select(func.count(CalcProduct.id))
     if section_id:
@@ -16,6 +16,13 @@ async def get_products(session: AsyncSession, section_id: int = None, search: st
     if search:
         stmt = stmt.where(CalcProduct.name.ilike(f"%{search}%"))
         count_stmt = count_stmt.where(CalcProduct.name.ilike(f"%{search}%"))
+    if is_composite is not None:
+        if is_composite:
+            stmt = stmt.where(CalcProduct.components.any())
+            count_stmt = count_stmt.where(CalcProduct.components.any())
+        else:
+            stmt = stmt.where(~CalcProduct.components.any())
+            count_stmt = count_stmt.where(~CalcProduct.components.any())
     total = (await session.execute(count_stmt)).scalar() or 0
     stmt = stmt.offset((page - 1) * per_page).limit(per_page)
     result = await session.execute(stmt)

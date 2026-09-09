@@ -1,6 +1,7 @@
 from fastapi import APIRouter, Request, Depends, Form
 from fastapi.responses import HTMLResponse, RedirectResponse, JSONResponse
 from fastapi.templating import Jinja2Templates
+from pydantic import ValidationError
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from scr.dbase.database import db_helper
@@ -8,11 +9,10 @@ from scr.dbase import crud_users, crud_requests, crud_counterparties
 from scr.dbase import crud_organizations, crud_directors, crud_positions, crud_equipment, crud_invoices, crud_settings, crud_payments, crud_equipment_sections
 from scr.dbase.models import Probability
 from scr.dbase.models import RequestStatus
+from scr.constants import SESSION_KEY
 
 templates = Jinja2Templates(directory="templates")
 pages_router = APIRouter(tags=["Pages"])
-
-SESSION_KEY = "user_email"
 
 
 async def get_current_user(request: Request, session: AsyncSession):
@@ -66,7 +66,14 @@ async def register_submit(
             "register.html",
             {"request": request, "error": "Email уже зарегистрирован", "user": None},
         )
-    user = await crud_users.create_user(session, UserCreate(name=name, email=email, password=password))
+    try:
+        user_data = UserCreate(name=name, email=email, password=password)
+    except ValidationError as e:
+        return templates.TemplateResponse(
+            "register.html",
+            {"request": request, "error": e.errors()[0]["msg"], "user": None},
+        )
+    user = await crud_users.create_user(session, user_data)
     await session.commit()
     response = RedirectResponse("/requests", status_code=302)
     response.set_cookie(key=SESSION_KEY, value=user.email, httponly=True)
@@ -441,12 +448,25 @@ async def users_create_submit(
     form = await request.form()
     name = form.get("name", "").strip()
     email = form.get("email", "").strip()
+    error = None
     if name and email:
         existing = await crud_users.get_user_by_email(session, email)
-        if not existing:
-            from scr.dbase.schemas.schemas import UserCreate
-            await crud_users.create_user(session, UserCreate(name=name, email=email, password="123456", city=form.get("city", "ив").strip() or "ив", signature=form.get("signature") or None))
-            await session.commit()
+        if existing:
+            error = "Email уже зарегистрирован"
+        else:
+            try:
+                from scr.dbase.schemas.schemas import UserCreate
+                await crud_users.create_user(session, UserCreate(name=name, email=email, password="123456", city=form.get("city", "ив").strip() or "ив", signature=form.get("signature") or None))
+                await session.commit()
+            except ValidationError as e:
+                error = e.errors()[0]["msg"]
+    if error:
+        items, total = await crud_users.get_users(session, page=1)
+        per_page = 20
+        return templates.TemplateResponse(
+            "users/list.html",
+            {"request": request, "user": await get_current_user(request, session), "items": items, "page": 1, "pages": (total + per_page - 1) // per_page, "total": total, "active_page": "users", "error": error},
+        )
     return RedirectResponse("/users", status_code=302)
 
 
@@ -629,10 +649,11 @@ async def equipment_page(
     if not user:
         return RedirectResponse("/", status_code=302)
     items, total = await crud_equipment.get_equipment_list(session, page=page)
+    sections, _ = await crud_equipment_sections.get_all_sections(session, per_page=100)
     per_page = 20
     return templates.TemplateResponse(
         "equipment/list.html",
-        {"request": request, "user": user, "items": items, "page": page, "pages": (total + per_page - 1) // per_page, "total": total, "active_page": "equipment"},
+        {"request": request, "user": user, "items": items, "sections": sections, "page": page, "pages": (total + per_page - 1) // per_page, "total": total, "active_page": "equipment"},
     )
 
 
@@ -648,7 +669,10 @@ async def equipment_create_submit(
     name = form.get("name", "").strip()
     if name:
         from scr.dbase.schemas.schemas import EquipmentCreateSchema
-        await crud_equipment.add_equipment(session, EquipmentCreateSchema(name=name), created_by=user.name)
+        data = {"name": name}
+        if form.get("section_id"):
+            data["section_id"] = int(form["section_id"])
+        await crud_equipment.add_equipment(session, EquipmentCreateSchema(**data), created_by=user.name)
         await session.commit()
     return RedirectResponse("/equipment", status_code=302)
 
@@ -861,3 +885,67 @@ async def equipment_sections_edit_submit(
         await crud_equipment_sections.update_section(session, EquipmentSectionUpdateSchema(id=section_id, name=name))
         await session.commit()
     return RedirectResponse("/equipment-sections", status_code=302)
+
+
+# --- Calc Products (Composite / Source) ---
+from scr.dbase import crud_calc_products
+
+
+@pages_router.get("/calc-products/composite", response_class=HTMLResponse)
+async def calc_products_composite_page(
+    request: Request,
+    page: int = 1,
+    search: str = None,
+    session: AsyncSession = Depends(db_helper.session_dependency),
+):
+    user = await get_current_user(request, session)
+    if not user:
+        return RedirectResponse("/", status_code=302)
+    items, total = await crud_calc_products.get_products(session, search=search, page=page, is_composite=True)
+    per_page = 20
+    return templates.TemplateResponse(
+        "calc_products/list.html",
+        {"request": request, "user": user, "items": items, "page": page,
+         "pages": (total + per_page - 1) // per_page, "total": total,
+         "active_page": "calc_composite", "title": "Составное оборудование", "is_composite": True},
+    )
+
+
+@pages_router.get("/calc-products/source", response_class=HTMLResponse)
+async def calc_products_source_page(
+    request: Request,
+    page: int = 1,
+    search: str = None,
+    session: AsyncSession = Depends(db_helper.session_dependency),
+):
+    user = await get_current_user(request, session)
+    if not user:
+        return RedirectResponse("/", status_code=302)
+    items, total = await crud_calc_products.get_products(session, search=search, page=page, is_composite=False)
+    per_page = 20
+    return templates.TemplateResponse(
+        "calc_products/list.html",
+        {"request": request, "user": user, "items": items, "page": page,
+         "pages": (total + per_page - 1) // per_page, "total": total,
+         "active_page": "calc_source", "title": "Исходное оборудование", "is_composite": False},
+    )
+
+
+@pages_router.get("/calc-products/{product_id}", response_class=HTMLResponse)
+async def calc_product_detail_page(
+    product_id: int,
+    request: Request,
+    session: AsyncSession = Depends(db_helper.session_dependency),
+):
+    user = await get_current_user(request, session)
+    if not user:
+        return RedirectResponse("/", status_code=302)
+    product = await crud_calc_products.get_product_by_id(session, product_id)
+    if not product:
+        return RedirectResponse("/calc-products/composite", status_code=302)
+    is_composite = len(product.components) > 0
+    return templates.TemplateResponse(
+        "calc_products/detail.html",
+        {"request": request, "user": user, "product": product,
+         "is_composite": is_composite, "active_page": "calc_composite" if is_composite else "calc_source"},
+    )

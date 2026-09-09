@@ -1,8 +1,9 @@
-from pydantic import BaseModel, Field, ConfigDict
+from pydantic import BaseModel, Field, ConfigDict, field_validator
 from datetime import datetime
 from typing import Optional, List
 
 from scr.dbase.models import RequestStatus
+from scr.constants import ALLOWED_DOMAIN
 
 
 # --- Base ---
@@ -19,6 +20,7 @@ class BaseSchema(BaseModel):
 
 # --- Auth ---
 
+
 class UserCreate(BaseModel):
     name: str
     email: str
@@ -26,6 +28,13 @@ class UserCreate(BaseModel):
     phone: Optional[str] = None
     city: str = "ив"
     signature: Optional[str] = None
+
+    @field_validator("email")
+    @classmethod
+    def email_must_be_allowed_domain(cls, v: str) -> str:
+        if not v.lower().endswith(ALLOWED_DOMAIN):
+            raise ValueError(f"Регистрация разрешена только с домена {ALLOWED_DOMAIN}")
+        return v
 
 
 class UserLogin(BaseModel):

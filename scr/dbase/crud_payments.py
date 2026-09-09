@@ -1,6 +1,7 @@
 from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
-from scr.dbase.models import PaymentItem, PAYMENT_TYPES
+from scr.dbase.models import PaymentItem
+from scr.constants import PAYMENT_TYPES
 from scr.dbase.schemas.schemas import PaymentItemCreateSchema, PaymentItemUpdateSchema
 
 
