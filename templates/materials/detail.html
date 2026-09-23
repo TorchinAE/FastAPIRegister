@@ -1,0 +1,92 @@
+{% extends "base.html" %}
+{% block title %}{{ mat.name }}{% endblock %}
+{% block content %}
+<div class="page-header">
+    <div>
+        <h1>{{ mat.name }}</h1>
+        <div class="subtitle">Материал #{{ mat.id }}</div>
+    </div>
+    <a href="{{ back_to or '/materials' }}" class="btn btn-ghost">← Назад</a>
+</div>
+
+<div class="card">
+    <form id="editMatForm">
+        <input type="hidden" name="id" value="{{ mat.id }}">
+        <div class="form-row" style="grid-template-columns: 1fr 1fr;">
+            <div class="form-group">
+                <label>Название</label>
+                <input type="text" name="name" value="{{ mat.name }}" required style="width:100%;min-width:0">
+            </div>
+            <div class="form-group">
+                <label>Цена</label>
+                <input type="number" name="price" value="{{ mat.price }}" step="0.01" min="0" style="width:100%;min-width:0">
+            </div>
+        </div>
+        <div class="form-row" style="grid-template-columns: 1fr 1fr 1fr;">
+            <div class="form-group">
+                <label>Код 1С</label>
+                <input type="text" name="code_1c" value="{{ mat.code_1c or '' }}" style="width:100%;min-width:0">
+            </div>
+            <div class="form-group">
+                <label>Код агент</label>
+                <input type="text" name="code_agent" value="{{ mat.code_agent or '' }}" style="width:100%;min-width:0">
+            </div>
+            <div class="form-group">
+                <label>URL агент</label>
+                <input type="text" name="url_agent" value="{{ mat.url_agent or '' }}" style="width:100%;min-width:0">
+            </div>
+        </div>
+        <div class="actions">
+            <button type="submit" class="btn btn-primary">Сохранить</button>
+            <button type="button" class="btn btn-danger" onclick="deleteMat()">Удалить</button>
+        </div>
+    </form>
+</div>
+
+<div id="toast" class="toast" style="display:none"></div>
+{% endblock %}
+
+{% block scripts %}
+<script>
+document.getElementById('editMatForm').addEventListener('submit', async function(e) {
+    e.preventDefault();
+    const fd = new FormData(this);
+    const data = {
+        id: parseInt(fd.get('id')),
+        name: fd.get('name'),
+        price: parseFloat(fd.get('price')) || 0,
+        code_1c: fd.get('code_1c') || null,
+        code_agent: fd.get('code_agent') || null,
+        url_agent: fd.get('url_agent') || null,
+    };
+    const resp = await fetch('/api/materials/', {
+        method: 'PATCH',
+        headers: {'Content-Type': 'application/json'},
+        body: JSON.stringify(data),
+    });
+    if (resp.ok) {
+        showToast('Сохранено');
+    } else {
+        const err = await resp.json();
+        showToast('Ошибка: ' + (err.detail || 'не удалось сохранить'));
+    }
+});
+
+async function deleteMat() {
+    if (!confirm('Удалить материал {{ mat.name }}?')) return;
+    const resp = await fetch('/api/materials/{{ mat.id }}', {method: 'DELETE'});
+    if (resp.ok) {
+        window.location.href = '/materials';
+    } else {
+        showToast('Ошибка удаления');
+    }
+}
+
+function showToast(msg) {
+    const t = document.getElementById('toast');
+    t.textContent = msg;
+    t.style.display = 'block';
+    setTimeout(() => t.style.display = 'none', 2500);
+}
+</script>
+{% endblock %}

@@ -6,6 +6,7 @@ from sqlalchemy.ext.asyncio import AsyncSession
 from scr.dbase.database import db_helper
 from scr.dbase import crud_users, crud_requests, crud_counterparties
 from scr.dbase import crud_organizations, crud_directors, crud_positions, crud_equipment, crud_invoices, crud_settings, crud_payments
+from scr.dbase import crud_materials, crud_modules
 from scr.dbase.models import Probability
 from scr.dbase.models import RequestStatus
 
@@ -746,7 +747,162 @@ async def request_calc_page(
     req = await crud_requests.get_request_by_id(session, req_id)
     if not req:
         return HTMLResponse("ТКП не найдена", status_code=404)
+    materials, _ = await crud_materials.get_materials(session, per_page=1000)
+    modules_list, _ = await crud_modules.get_modules(session, per_page=1000)
+
+    import json
+
+    def _mod_items_json(mod):
+        items = []
+        for item in mod.items:
+            if item.material:
+                items.append({"material": {"name": item.material.name, "price": float(item.material.price)}, "quantity": item.quantity})
+        return items
+
+    modules_json = json.dumps([{"id": m.id, "name": m.name, "total_price": m.total_price, "items": _mod_items_json(m)} for m in modules_list], ensure_ascii=False)
+    materials_json = json.dumps([{"id": m.id, "name": m.name, "price": float(m.price)} for m in materials], ensure_ascii=False)
+
     return templates.TemplateResponse(
         "requests/calc.html",
-        {"request": request, "user": user, "req": req, "active_page": "requests"},
+        {"request": request, "user": user, "req": req, "modules": modules_list, "materials": materials,
+         "modules_json": modules_json, "materials_json": materials_json, "active_page": "requests"},
+    )
+
+
+# --- Materials ---
+@pages_router.get("/materials", response_class=HTMLResponse)
+async def materials_page(
+    request: Request,
+    page: int = 1,
+    session: AsyncSession = Depends(db_helper.session_dependency),
+):
+    user = await get_current_user(request, session)
+    if not user:
+        return RedirectResponse("/", status_code=302)
+    items, total = await crud_materials.get_materials(session, page=page)
+    per_page = 20
+    return templates.TemplateResponse(
+        "materials/list.html",
+        {"request": request, "user": user, "items": items, "page": page, "pages": (total + per_page - 1) // per_page, "total": total, "active_page": "materials"},
+    )
+
+
+@pages_router.post("/materials", response_class=HTMLResponse)
+async def materials_create_submit(
+    request: Request,
+    session: AsyncSession = Depends(db_helper.session_dependency),
+):
+    user = await get_current_user(request, session)
+    if not user:
+        return RedirectResponse("/", status_code=302)
+    form = await request.form()
+    name = form.get("name", "").strip()
+    if name:
+        from scr.dbase.schemas.schemas import MaterialCreateSchema
+        data = {
+            "name": name,
+            "price": float(form.get("price", 0)),
+            "code_1c": form.get("code_1c") or None,
+            "code_agent": form.get("code_agent") or None,
+            "url_agent": form.get("url_agent") or None,
+        }
+        await crud_materials.add_material(session, MaterialCreateSchema(**data), created_by=user.name)
+        await session.commit()
+    return RedirectResponse("/materials", status_code=302)
+
+
+@pages_router.get("/materials/{mat_id}", response_class=HTMLResponse)
+async def materials_detail_page(
+    mat_id: int,
+    request: Request,
+    back_to: str | None = None,
+    session: AsyncSession = Depends(db_helper.session_dependency),
+):
+    user = await get_current_user(request, session)
+    if not user:
+        return RedirectResponse("/", status_code=302)
+    mat = await crud_materials.get_material_by_id(session, mat_id)
+    if not mat:
+        return HTMLResponse("Материал не найден", status_code=404)
+    return templates.TemplateResponse(
+        "materials/detail.html",
+        {"request": request, "user": user, "mat": mat, "back_to": back_to, "active_page": "materials"},
+    )
+
+
+# --- Modules ---
+@pages_router.get("/modules", response_class=HTMLResponse)
+async def modules_page(
+    request: Request,
+    page: int = 1,
+    session: AsyncSession = Depends(db_helper.session_dependency),
+):
+    user = await get_current_user(request, session)
+    if not user:
+        return RedirectResponse("/", status_code=302)
+    items, total = await crud_modules.get_modules(session, page=page)
+    per_page = 20
+    return templates.TemplateResponse(
+        "modules/list.html",
+        {"request": request, "user": user, "items": items, "page": page, "pages": (total + per_page - 1) // per_page, "total": total, "active_page": "modules"},
+    )
+
+
+@pages_router.post("/modules", response_class=HTMLResponse)
+async def modules_create_submit(
+    request: Request,
+    session: AsyncSession = Depends(db_helper.session_dependency),
+):
+    user = await get_current_user(request, session)
+    if not user:
+        return RedirectResponse("/", status_code=302)
+    form = await request.form()
+    name = form.get("name", "").strip()
+    if name:
+        from scr.dbase.schemas.schemas import ModuleCreateSchema
+        await crud_modules.add_module(session, ModuleCreateSchema(name=name), created_by=user.name)
+        await session.commit()
+    return RedirectResponse("/modules", status_code=302)
+
+
+@pages_router.get("/modules/{mod_id}", response_class=HTMLResponse)
+async def modules_detail_page(
+    mod_id: int,
+    request: Request,
+    back_to: str | None = None,
+    session: AsyncSession = Depends(db_helper.session_dependency),
+):
+    user = await get_current_user(request, session)
+    if not user:
+        return RedirectResponse("/", status_code=302)
+    mod = await crud_modules.get_module_by_id(session, mod_id)
+    if not mod:
+        return HTMLResponse("Модуль не найден", status_code=404)
+    materials, _ = await crud_materials.get_materials(session, per_page=1000)
+    all_modules, _ = await crud_modules.get_modules(session, per_page=1000)
+    other_modules = [m for m in all_modules if m.id != mod_id]
+
+    import json
+
+    def _bom_flat(module, qty=1):
+        result = []
+        for item in module.items:
+            if item.material:
+                result.append({"name": item.material.name, "price": float(item.material.price), "quantity": item.quantity * qty})
+            elif item.sub_module:
+                result.extend(_bom_flat(item.sub_module, item.quantity * qty))
+        return result
+
+    bom_items = _bom_flat(mod)
+    bom_total = sum(bi["price"] * bi["quantity"] for bi in bom_items)
+
+    materials_json = json.dumps([{"id": m.id, "name": m.name, "price": float(m.price)} for m in materials], ensure_ascii=False)
+    modules_json = json.dumps([{"id": m.id, "name": m.name} for m in other_modules], ensure_ascii=False)
+
+    return templates.TemplateResponse(
+        "modules/detail.html",
+        {"request": request, "user": user, "mod": mod, "materials": materials, "modules": other_modules,
+         "materials_json": materials_json, "modules_json": modules_json,
+         "bom_items": bom_items, "bom_total": bom_total,
+         "back_to": back_to, "active_page": "modules"},
     )

@@ -1,0 +1,197 @@
+{% extends "base.html" %}
+{% block title %}{{ mod.name }}{% endblock %}
+{% block content %}
+<div class="page-header">
+    <div>
+        <h1>{{ mod.name }}</h1>
+        <div class="subtitle">Модуль #{{ mod.id }} &middot; Стоимость: {{ "%.2f"|format(mod.total_price) }}</div>
+    </div>
+    <a href="{{ back_to or '/modules' }}" class="btn btn-ghost">← Назад</a>
+</div>
+
+<div class="card">
+    <form id="editModForm">
+        <input type="hidden" name="id" value="{{ mod.id }}">
+        <div class="form-row" style="grid-template-columns: 1fr;">
+            <div class="form-group">
+                <label>Название</label>
+                <input type="text" name="name" value="{{ mod.name }}" required style="width:100%;min-width:0">
+            </div>
+        </div>
+        <div class="actions">
+            <button type="submit" class="btn btn-primary">Сохранить</button>
+            <button type="button" class="btn btn-danger" onclick="deleteMod()">Удалить</button>
+        </div>
+    </form>
+</div>
+
+<h2 style="margin:1.5rem 0 0.75rem;">Состав модуля</h2>
+
+<div class="card" style="margin-bottom:1rem;">
+    <div style="display:flex;gap:0.75rem;align-items:flex-end;flex-wrap:wrap;">
+        <div class="form-group" style="flex:1;min-width:150px;margin-bottom:0;">
+            <label>Тип</label>
+            <select id="itemType" style="width:100%;" onchange="updateItemSelect()">
+                <option value="material">Материал</option>
+                <option value="module">Модуль</option>
+            </select>
+        </div>
+        <div class="form-group" style="flex:2;min-width:200px;margin-bottom:0;">
+            <label>Компонент</label>
+            <select id="itemId" style="width:100%;">
+                {% for mat in materials %}
+                <option value="{{ mat.id }}">{{ mat.name }} ({{ "%.2f"|format(mat.price) }})</option>
+                {% endfor %}
+            </select>
+        </div>
+        <div class="form-group" style="width:80px;margin-bottom:0;">
+            <label>Кол-во</label>
+            <input type="number" id="itemQty" value="1" min="1" style="width:100%;">
+        </div>
+        <button type="button" class="btn btn-success" style="height:38px;" onclick="addItem()">Добавить</button>
+    </div>
+</div>
+
+<div class="table-wrap">
+    <table id="itemsTable">
+        <thead>
+            <tr>
+                <th>Тип</th><th>Название</th><th>Цена за ед.</th><th>Кол-во</th><th>Сумма</th><th></th>
+            </tr>
+        </thead>
+        <tbody>
+            {% for item in mod.items %}
+            <tr data-item-id="{{ item.id }}">
+                <td>{% if item.material_id %}Материал{% else %}Модуль{% endif %}</td>
+                <td>{% if item.material %}{{ item.material.name }}{% elif item.sub_module_name %}{{ item.sub_module_name }}{% endif %}</td>
+                <td>{% if item.material %}{{ "%.2f"|format(item.material.price) }}{% endif %}</td>
+                <td>{{ item.quantity }}</td>
+                <td>{% if item.material %}{{ "%.2f"|format(item.material.price * item.quantity) }}{% endif %}</td>
+                <td style="text-align:center;width:40px">
+                    <button class="btn btn-danger btn-sm btn-icon" title="Удалить" onclick="deleteItem({{ item.id }}, this)">&#10005;</button>
+                </td>
+            </tr>
+            {% endfor %}
+            {% if not mod.items %}<tr class="empty-row"><td colspan="6">Нет компонентов</td></tr>{% endif %}
+        </tbody>
+        <tfoot>
+            <tr>
+                <td colspan="4" style="text-align:right;font-weight:bold;">Итого:</td>
+                <td style="font-weight:bold;" id="totalPrice">{{ "%.2f"|format(mod.total_price) }}</td>
+                <td></td>
+            </tr>
+        </tfoot>
+    </table>
+</div>
+
+{% if bom_items %}
+<h2 style="margin:1.5rem 0 0.75rem;">Раскрытие состава (BOM)</h2>
+<div class="table-wrap">
+    <table>
+        <thead>
+            <tr><th>Материал</th><th>Цена за ед.</th><th>Кол-во</th><th>Сумма</th></tr>
+        </thead>
+        <tbody>
+            {% for bi in bom_items %}
+            <tr>
+                <td>{{ bi.name }}</td>
+                <td>{{ "%.2f"|format(bi.price) }}</td>
+                <td>{{ bi.quantity }}</td>
+                <td>{{ "%.2f"|format(bi.price * bi.quantity) }}</td>
+            </tr>
+            {% endfor %}
+        </tbody>
+        <tfoot>
+            <tr>
+                <td colspan="3" style="text-align:right;font-weight:bold;">Итого:</td>
+                <td style="font-weight:bold;">{{ "%.2f"|format(bom_total) }}</td>
+            </tr>
+        </tfoot>
+    </table>
+</div>
+{% endif %}
+
+<div id="toast" class="toast" style="display:none"></div>
+{% endblock %}
+
+{% block scripts %}
+<script>
+const materialsData = {{ materials_json | safe }};
+const modulesData = {{ modules_json | safe }};
+
+function updateItemSelect() {
+    const type = document.getElementById('itemType').value;
+    const sel = document.getElementById('itemId');
+    sel.innerHTML = '';
+    if (type === 'material') {
+        materialsData.forEach(m => {
+            const opt = document.createElement('option');
+            opt.value = m.id;
+            opt.textContent = m.name + ' (' + Number(m.price).toFixed(2) + ')';
+            sel.appendChild(opt);
+        });
+    } else {
+        modulesData.forEach(m => {
+            const opt = document.createElement('option');
+            opt.value = m.id;
+            opt.textContent = m.name;
+            sel.appendChild(opt);
+        });
+    }
+}
+
+async function addItem() {
+    const type = document.getElementById('itemType').value;
+    const id = parseInt(document.getElementById('itemId').value);
+    const qty = parseInt(document.getElementById('itemQty').value) || 1;
+    const data = { quantity: qty };
+    if (type === 'material') data.material_id = id;
+    else data.sub_module_id = id;
+
+    const resp = await fetch('/api/modules/{{ mod.id }}/items', {
+        method: 'POST',
+        headers: {'Content-Type': 'application/json'},
+        body: JSON.stringify(data),
+    });
+    if (resp.ok) {
+        showToast('Добавлено');
+        setTimeout(() => location.reload(), 500);
+    } else {
+        showToast('Ошибка добавления');
+    }
+}
+
+async function deleteItem(itemId, btn) {
+    if (!confirm('Удалить компонент?')) return;
+    const resp = await fetch(`/api/modules/items/${itemId}`, {method: 'DELETE'});
+    if (resp.ok) { btn.closest('tr').remove(); showToast('Удалено'); } else { showToast('Ошибка'); }
+}
+
+document.getElementById('editModForm').addEventListener('submit', async function(e) {
+    e.preventDefault();
+    const fd = new FormData(this);
+    const data = { id: parseInt(fd.get('id')), name: fd.get('name') };
+    const resp = await fetch('/api/modules/', {
+        method: 'PATCH',
+        headers: {'Content-Type': 'application/json'},
+        body: JSON.stringify(data),
+    });
+    if (resp.ok) showToast('Сохранено');
+    else showToast('Ошибка сохранения');
+});
+
+async function deleteMod() {
+    if (!confirm('Удалить модуль {{ mod.name }}?')) return;
+    const resp = await fetch('/api/modules/{{ mod.id }}', {method: 'DELETE'});
+    if (resp.ok) window.location.href = '/modules';
+    else showToast('Ошибка удаления');
+}
+
+function showToast(msg) {
+    const t = document.getElementById('toast');
+    t.textContent = msg;
+    t.style.display = 'block';
+    setTimeout(() => t.style.display = 'none', 2500);
+}
+</script>
+{% endblock %}

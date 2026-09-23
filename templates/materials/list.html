@@ -1,0 +1,122 @@
+{% extends "base.html" %}
+{% block title %}Материалы{% endblock %}
+{% block content %}
+<div class="page-header">
+    <div>
+        <h1>Материалы</h1>
+        <div class="subtitle">Всего: {{ total }}</div>
+    </div>
+    <div style="display:flex;gap:0.5rem;">
+        <a href="/api/materials/export-excel" class="btn btn-ghost" download>Скачать Excel</a>
+        <label class="btn btn-ghost" style="cursor:pointer;">
+            Загрузить Excel
+            <input type="file" accept=".xlsx,.xls" style="display:none" onchange="importExcel(this)">
+        </label>
+    </div>
+</div>
+<form method="post" action="/materials" style="display:flex; gap:0.75rem; align-items:flex-end; margin-bottom:1rem; padding:1rem 1.25rem; flex-wrap:wrap;">
+    <div class="form-group" style="flex:2; min-width:200px; margin-bottom:0;">
+        <label>Название</label>
+        <input type="text" name="name" placeholder="Название материала" required>
+    </div>
+    <div class="form-group" style="flex:1; min-width:100px; margin-bottom:0;">
+        <label>Цена</label>
+        <input type="number" name="price" placeholder="0" step="0.01" min="0" value="0">
+    </div>
+    <div class="form-group" style="flex:1; min-width:100px; margin-bottom:0;">
+        <label>Код 1С</label>
+        <input type="text" name="code_1c" placeholder="Код 1С">
+    </div>
+    <div class="form-group" style="flex:1; min-width:100px; margin-bottom:0;">
+        <label>Код агент</label>
+        <input type="text" name="code_agent" placeholder="Код агент">
+    </div>
+    <div class="form-group" style="flex:1; min-width:100px; margin-bottom:0;">
+        <label>URL агент</label>
+        <input type="text" name="url_agent" placeholder="URL">
+    </div>
+    <button type="submit" class="btn btn-success" style="height:38px;">Добавить</button>
+</form>
+<div class="table-wrap">
+    <table id="dataTable">
+        <thead>
+            <tr>
+                <th>ID</th><th>Название</th><th>Цена</th><th>Код 1С</th><th>Код агент</th><th>URL агент</th><th></th>
+            </tr>
+            <tr class="table-filter">
+                <th><input type="text" data-col="0" data-min="1" placeholder="Фильтр..." class="tf-input"></th>
+                <th><input type="text" data-col="1" placeholder="Фильтр..." class="tf-input"></th>
+                <th><input type="text" data-col="2" placeholder="Фильтр..." class="tf-input"></th>
+                <th><input type="text" data-col="3" placeholder="Фильтр..." class="tf-input"></th>
+                <th><input type="text" data-col="4" placeholder="Фильтр..." class="tf-input"></th>
+                <th><input type="text" data-col="5" placeholder="Фильтр..." class="tf-input"></th>
+                <th></th>
+            </tr>
+        </thead>
+        <tbody>
+            {% for item in items %}
+            <tr style="cursor:pointer" onclick="location.href='/materials/{{ item.id }}'">
+                <td><strong>{{ item.id }}</strong></td>
+                <td>{{ item.name }}</td>
+                <td>{{ "%.2f"|format(item.price) }}</td>
+                <td>{{ item.code_1c or '' }}</td>
+                <td>{{ item.code_agent or '' }}</td>
+                <td>{{ item.url_agent or '' }}</td>
+                <td style="text-align:center;width:40px">
+                    <button class="btn btn-danger btn-sm btn-icon" title="Удалить" onclick="event.stopPropagation(); deleteMat({{ item.id }}, this)">&#10005;</button>
+                </td>
+            </tr>
+            {% endfor %}
+            {% if not items %}<tr class="empty-row"><td colspan="7">Нет материалов</td></tr>{% endif %}
+        </tbody>
+    </table>
+</div>
+{% if pages > 1 %}
+<div class="pagination">
+    {% for p in range(1, pages + 1) %}
+    <a href="/materials?page={{ p }}" class="{{ 'active' if p == page else '' }}">{{ p }}</a>
+    {% endfor %}
+</div>
+{% endif %}
+<div id="toast" class="toast" style="display:none"></div>
+{% endblock %}
+
+{% block scripts %}
+<script>
+async function deleteMat(id, btn) {
+    if (!confirm('Удалить материал?')) return;
+    const resp = await fetch(`/api/materials/${id}`, {method: 'DELETE'});
+    if (resp.ok) { btn.closest('tr').remove(); showToast('Удалено'); } else { showToast('Ошибка удаления'); }
+}
+async function importExcel(input) {
+    if (!input.files.length) return;
+    const fd = new FormData();
+    fd.append('file', input.files[0]);
+    const resp = await fetch('/api/materials/import-excel', {method: 'POST', body: fd});
+    if (resp.ok) {
+        const data = await resp.json();
+        showToast(data.message);
+        setTimeout(() => location.reload(), 1000);
+    } else {
+        showToast('Ошибка импорта');
+    }
+    input.value = '';
+}
+function showToast(msg) {
+    const t = document.getElementById('toast'); t.textContent = msg;
+    t.style.display = 'block'; setTimeout(() => t.style.display = 'none', 2500);
+}
+document.querySelectorAll('.tf-input').forEach(input => {
+    input.addEventListener('input', function() {
+        const col = parseInt(this.dataset.col);
+        const minLen = parseInt(this.dataset.min) || 3;
+        const val = this.value.toLowerCase();
+        document.querySelectorAll('#dataTable tbody tr:not(.empty-row)').forEach(row => {
+            if (val.length < minLen) { row.style.display = ''; return; }
+            const cell = row.cells[col];
+            row.style.display = cell && cell.textContent.toLowerCase().includes(val) ? '' : 'none';
+        });
+    });
+});
+</script>
+{% endblock %}

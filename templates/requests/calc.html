@@ -6,11 +6,144 @@
         <h1>Расчет ТКП</h1>
         <div class="subtitle">Код: {{ req.id }} &middot; {{ req.tkp_num or '' }}</div>
     </div>
-</div>
-<div style="display:flex;gap:0.5rem;margin-bottom:0.75rem;">
     <a href="/requests/{{ req.id }}" class="btn btn-ghost">← Назад к ТКП</a>
 </div>
-<div class="card">
-    <p style="color:var(--text-muted);">Страница расчета ТКП будет описана позже.</p>
+
+<div class="card" style="margin-bottom:1rem;">
+    <div style="display:flex;gap:0.75rem;align-items:flex-end;flex-wrap:wrap;">
+        <div class="form-group" style="flex:2;min-width:200px;margin-bottom:0;">
+            <label>Модуль</label>
+            <select id="moduleSelect" style="width:100%;">
+                <option value="">-- Выберите модуль --</option>
+                {% for mod in modules %}
+                <option value="{{ mod.id }}">{{ mod.name }} ({{ "%.2f"|format(mod.total_price) }})</option>
+                {% endfor %}
+            </select>
+        </div>
+        <div class="form-group" style="width:80px;margin-bottom:0;">
+            <label>Кол-во</label>
+            <input type="number" id="moduleQty" value="1" min="1" style="width:100%;">
+        </div>
+        <button type="button" class="btn btn-success" style="height:38px;" onclick="addModuleToCalc()">Добавить модуль</button>
+    </div>
 </div>
+
+<div class="card" style="margin-bottom:1rem;">
+    <div style="display:flex;gap:0.75rem;align-items:flex-end;flex-wrap:wrap;">
+        <div class="form-group" style="flex:2;min-width:200px;margin-bottom:0;">
+            <label>Материал</label>
+            <select id="materialSelect" style="width:100%;">
+                <option value="">-- Выберите материал --</option>
+                {% for mat in materials %}
+                <option value="{{ mat.id }}" data-price="{{ mat.price }}">{{ mat.name }} ({{ "%.2f"|format(mat.price) }})</option>
+                {% endfor %}
+            </select>
+        </div>
+        <div class="form-group" style="width:80px;margin-bottom:0;">
+            <label>Кол-во</label>
+            <input type="number" id="materialQty" value="1" min="1" style="width:100%;">
+        </div>
+        <button type="button" class="btn btn-success" style="height:38px;" onclick="addMaterialToCalc()">Добавить материал</button>
+    </div>
+</div>
+
+<div class="table-wrap">
+    <table id="calcTable">
+        <thead>
+            <tr><th>Наименование</th><th>Тип</th><th>Кол-во</th><th>Цена за ед.</th><th>Сумма</th><th></th></tr>
+        </thead>
+        <tbody id="calcBody">
+        </tbody>
+        <tfoot>
+            <tr>
+                <td colspan="4" style="text-align:right;font-weight:bold;">Итого:</td>
+                <td style="font-weight:bold;" id="calcTotal">0.00</td>
+                <td></td>
+            </tr>
+        </tfoot>
+    </table>
+</div>
+
+<div style="margin-top:1rem;">
+    <button class="btn btn-ghost" onclick="clearCalc()">Очистить расчёт</button>
+</div>
+
+<div id="toast" class="toast" style="display:none"></div>
+{% endblock %}
+
+{% block scripts %}
+<script>
+const modulesData = {{ modules_json | safe }};
+const materialsData = {{ materials_json | safe }};
+
+let calcItems = [];
+
+function addModuleToCalc() {
+    const modId = parseInt(document.getElementById('moduleSelect').value);
+    const qty = parseInt(document.getElementById('moduleQty').value) || 1;
+    if (!modId) return;
+    const mod = modulesData.find(m => m.id === modId);
+    if (!mod) return;
+    // Flatten BOM
+    if (mod.items) {
+        mod.items.forEach(item => {
+            if (item.material) {
+                calcItems.push({
+                    name: item.material.name,
+                    type: 'Материал (из ' + mod.name + ')',
+                    quantity: item.quantity * qty,
+                    price: item.material.price,
+                });
+            }
+        });
+    }
+    renderCalc();
+}
+
+function addMaterialToCalc() {
+    const matId = parseInt(document.getElementById('materialSelect').value);
+    const qty = parseInt(document.getElementById('materialQty').value) || 1;
+    if (!matId) return;
+    const mat = materialsData.find(m => m.id === matId);
+    if (!mat) return;
+    calcItems.push({
+        name: mat.name,
+        type: 'Материал',
+        quantity: qty,
+        price: mat.price,
+    });
+    renderCalc();
+}
+
+function renderCalc() {
+    const tbody = document.getElementById('calcBody');
+    tbody.innerHTML = '';
+    let total = 0;
+    calcItems.forEach((item, idx) => {
+        const sum = item.price * item.quantity;
+        total += sum;
+        const tr = document.createElement('tr');
+        tr.innerHTML = `<td>${item.name}</td><td>${item.type}</td><td>${item.quantity}</td><td>${Number(item.price).toFixed(2)}</td><td>${sum.toFixed(2)}</td><td style="text-align:center;width:40px"><button class="btn btn-danger btn-sm btn-icon" onclick="removeItem(${idx})">&#10005;</button></td>`;
+        tbody.appendChild(tr);
+    });
+    document.getElementById('calcTotal').textContent = total.toFixed(2);
+}
+
+function removeItem(idx) {
+    calcItems.splice(idx, 1);
+    renderCalc();
+}
+
+function clearCalc() {
+    calcItems = [];
+    renderCalc();
+}
+
+function showToast(msg) {
+    const t = document.getElementById('toast');
+    t.textContent = msg;
+    t.style.display = 'block';
+    setTimeout(() => t.style.display = 'none', 2500);
+}
+</script>
 {% endblock %}
