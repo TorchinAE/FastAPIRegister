@@ -1,19 +1,20 @@
 import io
-from fastapi import APIRouter, HTTPException, Depends, Query, UploadFile, File
-from fastapi.responses import StreamingResponse
-from sqlalchemy.ext.asyncio import AsyncSession
-from openpyxl import Workbook, load_workbook
 
-from scr.dbase.database import db_helper
+from fastapi import APIRouter, Depends, File, HTTPException, Query, UploadFile
+from fastapi.responses import StreamingResponse
+from openpyxl import Workbook, load_workbook
+from sqlalchemy.ext.asyncio import AsyncSession
+
 from scr.dbase import crud_modules
+from scr.dbase.database import db_helper
 from scr.dbase.schemas.schemas import (
+    MaterialResponseSchema,
     ModuleCreateSchema,
-    ModuleUpdateSchema,
-    ModuleResponseSchema,
     ModuleFullResponseSchema,
     ModuleItemCreateSchema,
     ModuleItemResponseSchema,
-    MaterialResponseSchema,
+    ModuleResponseSchema,
+    ModuleUpdateSchema,
     PaginatedResponse,
 )
 
@@ -60,9 +61,7 @@ async def read_modules(
     per_page: int = Query(20, ge=1, le=100),
     session: AsyncSession = Depends(db_helper.session_dependency),
 ):
-    items, total = await crud_modules.get_modules(
-        session=session, search=search, page=page, per_page=per_page
-    )
+    items, total = await crud_modules.get_modules(session=session, search=search, page=page, per_page=per_page)
     return PaginatedResponse(
         items=[_module_to_response(i) for i in items],
         total=total,
@@ -147,17 +146,20 @@ async def import_modules_excel(
             quantity = int(row[3]) if row[3] else 1
             if item_type == "материал":
                 from scr.dbase import crud_materials
+
                 mat = await crud_materials.get_material_by_name(session, item_name)
                 if mat:
                     await crud_modules.add_module_item(
-                        session, mod.id,
+                        session,
+                        mod.id,
                         ModuleItemCreateSchema(material_id=mat.id, quantity=quantity),
                     )
             elif item_type == "модуль":
                 sub_mod = await crud_modules.get_module_by_name(session, item_name)
                 if sub_mod:
                     await crud_modules.add_module_item(
-                        session, mod.id,
+                        session,
+                        mod.id,
                         ModuleItemCreateSchema(sub_module_id=sub_mod.id, quantity=quantity),
                     )
 
@@ -166,9 +168,7 @@ async def import_modules_excel(
 
 
 @mod_router.get("/{mod_id}", response_model=ModuleFullResponseSchema)
-async def read_module(
-    mod_id: int, session: AsyncSession = Depends(db_helper.session_dependency)
-):
+async def read_module(mod_id: int, session: AsyncSession = Depends(db_helper.session_dependency)):
     mod = await crud_modules.get_module_by_id(session=session, mod_id=mod_id)
     if not mod:
         raise HTTPException(status_code=404, detail="Модуль не найден")
@@ -196,9 +196,7 @@ async def update_module(
 
 
 @mod_router.delete("/{mod_id}")
-async def delete_module(
-    mod_id: int, session: AsyncSession = Depends(db_helper.session_dependency)
-):
+async def delete_module(mod_id: int, session: AsyncSession = Depends(db_helper.session_dependency)):
     result = await crud_modules.delete_module(session=session, mod_id=mod_id)
     if not result:
         raise HTTPException(status_code=404, detail="Модуль не найден")
@@ -217,13 +215,16 @@ async def add_module_item(
         raise HTTPException(status_code=404, detail="Модуль не найден")
     await session.commit()
     await session.refresh(item)
+    # Eagerly load relationships after commit (they get expired)
+    if item.material_id:
+        await session.refresh(item, ["material"])
+    if item.sub_module_id:
+        await session.refresh(item, ["sub_module"])
     return _module_item_to_response(item)
 
 
 @mod_router.delete("/items/{item_id}")
-async def delete_module_item(
-    item_id: int, session: AsyncSession = Depends(db_helper.session_dependency)
-):
+async def delete_module_item(item_id: int, session: AsyncSession = Depends(db_helper.session_dependency)):
     result = await crud_modules.delete_module_item(session, item_id)
     if not result:
         raise HTTPException(status_code=404, detail="Элемент не найден")

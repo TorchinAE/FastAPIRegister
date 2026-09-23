@@ -1,9 +1,9 @@
 # models.py
 import enum
 from datetime import datetime, timezone
-from typing import Optional, List
+from typing import Optional
 
-from sqlalchemy import String, DateTime, ForeignKey, Integer, Text, Enum, Numeric, CheckConstraint, UniqueConstraint
+from sqlalchemy import CheckConstraint, DateTime, Enum, ForeignKey, Integer, Numeric, String, Text, UniqueConstraint
 from sqlalchemy.orm import DeclarativeBase, Mapped, mapped_column, relationship
 
 
@@ -62,18 +62,14 @@ class BaseID(Base):
     __abstract__ = True
 
     id: Mapped[int] = mapped_column(primary_key=True)
-    created_by: Mapped[Optional[str]] = mapped_column(String(100), nullable=True)
-    created_at: Mapped[datetime] = mapped_column(
-        DateTime, default=lambda: datetime.now(timezone.utc)
-    )
+    created_by: Mapped[str | None] = mapped_column(String(100), nullable=True)
+    created_at: Mapped[datetime] = mapped_column(DateTime, default=lambda: datetime.now(timezone.utc))
     updated_at: Mapped[datetime] = mapped_column(
         DateTime,
         default=lambda: datetime.now(timezone.utc),
         onupdate=lambda: datetime.now(timezone.utc),
     )
-    changed_by_id: Mapped[int | None] = mapped_column(
-        ForeignKey("users.id"), nullable=True
-    )
+    changed_by_id: Mapped[int | None] = mapped_column(ForeignKey("users.id"), nullable=True)
 
 
 class User(Base):
@@ -82,28 +78,22 @@ class User(Base):
     name: Mapped[str] = mapped_column(String(100), nullable=False)
     email: Mapped[str] = mapped_column(String(100), unique=True, nullable=False)
     hashed_password: Mapped[str] = mapped_column(String(200), nullable=False)
-    phone: Mapped[Optional[str]] = mapped_column(String(20), nullable=True)
+    phone: Mapped[str | None] = mapped_column(String(20), nullable=True)
     city: Mapped[str] = mapped_column(String(50), nullable=False, default="ив")
-    signature: Mapped[Optional[str]] = mapped_column(String(200), nullable=True)
-    created_at: Mapped[datetime] = mapped_column(
-        DateTime, default=lambda: datetime.now(timezone.utc)
-    )
+    signature: Mapped[str | None] = mapped_column(String(200), nullable=True)
+    created_at: Mapped[datetime] = mapped_column(DateTime, default=lambda: datetime.now(timezone.utc))
 
 
 class Organization(BaseID):
     __tablename__ = "organizations"
     name: Mapped[str] = mapped_column(String(100), unique=True, nullable=False)
     inn: Mapped[str] = mapped_column(String(12), unique=True, nullable=True)
-    address: Mapped[Optional[str]] = mapped_column(String(200), nullable=True)
-    server_address_slug: Mapped[str] = mapped_column(
-        String(200), nullable=False, default="/02_сторонние_заказчики"
-    )
+    address: Mapped[str | None] = mapped_column(String(200), nullable=True)
+    server_address_slug: Mapped[str] = mapped_column(String(200), nullable=False, default="/02_сторонние_заказчики")
     director_id: Mapped[int] = mapped_column(ForeignKey("directors.id"), nullable=False)
 
     director: Mapped["Directors"] = relationship(back_populates="organizations")
-    counterparties: Mapped[List["Counterparty"]] = relationship(
-        back_populates="company"
-    )
+    counterparties: Mapped[list["Counterparty"]] = relationship(back_populates="company")
 
     def __repr__(self) -> str:
         director_name = self.director.name if self.director else "None"
@@ -119,16 +109,12 @@ class Organization(BaseID):
 class Directors(BaseID):
     __tablename__ = "directors"
     name: Mapped[str] = mapped_column(String(100), unique=True, nullable=False)
-    email: Mapped[Optional[str]] = mapped_column(
-        String(100), unique=True, nullable=True
-    )
-    phone: Mapped[Optional[str]] = mapped_column(String(20), nullable=True)
+    email: Mapped[str | None] = mapped_column(String(100), unique=True, nullable=True)
+    phone: Mapped[str | None] = mapped_column(String(20), nullable=True)
     position_id: Mapped[int] = mapped_column(ForeignKey("positions.id"))
 
     position: Mapped["Positions"] = relationship(back_populates="directors")
-    organizations: Mapped[List["Organization"]] = relationship(
-        back_populates="director"
-    )
+    organizations: Mapped[list["Organization"]] = relationship(back_populates="director")
 
     @property
     def short_name(self) -> str:
@@ -139,9 +125,7 @@ class Directors(BaseID):
         return get_give_name(self.name)
 
     def __repr__(self) -> str:
-        org_names = (
-            [org.name for org in self.organizations] if self.organizations else []
-        )
+        org_names = [org.name for org in self.organizations] if self.organizations else []
         return (
             f"Director(id={self.id}, "
             f"name='{self.name}', "
@@ -155,7 +139,7 @@ class Directors(BaseID):
 class Positions(BaseID):
     __tablename__ = "positions"
     name: Mapped[str] = mapped_column(String(100), unique=True, nullable=False)
-    directors: Mapped[List["Directors"]] = relationship(back_populates="position")
+    directors: Mapped[list["Directors"]] = relationship(back_populates="position")
 
     def __repr__(self) -> str:
         return f"Positions(id={self.id}, name='{self.name}')"
@@ -165,10 +149,8 @@ class Counterparty(BaseID):
     __tablename__ = "counterparties"
     name: Mapped[str] = mapped_column(String(100), nullable=False)
     email: Mapped[str] = mapped_column(String(100), unique=True, nullable=False)
-    phone: Mapped[Optional[str]] = mapped_column(String(20), nullable=True)
-    company_id: Mapped[int] = mapped_column(
-        ForeignKey("organizations.id"), nullable=False
-    )
+    phone: Mapped[str | None] = mapped_column(String(20), nullable=True)
+    company_id: Mapped[int] = mapped_column(ForeignKey("organizations.id"), nullable=False)
 
     company: Mapped["Organization"] = relationship(back_populates="counterparties")
 
@@ -202,40 +184,26 @@ DEFAULT_PROBABILITIES = [
 
 class Request(BaseID):
     __tablename__ = "requests"
-    counterparty_id: Mapped[int | None] = mapped_column(
-        ForeignKey("counterparties.id"), nullable=True
-    )
-    company_id: Mapped[int | None] = mapped_column(
-        ForeignKey("organizations.id"), nullable=True
-    )
+    counterparty_id: Mapped[int | None] = mapped_column(ForeignKey("counterparties.id"), nullable=True)
+    company_id: Mapped[int | None] = mapped_column(ForeignKey("organizations.id"), nullable=True)
     manager_id: Mapped[int] = mapped_column(ForeignKey("users.id"), nullable=False)
-    equipment_id: Mapped[Optional[int]] = mapped_column(
-        ForeignKey("equipment.id"), nullable=True
-    )
-    probability_id: Mapped[Optional[int]] = mapped_column(
-        ForeignKey("probabilities.id"), nullable=True
-    )
-    project_stamp: Mapped[Optional[str]] = mapped_column(String(200), nullable=True)
-    request_date: Mapped[datetime] = mapped_column(
-        DateTime, default=lambda: datetime.now(timezone.utc)
-    )
-    issue_date: Mapped[Optional[datetime]] = mapped_column(
-        DateTime, nullable=True
-    )
-    status: Mapped[RequestStatus] = mapped_column(
-        Enum(RequestStatus), default=RequestStatus.ZAPROS, nullable=False
-    )
+    equipment_id: Mapped[int | None] = mapped_column(ForeignKey("equipment.id"), nullable=True)
+    probability_id: Mapped[int | None] = mapped_column(ForeignKey("probabilities.id"), nullable=True)
+    project_stamp: Mapped[str | None] = mapped_column(String(200), nullable=True)
+    request_date: Mapped[datetime] = mapped_column(DateTime, default=lambda: datetime.now(timezone.utc))
+    issue_date: Mapped[datetime | None] = mapped_column(DateTime, nullable=True)
+    status: Mapped[RequestStatus] = mapped_column(Enum(RequestStatus), default=RequestStatus.ZAPROS, nullable=False)
     cost: Mapped[float] = mapped_column(Numeric(12, 2), default=0)
-    description: Mapped[Optional[str]] = mapped_column(Text, nullable=True)
-    notes: Mapped[Optional[str]] = mapped_column(Text, nullable=True)
-    tkp_num: Mapped[Optional[str]] = mapped_column(String(50), nullable=True)
-    incoming_letter_num: Mapped[Optional[str]] = mapped_column(String(100), nullable=True)
-    repeat_tkp: Mapped[Optional[str]] = mapped_column(String(100), nullable=True)
-    invoice_num: Mapped[Optional[str]] = mapped_column(String(100), nullable=True)
-    invoice_date: Mapped[Optional[datetime]] = mapped_column(DateTime, nullable=True)
-    factory_order_num: Mapped[Optional[str]] = mapped_column(String(100), nullable=True)
-    factory_order_date: Mapped[Optional[datetime]] = mapped_column(DateTime, nullable=True)
-    ship_date: Mapped[Optional[datetime]] = mapped_column(DateTime, nullable=True)
+    description: Mapped[str | None] = mapped_column(Text, nullable=True)
+    notes: Mapped[str | None] = mapped_column(Text, nullable=True)
+    tkp_num: Mapped[str | None] = mapped_column(String(50), nullable=True)
+    incoming_letter_num: Mapped[str | None] = mapped_column(String(100), nullable=True)
+    repeat_tkp: Mapped[str | None] = mapped_column(String(100), nullable=True)
+    invoice_num: Mapped[str | None] = mapped_column(String(100), nullable=True)
+    invoice_date: Mapped[datetime | None] = mapped_column(DateTime, nullable=True)
+    factory_order_num: Mapped[str | None] = mapped_column(String(100), nullable=True)
+    factory_order_date: Mapped[datetime | None] = mapped_column(DateTime, nullable=True)
+    ship_date: Mapped[datetime | None] = mapped_column(DateTime, nullable=True)
 
     # Оборудование (количество, 0-100)
     bktpb: Mapped[int] = mapped_column(Integer, default=0, nullable=False)
@@ -255,21 +223,19 @@ class Request(BaseID):
     manager: Mapped["User"] = relationship(foreign_keys=[manager_id])
     equipment: Mapped[Optional["Equipment"]] = relationship(foreign_keys=[equipment_id])
     probability: Mapped[Optional["Probability"]] = relationship(foreign_keys=[probability_id])
-    invoices: Mapped[List["Invoice"]] = relationship(back_populates="request", cascade="all, delete-orphan")
-    payment_items: Mapped[List["PaymentItem"]] = relationship(back_populates="request", cascade="all, delete-orphan")
+    invoices: Mapped[list["Invoice"]] = relationship(back_populates="request", cascade="all, delete-orphan")
+    payment_items: Mapped[list["PaymentItem"]] = relationship(back_populates="request", cascade="all, delete-orphan")
 
 
 class Invoice(BaseID):
     __tablename__ = "invoices"
     request_id: Mapped[int] = mapped_column(ForeignKey("requests.id"), nullable=False)
-    invoice_num: Mapped[Optional[str]] = mapped_column(String(100), nullable=True)
-    invoice_date: Mapped[datetime] = mapped_column(
-        DateTime, default=lambda: datetime.now(timezone.utc)
-    )
+    invoice_num: Mapped[str | None] = mapped_column(String(100), nullable=True)
+    invoice_date: Mapped[datetime] = mapped_column(DateTime, default=lambda: datetime.now(timezone.utc))
     percent: Mapped[float] = mapped_column(Numeric(5, 2), default=0)
     amount: Mapped[float] = mapped_column(Numeric(12, 2), default=0)
     paid_amount: Mapped[float] = mapped_column(Numeric(12, 2), default=0, nullable=False)
-    paid_date: Mapped[Optional[datetime]] = mapped_column(DateTime, nullable=True)
+    paid_date: Mapped[datetime | None] = mapped_column(DateTime, nullable=True)
 
     request: Mapped["Request"] = relationship(back_populates="invoices")
 
@@ -283,9 +249,9 @@ class PaymentItem(BaseID):
     payment_type: Mapped[str] = mapped_column(String(50), nullable=False)
     amount: Mapped[float] = mapped_column(Numeric(12, 2), default=0)
     percent: Mapped[float] = mapped_column(Numeric(5, 2), default=0)
-    due_date: Mapped[Optional[datetime]] = mapped_column(DateTime, nullable=True)
+    due_date: Mapped[datetime | None] = mapped_column(DateTime, nullable=True)
     paid_amount: Mapped[float] = mapped_column(Numeric(12, 2), default=0, nullable=False)
-    paid_date: Mapped[Optional[datetime]] = mapped_column(DateTime, nullable=True)
+    paid_date: Mapped[datetime | None] = mapped_column(DateTime, nullable=True)
 
     request: Mapped["Request"] = relationship(back_populates="payment_items")
 
@@ -300,9 +266,9 @@ class Material(BaseID):
     __tablename__ = "materials"
     name: Mapped[str] = mapped_column(String(200), nullable=False)
     price: Mapped[float] = mapped_column(Numeric(12, 2), default=0, nullable=False)
-    code_1c: Mapped[Optional[str]] = mapped_column(String(100), nullable=True)
-    code_agent: Mapped[Optional[str]] = mapped_column(String(100), nullable=True)
-    url_agent: Mapped[Optional[str]] = mapped_column(String(500), nullable=True)
+    code_1c: Mapped[str | None] = mapped_column(String(100), nullable=True)
+    code_agent: Mapped[str | None] = mapped_column(String(100), nullable=True)
+    url_agent: Mapped[str | None] = mapped_column(String(500), nullable=True)
 
     def __repr__(self) -> str:
         return f"Material(id={self.id}, name='{self.name}', price={self.price})"
@@ -312,12 +278,16 @@ class Module(BaseID):
     __tablename__ = "modules"
     name: Mapped[str] = mapped_column(String(200), unique=True, nullable=False)
 
-    items: Mapped[List["ModuleItem"]] = relationship(
+    items: Mapped[list["ModuleItem"]] = relationship(
         back_populates="module", cascade="all, delete-orphan", foreign_keys="ModuleItem.module_id"
     )
 
     @property
     def total_price(self) -> float:
+        from sqlalchemy.orm import attributes
+
+        if attributes.instance_state(self).dict.get("items") is None:
+            return 0.0
         total = 0.0
         for item in self.items:
             if item.material:
@@ -328,6 +298,10 @@ class Module(BaseID):
 
     @property
     def items_count(self) -> int:
+        from sqlalchemy.orm import attributes
+
+        if attributes.instance_state(self).dict.get("items") is None:
+            return 0
         return len(self.items)
 
     def __repr__(self) -> str:
@@ -346,15 +320,9 @@ class ModuleItem(Base):
     )
 
     id: Mapped[int] = mapped_column(primary_key=True)
-    module_id: Mapped[int] = mapped_column(
-        ForeignKey("modules.id", ondelete="CASCADE"), nullable=False
-    )
-    material_id: Mapped[Optional[int]] = mapped_column(
-        ForeignKey("materials.id", ondelete="SET NULL"), nullable=True
-    )
-    sub_module_id: Mapped[Optional[int]] = mapped_column(
-        ForeignKey("modules.id", ondelete="SET NULL"), nullable=True
-    )
+    module_id: Mapped[int] = mapped_column(ForeignKey("modules.id", ondelete="CASCADE"), nullable=False)
+    material_id: Mapped[int | None] = mapped_column(ForeignKey("materials.id", ondelete="SET NULL"), nullable=True)
+    sub_module_id: Mapped[int | None] = mapped_column(ForeignKey("modules.id", ondelete="SET NULL"), nullable=True)
     quantity: Mapped[int] = mapped_column(Integer, default=1, nullable=False)
 
     module: Mapped["Module"] = relationship(foreign_keys=[module_id], back_populates="items")
