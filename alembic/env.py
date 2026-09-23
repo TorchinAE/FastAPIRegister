@@ -1,15 +1,16 @@
 import sys
-from pathlib import Path
 from logging.config import fileConfig
+from pathlib import Path
 
 from sqlalchemy import engine_from_config, pool
+
 from alembic import context
 
 # Add project root to path
 sys.path.insert(0, str(Path(__file__).resolve().parent.parent))
 
-from scr.dbase.models import Base
 from config import settings
+from scr.dbase.models import Base
 
 config = context.config
 

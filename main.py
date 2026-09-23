@@ -5,23 +5,24 @@ import uvicorn
 from fastapi import FastAPI
 from fastapi.staticfiles import StaticFiles
 from fastapi.templating import Jinja2Templates
-from scr.dbase.models import Base
+
 from scr.dbase.database import db_helper
-from scr.Routers.router import router
-from scr.Routers.directors import dir_router
-from scr.Routers.positions import pos_router
+from scr.dbase.models import Base
+from scr.Routers.auth import auth_router
 from scr.Routers.companies import org_router
 from scr.Routers.counterparties import cp_router
-from scr.Routers.requests import req_router
+from scr.Routers.directors import dir_router
 from scr.Routers.equipment import eq_router
-from scr.Routers.auth import auth_router
-from scr.Routers.users import users_router
 from scr.Routers.invoices import inv_router
-from scr.Routers.payments import pay_router
-from scr.Routers.settings import settings_router
 from scr.Routers.materials import mat_router
 from scr.Routers.modules import mod_router
 from scr.Routers.pages import pages_router
+from scr.Routers.payments import pay_router
+from scr.Routers.positions import pos_router
+from scr.Routers.requests import req_router
+from scr.Routers.router import router
+from scr.Routers.settings import settings_router
+from scr.Routers.users import users_router
 
 
 @asynccontextmanager
@@ -30,7 +31,9 @@ async def lifespan(_: FastAPI):
         await conn.run_sync(Base.metadata.create_all)
     # Seed default probabilities
     from sqlalchemy import select
-    from scr.dbase.models import Probability, DEFAULT_PROBABILITIES
+
+    from scr.dbase.models import DEFAULT_PROBABILITIES, Probability
+
     async with db_helper.session_factory() as session:
         for id_, name, value in DEFAULT_PROBABILITIES:
             existing = await session.get(Probability, id_)

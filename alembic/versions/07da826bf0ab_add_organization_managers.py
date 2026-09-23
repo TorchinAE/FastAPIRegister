@@ -5,26 +5,29 @@ Revises: 6b915867262d
 Create Date: 2026-08-12 23:52:16.636786
 
 """
-from typing import Sequence, Union
 
-from alembic import op
+from collections.abc import Sequence
+from typing import Union
+
 import sqlalchemy as sa
 
+from alembic import op
 
-revision: str = '07da826bf0ab'
-down_revision: Union[str, Sequence[str], None] = '6b915867262d'
-branch_labels: Union[str, Sequence[str], None] = None
-depends_on: Union[str, Sequence[str], None] = None
+revision: str = "07da826bf0ab"
+down_revision: str | Sequence[str] | None = "6b915867262d"
+branch_labels: str | Sequence[str] | None = None
+depends_on: str | Sequence[str] | None = None
 
 
 def upgrade() -> None:
     # Create junction table
-    op.create_table('organization_managers',
-        sa.Column('organization_id', sa.Integer(), nullable=False),
-        sa.Column('manager_id', sa.Integer(), nullable=False),
-        sa.ForeignKeyConstraint(['manager_id'], ['managers.id']),
-        sa.ForeignKeyConstraint(['organization_id'], ['organizations.id']),
-        sa.PrimaryKeyConstraint('organization_id', 'manager_id')
+    op.create_table(
+        "organization_managers",
+        sa.Column("organization_id", sa.Integer(), nullable=False),
+        sa.Column("manager_id", sa.Integer(), nullable=False),
+        sa.ForeignKeyConstraint(["manager_id"], ["managers.id"]),
+        sa.ForeignKeyConstraint(["organization_id"], ["organizations.id"]),
+        sa.PrimaryKeyConstraint("organization_id", "manager_id"),
     )
     # Migrate existing data
     op.execute(
@@ -62,9 +65,9 @@ def upgrade() -> None:
 
 def downgrade() -> None:
     # Add manager_id back
-    with op.batch_alter_table('organizations', schema=None) as batch_op:
-        batch_op.add_column(sa.Column('manager_id', sa.INTEGER(), nullable=True))
-        batch_op.create_foreign_key('fk_org_manager', 'managers', ['manager_id'], ['id'])
+    with op.batch_alter_table("organizations", schema=None) as batch_op:
+        batch_op.add_column(sa.Column("manager_id", sa.INTEGER(), nullable=True))
+        batch_op.create_foreign_key("fk_org_manager", "managers", ["manager_id"], ["id"])
     # Restore data
     op.execute(
         "UPDATE organizations SET manager_id = ("
@@ -72,4 +75,4 @@ def downgrade() -> None:
         "WHERE organization_managers.organization_id = organizations.id LIMIT 1"
         ") WHERE id IN (SELECT organization_id FROM organization_managers)"
     )
-    op.drop_table('organization_managers')
+    op.drop_table("organization_managers")
