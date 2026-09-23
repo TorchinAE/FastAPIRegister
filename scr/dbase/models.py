@@ -3,7 +3,7 @@ import enum
 from datetime import datetime, timezone
 from typing import Optional, List
 
-from sqlalchemy import String, DateTime, ForeignKey, Integer, Text, Enum, Numeric
+from sqlalchemy import String, DateTime, ForeignKey, Integer, Text, Enum, Numeric, CheckConstraint, UniqueConstraint
 from sqlalchemy.orm import DeclarativeBase, Mapped, mapped_column, relationship
 
 
@@ -294,3 +294,69 @@ class Setting(Base):
     __tablename__ = "settings"
     key: Mapped[str] = mapped_column(String(100), primary_key=True)
     value: Mapped[str] = mapped_column(Text, nullable=False, default="")
+
+
+class Material(BaseID):
+    __tablename__ = "materials"
+    name: Mapped[str] = mapped_column(String(200), nullable=False)
+    price: Mapped[float] = mapped_column(Numeric(12, 2), default=0, nullable=False)
+    code_1c: Mapped[Optional[str]] = mapped_column(String(100), nullable=True)
+    code_agent: Mapped[Optional[str]] = mapped_column(String(100), nullable=True)
+    url_agent: Mapped[Optional[str]] = mapped_column(String(500), nullable=True)
+
+    def __repr__(self) -> str:
+        return f"Material(id={self.id}, name='{self.name}', price={self.price})"
+
+
+class Module(BaseID):
+    __tablename__ = "modules"
+    name: Mapped[str] = mapped_column(String(200), unique=True, nullable=False)
+
+    items: Mapped[List["ModuleItem"]] = relationship(
+        back_populates="module", cascade="all, delete-orphan", foreign_keys="ModuleItem.module_id"
+    )
+
+    @property
+    def total_price(self) -> float:
+        total = 0.0
+        for item in self.items:
+            if item.material:
+                total += float(item.material.price) * item.quantity
+            elif item.sub_module:
+                total += item.sub_module.total_price * item.quantity
+        return total
+
+    @property
+    def items_count(self) -> int:
+        return len(self.items)
+
+    def __repr__(self) -> str:
+        return f"Module(id={self.id}, name='{self.name}')"
+
+
+class ModuleItem(Base):
+    __tablename__ = "module_items"
+    __table_args__ = (
+        CheckConstraint(
+            "(material_id IS NOT NULL AND sub_module_id IS NULL) OR "
+            "(material_id IS NULL AND sub_module_id IS NOT NULL)",
+            name="ck_module_item_one_ref",
+        ),
+        UniqueConstraint("module_id", "material_id", "sub_module_id", name="uq_module_item"),
+    )
+
+    id: Mapped[int] = mapped_column(primary_key=True)
+    module_id: Mapped[int] = mapped_column(
+        ForeignKey("modules.id", ondelete="CASCADE"), nullable=False
+    )
+    material_id: Mapped[Optional[int]] = mapped_column(
+        ForeignKey("materials.id", ondelete="SET NULL"), nullable=True
+    )
+    sub_module_id: Mapped[Optional[int]] = mapped_column(
+        ForeignKey("modules.id", ondelete="SET NULL"), nullable=True
+    )
+    quantity: Mapped[int] = mapped_column(Integer, default=1, nullable=False)
+
+    module: Mapped["Module"] = relationship(foreign_keys=[module_id], back_populates="items")
+    material: Mapped[Optional["Material"]] = relationship(foreign_keys=[material_id])
+    sub_module: Mapped[Optional["Module"]] = relationship(foreign_keys=[sub_module_id])
