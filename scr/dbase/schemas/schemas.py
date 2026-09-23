@@ -173,6 +173,98 @@ class CounterpartyResponseSchema(BaseModel):
     created_by: Optional[str] = None
 
 
+# --- Material ---
+
+class MaterialCreateSchema(BaseModel):
+    model_config = ConfigDict(from_attributes=True)
+
+    name: str
+    price: float = Field(0, ge=0)
+    code_1c: Optional[str] = None
+    code_agent: Optional[str] = None
+    url_agent: Optional[str] = None
+
+
+class MaterialUpdateSchema(BaseModel):
+    model_config = ConfigDict(from_attributes=True)
+
+    id: int
+    name: Optional[str] = None
+    price: Optional[float] = Field(None, ge=0)
+    code_1c: Optional[str] = None
+    code_agent: Optional[str] = None
+    url_agent: Optional[str] = None
+
+
+class MaterialResponseSchema(BaseModel):
+    model_config = ConfigDict(from_attributes=True)
+
+    id: int
+    name: str
+    price: float = 0
+    code_1c: Optional[str] = None
+    code_agent: Optional[str] = None
+    url_agent: Optional[str] = None
+    created_by: Optional[str] = None
+
+
+# --- Module Item ---
+
+class ModuleItemCreateSchema(BaseModel):
+    model_config = ConfigDict(from_attributes=True)
+
+    material_id: Optional[int] = None
+    sub_module_id: Optional[int] = None
+    quantity: int = Field(1, ge=1)
+
+
+class ModuleItemResponseSchema(BaseModel):
+    model_config = ConfigDict(from_attributes=True)
+
+    id: int
+    module_id: int
+    material_id: Optional[int] = None
+    sub_module_id: Optional[int] = None
+    quantity: int = 1
+    material: Optional[MaterialResponseSchema] = None
+    sub_module_name: Optional[str] = None
+
+
+# --- Module ---
+
+class ModuleCreateSchema(BaseModel):
+    model_config = ConfigDict(from_attributes=True)
+
+    name: str
+
+
+class ModuleUpdateSchema(BaseModel):
+    model_config = ConfigDict(from_attributes=True)
+
+    id: int
+    name: Optional[str] = None
+
+
+class ModuleResponseSchema(BaseModel):
+    model_config = ConfigDict(from_attributes=True)
+
+    id: int
+    name: str
+    items_count: int = 0
+    total_price: float = 0
+    created_by: Optional[str] = None
+
+
+class ModuleFullResponseSchema(BaseModel):
+    model_config = ConfigDict(from_attributes=True)
+
+    id: int
+    name: str
+    items: list[ModuleItemResponseSchema] = []
+    total_price: float = 0
+    created_by: Optional[str] = None
+
+
 # --- Equipment ---
 
 class EquipmentCreateSchema(BaseModel):
