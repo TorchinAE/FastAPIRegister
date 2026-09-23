@@ -19,6 +19,8 @@ from scr.Routers.users import users_router
 from scr.Routers.invoices import inv_router
 from scr.Routers.payments import pay_router
 from scr.Routers.settings import settings_router
+from scr.Routers.materials import mat_router
+from scr.Routers.modules import mod_router
 from scr.Routers.pages import pages_router
 
 
@@ -64,6 +66,8 @@ app.include_router(inv_router)
 app.include_router(pay_router)
 app.include_router(settings_router)
 app.include_router(users_router)
+app.include_router(mat_router)
+app.include_router(mod_router)
 app.include_router(pages_router)
 
 
