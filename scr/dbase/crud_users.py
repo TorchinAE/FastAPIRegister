@@ -1,5 +1,5 @@
 import bcrypt
-from sqlalchemy import select, Result, func
+from sqlalchemy import Result, func, select
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from scr.dbase.models import User
@@ -80,9 +80,7 @@ async def delete_user(session: AsyncSession, user_id: int) -> User | None:
     return user
 
 
-async def authenticate_user(
-    session: AsyncSession, email: str, password: str
-) -> User | None:
+async def authenticate_user(session: AsyncSession, email: str, password: str) -> User | None:
     user = await get_user_by_email(session, email)
     if not user:
         return None

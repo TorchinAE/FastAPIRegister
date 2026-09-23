@@ -1,7 +1,8 @@
-from fastapi import APIRouter, HTTPException, Depends, Request, Response
+from fastapi import APIRouter, Depends, HTTPException, Request, Response
 from sqlalchemy.ext.asyncio import AsyncSession
-from scr.dbase.database import db_helper
+
 from scr.dbase import crud_users
+from scr.dbase.database import db_helper
 from scr.dbase.schemas.schemas import UserCreate, UserLogin, UserResponse
 
 auth_router = APIRouter(prefix="/api/auth", tags=["Auth"])
@@ -30,9 +31,7 @@ async def login(
     response: Response,
     session: AsyncSession = Depends(db_helper.session_dependency),
 ):
-    user = await crud_users.authenticate_user(
-        session, credentials.email, credentials.password
-    )
+    user = await crud_users.authenticate_user(session, credentials.email, credentials.password)
     if not user:
         raise HTTPException(status_code=401, detail="Неверный email или пароль")
     response.set_cookie(key=SESSION_KEY, value=user.email, httponly=True)

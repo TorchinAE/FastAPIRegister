@@ -1,4 +1,4 @@
-from sqlalchemy import select, Result, func
+from sqlalchemy import Result, func, select
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from scr.dbase.models import Positions
@@ -44,9 +44,7 @@ async def add_position(
     return new_pos
 
 
-async def update_position(
-    session: AsyncSession, upd_position: PositionUpdateSchema
-) -> Positions | None:
+async def update_position(session: AsyncSession, upd_position: PositionUpdateSchema) -> Positions | None:
     check_position = await get_position_id(session, upd_position.id)
     if not check_position:
         return None

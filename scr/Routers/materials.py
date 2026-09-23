@@ -1,15 +1,16 @@
 import io
-from fastapi import APIRouter, HTTPException, Depends, Query, UploadFile, File
-from fastapi.responses import StreamingResponse
-from sqlalchemy.ext.asyncio import AsyncSession
-from openpyxl import Workbook, load_workbook
 
-from scr.dbase.database import db_helper
+from fastapi import APIRouter, Depends, File, HTTPException, Query, UploadFile
+from fastapi.responses import StreamingResponse
+from openpyxl import Workbook, load_workbook
+from sqlalchemy.ext.asyncio import AsyncSession
+
 from scr.dbase import crud_materials
+from scr.dbase.database import db_helper
 from scr.dbase.schemas.schemas import (
     MaterialCreateSchema,
-    MaterialUpdateSchema,
     MaterialResponseSchema,
+    MaterialUpdateSchema,
     PaginatedResponse,
 )
 
@@ -33,9 +34,7 @@ async def read_materials(
     per_page: int = Query(20, ge=1, le=100),
     session: AsyncSession = Depends(db_helper.session_dependency),
 ):
-    items, total = await crud_materials.get_materials(
-        session=session, search=search, page=page, per_page=per_page
-    )
+    items, total = await crud_materials.get_materials(session=session, search=search, page=page, per_page=per_page)
     return PaginatedResponse(
         items=[MaterialResponseSchema.model_validate(i) for i in items],
         total=total,
@@ -63,7 +62,9 @@ async def export_materials_excel(
     ws.title = "Материалы"
     ws.append(["ID", "Название", "Цена", "Код 1С", "Код агент", "URL агент"])
     for item in items:
-        ws.append([item.id, item.name, float(item.price), item.code_1c or "", item.code_agent or "", item.url_agent or ""])
+        ws.append(
+            [item.id, item.name, float(item.price), item.code_1c or "", item.code_agent or "", item.url_agent or ""]
+        )
 
     buf = io.BytesIO()
     wb.save(buf)
@@ -97,9 +98,7 @@ async def import_materials_excel(
         url_agent = str(row[4]).strip() if len(row) > 4 and row[4] else None
         await crud_materials.add_material(
             session,
-            MaterialCreateSchema(
-                name=name, price=price, code_1c=code_1c, code_agent=code_agent, url_agent=url_agent
-            ),
+            MaterialCreateSchema(name=name, price=price, code_1c=code_1c, code_agent=code_agent, url_agent=url_agent),
         )
         imported += 1
     await session.commit()
@@ -107,9 +106,7 @@ async def import_materials_excel(
 
 
 @mat_router.get("/{mat_id}", response_model=MaterialResponseSchema)
-async def read_material(
-    mat_id: int, session: AsyncSession = Depends(db_helper.session_dependency)
-):
+async def read_material(mat_id: int, session: AsyncSession = Depends(db_helper.session_dependency)):
     mat = await crud_materials.get_material_by_id(session=session, mat_id=mat_id)
     if not mat:
         raise HTTPException(status_code=404, detail="Материал не найден")
@@ -129,9 +126,7 @@ async def update_material(
 
 
 @mat_router.delete("/{mat_id}")
-async def delete_material(
-    mat_id: int, session: AsyncSession = Depends(db_helper.session_dependency)
-):
+async def delete_material(mat_id: int, session: AsyncSession = Depends(db_helper.session_dependency)):
     result = await crud_materials.delete_material(session=session, mat_id=mat_id)
     if not result:
         raise HTTPException(status_code=404, detail="Материал не найден")

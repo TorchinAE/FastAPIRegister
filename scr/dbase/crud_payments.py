@@ -1,17 +1,12 @@
 from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
-from scr.dbase.models import PaymentItem, PAYMENT_TYPES
-from scr.dbase.schemas.schemas import PaymentItemCreateSchema, PaymentItemUpdateSchema
+
+from scr.dbase.models import PAYMENT_TYPES, PaymentItem
+from scr.dbase.schemas.schemas import PaymentItemUpdateSchema
 
 
-async def get_payment_items_by_request(
-    session: AsyncSession, request_id: int
-) -> list[PaymentItem]:
-    stmt = (
-        select(PaymentItem)
-        .where(PaymentItem.request_id == request_id)
-        .order_by(PaymentItem.id)
-    )
+async def get_payment_items_by_request(session: AsyncSession, request_id: int) -> list[PaymentItem]:
+    stmt = select(PaymentItem).where(PaymentItem.request_id == request_id).order_by(PaymentItem.id)
     result = await session.execute(stmt)
     return list(result.scalars().all())
 
@@ -26,9 +21,7 @@ async def ensure_payment_items(session: AsyncSession, request_id: int) -> list[P
     return await get_payment_items_by_request(session, request_id)
 
 
-async def update_payment_item(
-    session: AsyncSession, data: PaymentItemUpdateSchema
-) -> PaymentItem | None:
+async def update_payment_item(session: AsyncSession, data: PaymentItemUpdateSchema) -> PaymentItem | None:
     item = await session.get(PaymentItem, data.id)
     if not item:
         return None

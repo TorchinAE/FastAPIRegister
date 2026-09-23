@@ -1,15 +1,16 @@
 from datetime import datetime
 
-from fastapi import APIRouter, HTTPException, Depends, Query
+from fastapi import APIRouter, Depends, HTTPException, Query
 from sqlalchemy.ext.asyncio import AsyncSession
-from scr.dbase.database import db_helper
+
 from scr.dbase import crud_requests
+from scr.dbase.database import db_helper
 from scr.dbase.models import RequestStatus
 from scr.dbase.schemas.schemas import (
-    RequestCreateSchema,
-    RequestUpdateSchema,
-    RequestResponseSchema,
     PaginatedResponse,
+    RequestCreateSchema,
+    RequestResponseSchema,
+    RequestUpdateSchema,
 )
 
 req_router = APIRouter(prefix="/api/requests", tags=["Requests"])
@@ -21,9 +22,7 @@ async def add_request(
     manager_id: int = Query(..., description="ID менеджера из сессии"),
     session: AsyncSession = Depends(db_helper.session_dependency),
 ):
-    new_req = await crud_requests.add_request(
-        session=session, in_req=request, manager_id=manager_id
-    )
+    new_req = await crud_requests.add_request(session=session, in_req=request, manager_id=manager_id)
     if not new_req:
         raise HTTPException(status_code=400, detail="Контрагент не найден")
     await session.commit()
@@ -63,9 +62,7 @@ async def read_requests(
 
 
 @req_router.get("/{req_id}", response_model=RequestResponseSchema)
-async def read_request(
-    req_id: int, session: AsyncSession = Depends(db_helper.session_dependency)
-):
+async def read_request(req_id: int, session: AsyncSession = Depends(db_helper.session_dependency)):
     req = await crud_requests.get_request_by_id(session=session, req_id=req_id)
     if not req:
         raise HTTPException(status_code=404, detail="Запрос не найден")
@@ -87,9 +84,7 @@ async def update_request(
 
 
 @req_router.delete("/{req_id}")
-async def delete_request(
-    req_id: int, session: AsyncSession = Depends(db_helper.session_dependency)
-):
+async def delete_request(req_id: int, session: AsyncSession = Depends(db_helper.session_dependency)):
     result = await crud_requests.delete_request(session=session, req_id=req_id)
     if not result:
         raise HTTPException(status_code=404, detail="Запрос не найден")

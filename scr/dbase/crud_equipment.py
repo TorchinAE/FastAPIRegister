@@ -1,4 +1,4 @@
-from sqlalchemy import select, Result, func
+from sqlalchemy import Result, func, select
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from scr.dbase.models import Equipment
@@ -51,9 +51,7 @@ async def add_equipment(
     return eq
 
 
-async def update_equipment(
-    session: AsyncSession, upd_eq: EquipmentUpdateSchema
-) -> Equipment | None:
+async def update_equipment(session: AsyncSession, upd_eq: EquipmentUpdateSchema) -> Equipment | None:
     check_eq = await get_equipment_by_id(session, upd_eq.id)
     if not check_eq:
         return None

@@ -1,4 +1,4 @@
-from sqlalchemy import select, Result, func
+from sqlalchemy import Result, func, select
 from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy.orm import selectinload
 
@@ -12,9 +12,7 @@ async def get_organizations(
     page: int = 1,
     per_page: int = 20,
 ) -> tuple[list[Organization], int]:
-    stmt = select(Organization).options(
-        selectinload(Organization.director)
-    ).order_by(Organization.name)
+    stmt = select(Organization).options(selectinload(Organization.director)).order_by(Organization.name)
     count_stmt = select(func.count(Organization.id))
 
     if search:
@@ -28,19 +26,13 @@ async def get_organizations(
     return list(result.scalars().all()), total
 
 
-async def get_organization_by_id(
-    session: AsyncSession, org_id: int
-) -> Organization | None:
-    stmt = select(Organization).options(
-        selectinload(Organization.director)
-    ).where(Organization.id == org_id)
+async def get_organization_by_id(session: AsyncSession, org_id: int) -> Organization | None:
+    stmt = select(Organization).options(selectinload(Organization.director)).where(Organization.id == org_id)
     result: Result = await session.execute(stmt)
     return result.scalar_one_or_none()
 
 
-async def get_organization_by_name(
-    session: AsyncSession, name: str
-) -> Organization | None:
+async def get_organization_by_name(session: AsyncSession, name: str) -> Organization | None:
     stmt = select(Organization).where(Organization.name == name)
     result: Result = await session.execute(stmt)
     return result.scalar_one_or_none()

@@ -10,9 +10,7 @@ async def test_home(client):
 
 @pytest.mark.asyncio
 async def test_create_position(client):
-    response = await client.post(
-        "/api/positions/", json={"name": "Директор"}
-    )
+    response = await client.post("/api/positions/", json={"name": "Директор"})
     assert response.status_code == 200
     data = response.json()
     assert data["name"] == "Директор"

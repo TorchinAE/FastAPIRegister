@@ -1,10 +1,11 @@
-from fastapi import APIRouter, HTTPException, status, Depends, Query
+from fastapi import APIRouter, Depends, HTTPException, Query, status
 from sqlalchemy.ext.asyncio import AsyncSession
-from scr.dbase.database import db_helper
+
 from scr.dbase import crud_directors
+from scr.dbase.database import db_helper
 from scr.dbase.schemas.schemas import (
-    DirectorSchema,
     DirectorResponseSchema,
+    DirectorSchema,
     DirectorUpdateSchema,
     PaginatedResponse,
 )
@@ -46,9 +47,7 @@ async def read_dirs(
 
 
 @dir_router.get("/{dir_id}", response_model=DirectorResponseSchema)
-async def read_dir_item(
-    dir_id: int, session: AsyncSession = Depends(db_helper.session_dependency)
-):
+async def read_dir_item(dir_id: int, session: AsyncSession = Depends(db_helper.session_dependency)):
     director = await crud_directors.get_dir_to_id(session=session, dir_id=dir_id)
     if not director:
         raise HTTPException(status_code=404, detail="Директор не найден")
@@ -69,9 +68,7 @@ async def update_dir_item(
 
 
 @dir_router.delete("/{dir_id}")
-async def delete_dir_item(
-    dir_id: int, session: AsyncSession = Depends(db_helper.session_dependency)
-):
+async def delete_dir_item(dir_id: int, session: AsyncSession = Depends(db_helper.session_dependency)):
     result = await crud_directors.delete_dir(session=session, dir_id=dir_id)
     if not result:
         raise HTTPException(status_code=404, detail="Директор не найден")

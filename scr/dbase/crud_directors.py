@@ -1,8 +1,9 @@
-from sqlalchemy import select, Result, func
+from sqlalchemy import Result, func, select
 from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy.orm import selectinload
+
 from scr.dbase.models import Directors
-from scr.dbase.schemas.schemas import DirectorUpdateSchema, DirectorSchema
+from scr.dbase.schemas.schemas import DirectorSchema, DirectorUpdateSchema
 
 
 async def get_dirs(
@@ -40,9 +41,7 @@ async def get_dir_by_name(session: AsyncSession, name: str) -> Directors | None:
     return result.scalar_one_or_none()
 
 
-async def add_dir(
-    session: AsyncSession, dir_in: DirectorSchema, created_by: str | None = None
-) -> Directors:
+async def add_dir(session: AsyncSession, dir_in: DirectorSchema, created_by: str | None = None) -> Directors:
     check_dir = await get_dir_by_name(session, dir_in.name)
     if check_dir:
         return check_dir
@@ -53,9 +52,7 @@ async def add_dir(
     return new_dir
 
 
-async def update_dir(
-    session: AsyncSession, upd_dir: DirectorUpdateSchema
-) -> Directors | None:
+async def update_dir(session: AsyncSession, upd_dir: DirectorUpdateSchema) -> Directors | None:
     check_dir = await get_dir_to_id(session, upd_dir.id)
     if not check_dir:
         return None

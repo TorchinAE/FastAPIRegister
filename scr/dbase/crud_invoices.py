@@ -1,26 +1,17 @@
-from sqlalchemy import select, func
+from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
-from sqlalchemy.orm import selectinload
 
-from scr.dbase.models import Invoice, Request
+from scr.dbase.models import Invoice
 from scr.dbase.schemas.schemas import InvoiceCreateSchema, InvoiceUpdateSchema
 
 
-async def get_invoices_by_request(
-    session: AsyncSession, request_id: int
-) -> list[Invoice]:
-    stmt = (
-        select(Invoice)
-        .where(Invoice.request_id == request_id)
-        .order_by(Invoice.id)
-    )
+async def get_invoices_by_request(session: AsyncSession, request_id: int) -> list[Invoice]:
+    stmt = select(Invoice).where(Invoice.request_id == request_id).order_by(Invoice.id)
     result = await session.execute(stmt)
     return list(result.scalars().all())
 
 
-async def get_invoice_by_id(
-    session: AsyncSession, invoice_id: int
-) -> Invoice | None:
+async def get_invoice_by_id(session: AsyncSession, invoice_id: int) -> Invoice | None:
     return await session.get(Invoice, invoice_id)
 
 
@@ -42,9 +33,7 @@ async def add_invoice(
     return invoice
 
 
-async def update_invoice(
-    session: AsyncSession, data: InvoiceUpdateSchema
-) -> Invoice | None:
+async def update_invoice(session: AsyncSession, data: InvoiceUpdateSchema) -> Invoice | None:
     invoice = await session.get(Invoice, data.id)
     if not invoice:
         return None

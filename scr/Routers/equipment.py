@@ -1,11 +1,12 @@
-from fastapi import APIRouter, HTTPException, Depends, Query
+from fastapi import APIRouter, Depends, HTTPException, Query
 from sqlalchemy.ext.asyncio import AsyncSession
-from scr.dbase.database import db_helper
+
 from scr.dbase import crud_equipment
+from scr.dbase.database import db_helper
 from scr.dbase.schemas.schemas import (
     EquipmentCreateSchema,
-    EquipmentUpdateSchema,
     EquipmentResponseSchema,
+    EquipmentUpdateSchema,
     PaginatedResponse,
 )
 
@@ -29,9 +30,7 @@ async def read_equipment(
     per_page: int = Query(20, ge=1, le=100),
     session: AsyncSession = Depends(db_helper.session_dependency),
 ):
-    items, total = await crud_equipment.get_equipment_list(
-        session=session, search=search, page=page, per_page=per_page
-    )
+    items, total = await crud_equipment.get_equipment_list(session=session, search=search, page=page, per_page=per_page)
     return PaginatedResponse(
         items=[EquipmentResponseSchema.model_validate(i) for i in items],
         total=total,
@@ -42,9 +41,7 @@ async def read_equipment(
 
 
 @eq_router.get("/{eq_id}", response_model=EquipmentResponseSchema)
-async def read_equipment_item(
-    eq_id: int, session: AsyncSession = Depends(db_helper.session_dependency)
-):
+async def read_equipment_item(eq_id: int, session: AsyncSession = Depends(db_helper.session_dependency)):
     eq = await crud_equipment.get_equipment_by_id(session=session, eq_id=eq_id)
     if not eq:
         raise HTTPException(status_code=404, detail="Оборудование не найдено")
@@ -64,9 +61,7 @@ async def update_equipment(
 
 
 @eq_router.delete("/{eq_id}")
-async def delete_equipment(
-    eq_id: int, session: AsyncSession = Depends(db_helper.session_dependency)
-):
+async def delete_equipment(eq_id: int, session: AsyncSession = Depends(db_helper.session_dependency)):
     result = await crud_equipment.delete_equipment(session=session, eq_id=eq_id)
     if not result:
         raise HTTPException(status_code=404, detail="Оборудование не найдено")

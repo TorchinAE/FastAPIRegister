@@ -1,10 +1,10 @@
 from datetime import datetime
 
-from sqlalchemy import select, Result, func
+from sqlalchemy import Result, func, select
 from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy.orm import selectinload
 
-from scr.dbase.models import Request, RequestStatus, Counterparty, Organization, Directors, Probability, User
+from scr.dbase.models import Counterparty, Directors, Organization, Probability, Request, RequestStatus
 from scr.dbase.schemas.schemas import RequestCreateSchema, RequestUpdateSchema
 
 
@@ -19,11 +19,15 @@ async def get_requests(
     page: int = 1,
     per_page: int = 20,
 ) -> tuple[list[Request], int]:
-    stmt = select(Request).options(
-        selectinload(Request.equipment),
-        selectinload(Request.manager),
-        selectinload(Request.company),
-    ).order_by(Request.id.desc())
+    stmt = (
+        select(Request)
+        .options(
+            selectinload(Request.equipment),
+            selectinload(Request.manager),
+            selectinload(Request.company),
+        )
+        .order_by(Request.id.desc())
+    )
     count_stmt = select(func.count(Request.id))
 
     if status:
@@ -51,15 +55,20 @@ async def get_requests(
     return list(result.scalars().all()), total
 
 
-async def get_request_by_id(
-    session: AsyncSession, req_id: int
-) -> Request | None:
-    stmt = select(Request).options(
-        selectinload(Request.counterparty).selectinload(Counterparty.company).selectinload(Organization.director).selectinload(Directors.position),
-        selectinload(Request.company),
-        selectinload(Request.manager),
-        selectinload(Request.equipment),
-    ).where(Request.id == req_id)
+async def get_request_by_id(session: AsyncSession, req_id: int) -> Request | None:
+    stmt = (
+        select(Request)
+        .options(
+            selectinload(Request.counterparty)
+            .selectinload(Counterparty.company)
+            .selectinload(Organization.director)
+            .selectinload(Directors.position),
+            selectinload(Request.company),
+            selectinload(Request.manager),
+            selectinload(Request.equipment),
+        )
+        .where(Request.id == req_id)
+    )
     result: Result = await session.execute(stmt)
     return result.scalar_one_or_none()
 
@@ -116,9 +125,7 @@ async def add_request(
     return req
 
 
-async def update_request(
-    session: AsyncSession, upd_req: RequestUpdateSchema
-) -> Request | None:
+async def update_request(session: AsyncSession, upd_req: RequestUpdateSchema) -> Request | None:
     check_req = await get_request_by_id(session, upd_req.id)
     if not check_req:
         return None
@@ -129,7 +136,7 @@ async def update_request(
         if counterparty:
             check_req.company_id = counterparty.company_id
 
-    if "factory_order_num" in update_data and update_data["factory_order_num"]:
+    if update_data.get("factory_order_num"):
         stmt = select(Probability).where(Probability.value == 100)
         result = await session.execute(stmt)
         prob_100 = result.scalar_one_or_none()

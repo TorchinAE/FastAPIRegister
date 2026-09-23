@@ -4,12 +4,12 @@ from pathlib import Path
 sys.path.insert(0, str(Path(__file__).resolve().parent.parent))
 
 import pytest
-from httpx import AsyncClient, ASGITransport
-from sqlalchemy.ext.asyncio import create_async_engine, async_sessionmaker, AsyncSession
+from httpx import ASGITransport, AsyncClient
+from sqlalchemy.ext.asyncio import AsyncSession, async_sessionmaker, create_async_engine
 
-from scr.dbase.models import Base
-from scr.dbase.database import db_helper
 from main import app
+from scr.dbase.database import db_helper
+from scr.dbase.models import Base
 
 TEST_DB_URL = "sqlite+aiosqlite:///:memory:"
 

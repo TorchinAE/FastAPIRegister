@@ -1,11 +1,12 @@
-from fastapi import APIRouter, HTTPException, Depends, Query
+from fastapi import APIRouter, Depends, HTTPException, Query
 from sqlalchemy.ext.asyncio import AsyncSession
-from scr.dbase.database import db_helper
+
 from scr.dbase import crud_counterparties
+from scr.dbase.database import db_helper
 from scr.dbase.schemas.schemas import (
     CounterpartyCreateSchema,
-    CounterpartyUpdateSchema,
     CounterpartyResponseSchema,
+    CounterpartyUpdateSchema,
     PaginatedResponse,
 )
 
@@ -17,9 +18,7 @@ async def add_counterparty(
     counterparty: CounterpartyCreateSchema,
     session: AsyncSession = Depends(db_helper.session_dependency),
 ):
-    new_cp = await crud_counterparties.add_counterparty(
-        session=session, in_cp=counterparty
-    )
+    new_cp = await crud_counterparties.add_counterparty(session=session, in_cp=counterparty)
     await session.commit()
     return new_cp
 
@@ -57,9 +56,7 @@ async def read_counterparties(
 
 
 @cp_router.get("/{cp_id}", response_model=CounterpartyResponseSchema)
-async def read_counterparty(
-    cp_id: int, session: AsyncSession = Depends(db_helper.session_dependency)
-):
+async def read_counterparty(cp_id: int, session: AsyncSession = Depends(db_helper.session_dependency)):
     cp = await crud_counterparties.get_counterparty_by_id(session=session, cp_id=cp_id)
     if not cp:
         raise HTTPException(status_code=404, detail="Контрагент не найден")
@@ -79,9 +76,7 @@ async def update_counterparty(
 
 
 @cp_router.delete("/{cp_id}")
-async def delete_counterparty(
-    cp_id: int, session: AsyncSession = Depends(db_helper.session_dependency)
-):
+async def delete_counterparty(cp_id: int, session: AsyncSession = Depends(db_helper.session_dependency)):
     result = await crud_counterparties.delete_counterparty(session=session, cp_id=cp_id)
     if not result:
         raise HTTPException(status_code=404, detail="Контрагент не найден")

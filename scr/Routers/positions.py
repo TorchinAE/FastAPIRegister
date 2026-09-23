@@ -1,12 +1,13 @@
-from fastapi import APIRouter, HTTPException, Depends, Query
+from fastapi import APIRouter, Depends, HTTPException, Query
 from sqlalchemy.ext.asyncio import AsyncSession
-from scr.dbase.database import db_helper
+
 from scr.dbase import crud_positions
+from scr.dbase.database import db_helper
 from scr.dbase.schemas.schemas import (
-    PositionCreateSchema,
-    PositionUpdateSchema,
-    PositionResponseSchema,
     PaginatedResponse,
+    PositionCreateSchema,
+    PositionResponseSchema,
+    PositionUpdateSchema,
 )
 
 pos_router = APIRouter(prefix="/api/positions", tags=["Positions"])
@@ -42,9 +43,7 @@ async def read_positions(
 
 
 @pos_router.get("/{pos_id}", response_model=PositionResponseSchema)
-async def read_position(
-    pos_id: int, session: AsyncSession = Depends(db_helper.session_dependency)
-):
+async def read_position(pos_id: int, session: AsyncSession = Depends(db_helper.session_dependency)):
     position = await crud_positions.get_position_id(session=session, pos_id=pos_id)
     if not position:
         raise HTTPException(status_code=404, detail="Должность не найдена")
@@ -64,9 +63,7 @@ async def update_position(
 
 
 @pos_router.delete("/{pos_id}")
-async def delete_position(
-    pos_id: int, session: AsyncSession = Depends(db_helper.session_dependency)
-):
+async def delete_position(pos_id: int, session: AsyncSession = Depends(db_helper.session_dependency)):
     result = await crud_positions.delete_position(session=session, pos_id=pos_id)
     if not result:
         raise HTTPException(status_code=404, detail="Должность не найдена")

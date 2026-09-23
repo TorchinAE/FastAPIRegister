@@ -1,11 +1,12 @@
-from fastapi import APIRouter, HTTPException, Depends, Query
+from fastapi import APIRouter, Depends, HTTPException, Query
 from sqlalchemy.ext.asyncio import AsyncSession
-from scr.dbase.database import db_helper
+
 from scr.dbase import crud_organizations
+from scr.dbase.database import db_helper
 from scr.dbase.schemas.schemas import (
     OrganizationAddSchema,
-    OrganizationUpdateSchema,
     OrganizationResponseSchema,
+    OrganizationUpdateSchema,
     PaginatedResponse,
 )
 
@@ -42,9 +43,7 @@ async def read_companies(
 
 
 @org_router.get("/{org_id}", response_model=OrganizationResponseSchema)
-async def read_company(
-    org_id: int, session: AsyncSession = Depends(db_helper.session_dependency)
-):
+async def read_company(org_id: int, session: AsyncSession = Depends(db_helper.session_dependency)):
     org = await crud_organizations.get_organization_by_id(session=session, org_id=org_id)
     if not org:
         raise HTTPException(status_code=404, detail="Компания не найдена")
@@ -56,9 +55,7 @@ async def update_company(
     data: OrganizationUpdateSchema,
     session: AsyncSession = Depends(db_helper.session_dependency),
 ):
-    result = await crud_organizations.update_organization(
-        session=session, update_organization=data
-    )
+    result = await crud_organizations.update_organization(session=session, update_organization=data)
     if not result:
         raise HTTPException(status_code=404, detail="Компания не найдена")
     await session.commit()
@@ -66,9 +63,7 @@ async def update_company(
 
 
 @org_router.delete("/{org_id}")
-async def delete_company(
-    org_id: int, session: AsyncSession = Depends(db_helper.session_dependency)
-):
+async def delete_company(org_id: int, session: AsyncSession = Depends(db_helper.session_dependency)):
     result = await crud_organizations.delete_organization(session=session, org_id=org_id)
     if not result:
         raise HTTPException(status_code=404, detail="Компания не найдена")

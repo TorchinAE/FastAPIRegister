@@ -1,14 +1,24 @@
-from fastapi import APIRouter, Request, Depends, Form
-from fastapi.responses import HTMLResponse, RedirectResponse, JSONResponse
+from fastapi import APIRouter, Depends, Form, Request
+from fastapi.responses import HTMLResponse, JSONResponse, RedirectResponse
 from fastapi.templating import Jinja2Templates
 from sqlalchemy.ext.asyncio import AsyncSession
 
+from scr.dbase import (
+    crud_counterparties,
+    crud_directors,
+    crud_equipment,
+    crud_invoices,
+    crud_materials,
+    crud_modules,
+    crud_organizations,
+    crud_payments,
+    crud_positions,
+    crud_requests,
+    crud_settings,
+    crud_users,
+)
 from scr.dbase.database import db_helper
-from scr.dbase import crud_users, crud_requests, crud_counterparties
-from scr.dbase import crud_organizations, crud_directors, crud_positions, crud_equipment, crud_invoices, crud_settings, crud_payments
-from scr.dbase import crud_materials, crud_modules
-from scr.dbase.models import Probability
-from scr.dbase.models import RequestStatus
+from scr.dbase.models import Probability, RequestStatus
 
 templates = Jinja2Templates(directory="templates")
 pages_router = APIRouter(tags=["Pages"])
@@ -96,8 +106,16 @@ async def requests_page(
     pages = (total + per_page - 1) // per_page
     return templates.TemplateResponse(
         "requests/list.html",
-        {"request": request, "user": user, "items": requests_list, "page": page, "pages": pages, "total": total,
-         "statuses": RequestStatus, "active_page": "requests"},
+        {
+            "request": request,
+            "user": user,
+            "items": requests_list,
+            "page": page,
+            "pages": pages,
+            "total": total,
+            "statuses": RequestStatus,
+            "active_page": "requests",
+        },
     )
 
 
@@ -110,6 +128,7 @@ async def request_create_page(
     if not user:
         return RedirectResponse("/", status_code=302)
     from scr.dbase.schemas.schemas import RequestCreateSchema
+
     # Create minimal request with auto-filled fields
     schema = RequestCreateSchema()
     new_req = await crud_requests.add_request(
@@ -128,8 +147,8 @@ async def request_create_submit(
     if not user:
         return RedirectResponse("/", status_code=302)
     form = await request.form()
-    from scr.dbase.schemas.schemas import RequestCreateSchema
     from scr.dbase.models import RequestStatus as RS
+    from scr.dbase.schemas.schemas import RequestCreateSchema
 
     data = {
         "counterparty_id": int(form["counterparty_id"]),
@@ -187,7 +206,10 @@ async def request_detail_page(
     equipment_list, _ = await crud_equipment.get_equipment_list(session, per_page=100)
     companies_list, _ = await crud_organizations.get_organizations(session, per_page=100)
     from sqlalchemy import select as sa_select
-    related, _ = await crud_requests.get_requests(session, company_id=req.company_id, per_page=50) if req.company_id else ([], 0)
+
+    related, _ = (
+        await crud_requests.get_requests(session, company_id=req.company_id, per_page=50) if req.company_id else ([], 0)
+    )
     invoices = await crud_invoices.get_invoices_by_request(session, req_id)
     payment_items = await crud_payments.ensure_payment_items(session, req_id)
     all_settings = await crud_settings.get_all_settings(session)
@@ -196,7 +218,22 @@ async def request_detail_page(
     probabilities = list(probs_result.scalars().all())
     return templates.TemplateResponse(
         "requests/detail.html",
-        {"request": request, "user": user, "req": req, "counterparties": cps, "users_list": users_list, "equipment": equipment_list, "companies": companies_list, "related_requests": related, "statuses": RequestStatus, "invoices": invoices, "payment_items": payment_items, "settings": settings_dict, "probabilities": probabilities, "active_page": "requests"},
+        {
+            "request": request,
+            "user": user,
+            "req": req,
+            "counterparties": cps,
+            "users_list": users_list,
+            "equipment": equipment_list,
+            "companies": companies_list,
+            "related_requests": related,
+            "statuses": RequestStatus,
+            "invoices": invoices,
+            "payment_items": payment_items,
+            "settings": settings_dict,
+            "probabilities": probabilities,
+            "active_page": "requests",
+        },
     )
 
 
@@ -266,7 +303,17 @@ async def counterparties_page(
     per_page = 20
     return templates.TemplateResponse(
         "counterparties/list.html",
-        {"request": request, "user": user, "items": items, "companies": companies, "page": page, "pages": (total + per_page - 1) // per_page, "total": total, "active_page": "counterparties", "statuses": RequestStatus},
+        {
+            "request": request,
+            "user": user,
+            "items": items,
+            "companies": companies,
+            "page": page,
+            "pages": (total + per_page - 1) // per_page,
+            "total": total,
+            "active_page": "counterparties",
+            "statuses": RequestStatus,
+        },
     )
 
 
@@ -283,6 +330,7 @@ async def counterparties_create_submit(
     email = form.get("email", "").strip()
     if name and email:
         from scr.dbase.schemas.schemas import CounterpartyCreateSchema
+
         data = {
             "name": name,
             "email": email,
@@ -311,8 +359,16 @@ async def counterparties_detail_page(
     directors, _ = await crud_directors.get_dirs(session, per_page=100)
     return templates.TemplateResponse(
         "counterparties/detail.html",
-        {"request": request, "user": user, "cp": cp, "reqs": reqs, "statuses": RequestStatus,
-         "companies": companies, "directors": directors, "active_page": "counterparties"},
+        {
+            "request": request,
+            "user": user,
+            "cp": cp,
+            "reqs": reqs,
+            "statuses": RequestStatus,
+            "companies": companies,
+            "directors": directors,
+            "active_page": "counterparties",
+        },
     )
 
 
@@ -347,7 +403,16 @@ async def companies_page(
     per_page = 20
     return templates.TemplateResponse(
         "companies/list.html",
-        {"request": request, "user": user, "items": items, "directors": directors, "page": page, "pages": (total + per_page - 1) // per_page, "total": total, "active_page": "companies"},
+        {
+            "request": request,
+            "user": user,
+            "items": items,
+            "directors": directors,
+            "page": page,
+            "pages": (total + per_page - 1) // per_page,
+            "total": total,
+            "active_page": "companies",
+        },
     )
 
 
@@ -363,6 +428,7 @@ async def companies_create_submit(
     name = form.get("name", "").strip()
     if name:
         from scr.dbase.schemas.schemas import OrganizationAddSchema
+
         data = {
             "name": name,
             "inn": form.get("inn") or None,
@@ -407,7 +473,15 @@ async def companies_edit_page(
     reqs, _ = await crud_requests.get_requests(session, company_id=org_id, per_page=100)
     return templates.TemplateResponse(
         "companies/edit.html",
-        {"request": request, "user": user, "org": org, "directors": directors, "reqs": reqs, "back_to": back_to, "active_page": "companies"},
+        {
+            "request": request,
+            "user": user,
+            "org": org,
+            "directors": directors,
+            "reqs": reqs,
+            "back_to": back_to,
+            "active_page": "companies",
+        },
     )
 
 
@@ -425,7 +499,15 @@ async def users_page(
     per_page = 20
     return templates.TemplateResponse(
         "users/list.html",
-        {"request": request, "user": user, "items": items, "page": page, "pages": (total + per_page - 1) // per_page, "total": total, "active_page": "users"},
+        {
+            "request": request,
+            "user": user,
+            "items": items,
+            "page": page,
+            "pages": (total + per_page - 1) // per_page,
+            "total": total,
+            "active_page": "users",
+        },
     )
 
 
@@ -444,7 +526,17 @@ async def users_create_submit(
         existing = await crud_users.get_user_by_email(session, email)
         if not existing:
             from scr.dbase.schemas.schemas import UserCreate
-            await crud_users.create_user(session, UserCreate(name=name, email=email, password="123456", city=form.get("city", "ив").strip() or "ив", signature=form.get("signature") or None))
+
+            await crud_users.create_user(
+                session,
+                UserCreate(
+                    name=name,
+                    email=email,
+                    password="123456",
+                    city=form.get("city", "ив").strip() or "ив",
+                    signature=form.get("signature") or None,
+                ),
+            )
             await session.commit()
     return RedirectResponse("/users", status_code=302)
 
@@ -499,7 +591,16 @@ async def directors_page(
     per_page = 20
     return templates.TemplateResponse(
         "directors/list.html",
-        {"request": request, "user": user, "items": items, "positions": positions, "page": page, "pages": (total + per_page - 1) // per_page, "total": total, "active_page": "directors"},
+        {
+            "request": request,
+            "user": user,
+            "items": items,
+            "positions": positions,
+            "page": page,
+            "pages": (total + per_page - 1) // per_page,
+            "total": total,
+            "active_page": "directors",
+        },
     )
 
 
@@ -515,6 +616,7 @@ async def directors_create_submit(
     name = form.get("name", "").strip()
     if name:
         from scr.dbase.schemas.schemas import DirectorSchema
+
         data = {
             "name": name,
             "email": form.get("email") or None,
@@ -542,7 +644,14 @@ async def directors_detail_page(
     positions, _ = await crud_positions.get_all_positions(session, per_page=100)
     return templates.TemplateResponse(
         "directors/detail.html",
-        {"request": request, "user": user, "dir": dir, "positions": positions, "back_to": back_to, "active_page": "directors"},
+        {
+            "request": request,
+            "user": user,
+            "dir": dir,
+            "positions": positions,
+            "back_to": back_to,
+            "active_page": "directors",
+        },
     )
 
 
@@ -576,7 +685,15 @@ async def positions_page(
     per_page = 20
     return templates.TemplateResponse(
         "positions/list.html",
-        {"request": request, "user": user, "items": items, "page": page, "pages": (total + per_page - 1) // per_page, "total": total, "active_page": "positions"},
+        {
+            "request": request,
+            "user": user,
+            "items": items,
+            "page": page,
+            "pages": (total + per_page - 1) // per_page,
+            "total": total,
+            "active_page": "positions",
+        },
     )
 
 
@@ -592,6 +709,7 @@ async def positions_create_submit(
     name = form.get("name", "").strip()
     if name:
         from scr.dbase.schemas.schemas import PositionCreateSchema
+
         await crud_positions.add_position(session, PositionCreateSchema(name=name), created_by=user.name)
         await session.commit()
     return RedirectResponse("/positions", status_code=302)
@@ -630,7 +748,15 @@ async def equipment_page(
     per_page = 20
     return templates.TemplateResponse(
         "equipment/list.html",
-        {"request": request, "user": user, "items": items, "page": page, "pages": (total + per_page - 1) // per_page, "total": total, "active_page": "equipment"},
+        {
+            "request": request,
+            "user": user,
+            "items": items,
+            "page": page,
+            "pages": (total + per_page - 1) // per_page,
+            "total": total,
+            "active_page": "equipment",
+        },
     )
 
 
@@ -646,6 +772,7 @@ async def equipment_create_submit(
     name = form.get("name", "").strip()
     if name:
         from scr.dbase.schemas.schemas import EquipmentCreateSchema
+
         await crud_equipment.add_equipment(session, EquipmentCreateSchema(name=name), created_by=user.name)
         await session.commit()
     return RedirectResponse("/equipment", status_code=302)
@@ -711,9 +838,11 @@ async def invoices_page(
     user = await get_current_user(request, session)
     if not user:
         return RedirectResponse("/", status_code=302)
-    from sqlalchemy import select, func
+    from sqlalchemy import func, select
     from sqlalchemy.orm import selectinload
-    from scr.dbase.models import Invoice, Request as ReqModel
+
+    from scr.dbase.models import Invoice
+    from scr.dbase.models import Request as ReqModel
 
     stmt = (
         select(Invoice)
@@ -731,7 +860,15 @@ async def invoices_page(
     pages = (total + per_page - 1) // per_page
     return templates.TemplateResponse(
         "invoices/list.html",
-        {"request": request, "user": user, "items": items, "page": page, "pages": pages, "total": total, "active_page": "invoices"},
+        {
+            "request": request,
+            "user": user,
+            "items": items,
+            "page": page,
+            "pages": pages,
+            "total": total,
+            "active_page": "invoices",
+        },
     )
 
 
@@ -756,16 +893,34 @@ async def request_calc_page(
         items = []
         for item in mod.items:
             if item.material:
-                items.append({"material": {"name": item.material.name, "price": float(item.material.price)}, "quantity": item.quantity})
+                items.append(
+                    {
+                        "material": {"name": item.material.name, "price": float(item.material.price)},
+                        "quantity": item.quantity,
+                    }
+                )
         return items
 
-    modules_json = json.dumps([{"id": m.id, "name": m.name, "total_price": m.total_price, "items": _mod_items_json(m)} for m in modules_list], ensure_ascii=False)
-    materials_json = json.dumps([{"id": m.id, "name": m.name, "price": float(m.price)} for m in materials], ensure_ascii=False)
+    modules_json = json.dumps(
+        [{"id": m.id, "name": m.name, "total_price": m.total_price, "items": _mod_items_json(m)} for m in modules_list],
+        ensure_ascii=False,
+    )
+    materials_json = json.dumps(
+        [{"id": m.id, "name": m.name, "price": float(m.price)} for m in materials], ensure_ascii=False
+    )
 
     return templates.TemplateResponse(
         "requests/calc.html",
-        {"request": request, "user": user, "req": req, "modules": modules_list, "materials": materials,
-         "modules_json": modules_json, "materials_json": materials_json, "active_page": "requests"},
+        {
+            "request": request,
+            "user": user,
+            "req": req,
+            "modules": modules_list,
+            "materials": materials,
+            "modules_json": modules_json,
+            "materials_json": materials_json,
+            "active_page": "requests",
+        },
     )
 
 
@@ -783,7 +938,15 @@ async def materials_page(
     per_page = 20
     return templates.TemplateResponse(
         "materials/list.html",
-        {"request": request, "user": user, "items": items, "page": page, "pages": (total + per_page - 1) // per_page, "total": total, "active_page": "materials"},
+        {
+            "request": request,
+            "user": user,
+            "items": items,
+            "page": page,
+            "pages": (total + per_page - 1) // per_page,
+            "total": total,
+            "active_page": "materials",
+        },
     )
 
 
@@ -799,6 +962,7 @@ async def materials_create_submit(
     name = form.get("name", "").strip()
     if name:
         from scr.dbase.schemas.schemas import MaterialCreateSchema
+
         data = {
             "name": name,
             "price": float(form.get("price", 0)),
@@ -844,7 +1008,15 @@ async def modules_page(
     per_page = 20
     return templates.TemplateResponse(
         "modules/list.html",
-        {"request": request, "user": user, "items": items, "page": page, "pages": (total + per_page - 1) // per_page, "total": total, "active_page": "modules"},
+        {
+            "request": request,
+            "user": user,
+            "items": items,
+            "page": page,
+            "pages": (total + per_page - 1) // per_page,
+            "total": total,
+            "active_page": "modules",
+        },
     )
 
 
@@ -860,6 +1032,7 @@ async def modules_create_submit(
     name = form.get("name", "").strip()
     if name:
         from scr.dbase.schemas.schemas import ModuleCreateSchema
+
         await crud_modules.add_module(session, ModuleCreateSchema(name=name), created_by=user.name)
         await session.commit()
     return RedirectResponse("/modules", status_code=302)
@@ -888,7 +1061,9 @@ async def modules_detail_page(
         result = []
         for item in module.items:
             if item.material:
-                result.append({"name": item.material.name, "price": float(item.material.price), "quantity": item.quantity * qty})
+                result.append(
+                    {"name": item.material.name, "price": float(item.material.price), "quantity": item.quantity * qty}
+                )
             elif item.sub_module:
                 result.extend(_bom_flat(item.sub_module, item.quantity * qty))
         return result
@@ -896,13 +1071,24 @@ async def modules_detail_page(
     bom_items = _bom_flat(mod)
     bom_total = sum(bi["price"] * bi["quantity"] for bi in bom_items)
 
-    materials_json = json.dumps([{"id": m.id, "name": m.name, "price": float(m.price)} for m in materials], ensure_ascii=False)
+    materials_json = json.dumps(
+        [{"id": m.id, "name": m.name, "price": float(m.price)} for m in materials], ensure_ascii=False
+    )
     modules_json = json.dumps([{"id": m.id, "name": m.name} for m in other_modules], ensure_ascii=False)
 
     return templates.TemplateResponse(
         "modules/detail.html",
-        {"request": request, "user": user, "mod": mod, "materials": materials, "modules": other_modules,
-         "materials_json": materials_json, "modules_json": modules_json,
-         "bom_items": bom_items, "bom_total": bom_total,
-         "back_to": back_to, "active_page": "modules"},
+        {
+            "request": request,
+            "user": user,
+            "mod": mod,
+            "materials": materials,
+            "modules": other_modules,
+            "materials_json": materials_json,
+            "modules_json": modules_json,
+            "bom_items": bom_items,
+            "bom_total": bom_total,
+            "back_to": back_to,
+            "active_page": "modules",
+        },
     )

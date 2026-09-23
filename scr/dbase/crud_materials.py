@@ -1,4 +1,4 @@
-from sqlalchemy import select, Result, func
+from sqlalchemy import Result, func, select
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from scr.dbase.models import Material
@@ -38,9 +38,7 @@ async def get_material_by_name(session: AsyncSession, name: str) -> Material | N
     return result.scalar_one_or_none()
 
 
-async def add_material(
-    session: AsyncSession, in_mat: MaterialCreateSchema, created_by: str | None = None
-) -> Material:
+async def add_material(session: AsyncSession, in_mat: MaterialCreateSchema, created_by: str | None = None) -> Material:
     check_mat = await get_material_by_name(session, in_mat.name)
     if check_mat:
         return check_mat
@@ -51,9 +49,7 @@ async def add_material(
     return mat
 
 
-async def update_material(
-    session: AsyncSession, upd_mat: MaterialUpdateSchema
-) -> Material | None:
+async def update_material(session: AsyncSession, upd_mat: MaterialUpdateSchema) -> Material | None:
     check_mat = await get_material_by_id(session, upd_mat.id)
     if not check_mat:
         return None

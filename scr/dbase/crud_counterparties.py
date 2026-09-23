@@ -1,8 +1,8 @@
-from sqlalchemy import select, Result, func
+from sqlalchemy import Result, func, select
 from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy.orm import selectinload
 
-from scr.dbase.models import Counterparty, Organization, Directors
+from scr.dbase.models import Counterparty, Directors, Organization
 from scr.dbase.schemas.schemas import CounterpartyCreateSchema, CounterpartyUpdateSchema
 
 
@@ -13,9 +13,13 @@ async def get_counterparties(
     page: int = 1,
     per_page: int = 20,
 ) -> tuple[list[Counterparty], int]:
-    stmt = select(Counterparty).options(
-        selectinload(Counterparty.company).selectinload(Organization.director).selectinload(Directors.position)
-    ).order_by(Counterparty.name)
+    stmt = (
+        select(Counterparty)
+        .options(
+            selectinload(Counterparty.company).selectinload(Organization.director).selectinload(Directors.position)
+        )
+        .order_by(Counterparty.name)
+    )
     count_stmt = select(func.count(Counterparty.id))
 
     if company_id:
@@ -32,19 +36,19 @@ async def get_counterparties(
     return list(result.scalars().all()), total
 
 
-async def get_counterparty_by_id(
-    session: AsyncSession, cp_id: int
-) -> Counterparty | None:
-    stmt = select(Counterparty).options(
-        selectinload(Counterparty.company).selectinload(Organization.director).selectinload(Directors.position)
-    ).where(Counterparty.id == cp_id)
+async def get_counterparty_by_id(session: AsyncSession, cp_id: int) -> Counterparty | None:
+    stmt = (
+        select(Counterparty)
+        .options(
+            selectinload(Counterparty.company).selectinload(Organization.director).selectinload(Directors.position)
+        )
+        .where(Counterparty.id == cp_id)
+    )
     result: Result = await session.execute(stmt)
     return result.scalar_one_or_none()
 
 
-async def get_counterparty_by_email(
-    session: AsyncSession, email: str
-) -> Counterparty | None:
+async def get_counterparty_by_email(session: AsyncSession, email: str) -> Counterparty | None:
     stmt = select(Counterparty).where(Counterparty.email == email)
     result: Result = await session.execute(stmt)
     return result.scalar_one_or_none()
@@ -65,9 +69,7 @@ async def add_counterparty(
     return cp
 
 
-async def update_counterparty(
-    session: AsyncSession, upd_cp: CounterpartyUpdateSchema
-) -> Counterparty | None:
+async def update_counterparty(session: AsyncSession, upd_cp: CounterpartyUpdateSchema) -> Counterparty | None:
     check_cp = await get_counterparty_by_id(session, upd_cp.id)
     if not check_cp:
         return None
@@ -78,9 +80,7 @@ async def update_counterparty(
     return check_cp
 
 
-async def delete_counterparty(
-    session: AsyncSession, cp_id: int
-) -> Counterparty | None:
+async def delete_counterparty(session: AsyncSession, cp_id: int) -> Counterparty | None:
     cp = await session.get(Counterparty, cp_id)
     if cp:
         await session.delete(cp)

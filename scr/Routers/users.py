@@ -1,9 +1,9 @@
-from fastapi import APIRouter, HTTPException, Depends
+from fastapi import APIRouter, Depends, HTTPException
 from pydantic import BaseModel, ConfigDict
-from typing import Optional
 from sqlalchemy.ext.asyncio import AsyncSession
-from scr.dbase.database import db_helper
+
 from scr.dbase import crud_users
+from scr.dbase.database import db_helper
 
 users_router = APIRouter(prefix="/api/users", tags=["Users"])
 
@@ -11,10 +11,10 @@ users_router = APIRouter(prefix="/api/users", tags=["Users"])
 class UserUpdate(BaseModel):
     model_config = ConfigDict(from_attributes=True)
     id: int
-    name: Optional[str] = None
-    email: Optional[str] = None
-    city: Optional[str] = None
-    signature: Optional[str] = None
+    name: str | None = None
+    email: str | None = None
+    city: str | None = None
+    signature: str | None = None
 
 
 @users_router.patch("/{user_id}")

@@ -1,8 +1,9 @@
 from fastapi import APIRouter, Depends
-from sqlalchemy.ext.asyncio import AsyncSession
-from scr.dbase.database import db_helper
-from scr.dbase import crud_settings
 from pydantic import BaseModel
+from sqlalchemy.ext.asyncio import AsyncSession
+
+from scr.dbase import crud_settings
+from scr.dbase.database import db_helper
 
 settings_router = APIRouter(prefix="/api/settings", tags=["Settings"])
 

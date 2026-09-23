@@ -1,19 +1,18 @@
 from fastapi import APIRouter, Depends
 from sqlalchemy.ext.asyncio import AsyncSession
-from scr.dbase.database import db_helper
+
 from scr.dbase import crud_payments
+from scr.dbase.database import db_helper
 from scr.dbase.schemas.schemas import (
-    PaymentItemUpdateSchema,
     PaymentItemResponseSchema,
+    PaymentItemUpdateSchema,
 )
 
 pay_router = APIRouter(prefix="/api/payments", tags=["Payments"])
 
 
 @pay_router.get("/by-request/{request_id}", response_model=list[PaymentItemResponseSchema])
-async def read_payments(
-    request_id: int, session: AsyncSession = Depends(db_helper.session_dependency)
-):
+async def read_payments(request_id: int, session: AsyncSession = Depends(db_helper.session_dependency)):
     return await crud_payments.ensure_payment_items(session, request_id)
 
 
@@ -27,6 +26,7 @@ async def update_payment(
     result = await crud_payments.update_payment_item(session, data)
     if not result:
         from fastapi import HTTPException
+
         raise HTTPException(status_code=404, detail="Платёж не найден")
     await session.commit()
     return result
