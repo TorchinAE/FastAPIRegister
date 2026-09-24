@@ -12,7 +12,7 @@
             <h1>Регистрация</h1>
             <p class="auth-subtitle">Создайте новый аккаунт</p>
             {% if error %}<div class="alert alert-error">{{ error }}</div>{% endif %}
-            <form method="post" action="/register">
+            <form method="post" action="/reg/register">
                 <div class="form-group">
                     <label>Имя</label>
                     <input type="text" name="name" required placeholder="Иван Иванов">
@@ -29,7 +29,7 @@
                     <button type="submit" class="btn btn-success" style="flex:1;justify-content:center;">Зарегистрироваться</button>
                 </div>
             </form>
-            <div class="auth-link">Уже есть аккаунт? <a href="/">Войти</a></div>
+            <div class="auth-link">Уже есть аккаунт? <a href="login">Войти</a></div>
         </div>
     </div>
 </body>

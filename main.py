@@ -2,7 +2,8 @@
 from contextlib import asynccontextmanager
 
 import uvicorn
-from fastapi import FastAPI
+from fastapi import FastAPI, Request
+from fastapi.responses import HTMLResponse
 from fastapi.staticfiles import StaticFiles
 from fastapi.templating import Jinja2Templates
 
@@ -56,22 +57,30 @@ os.makedirs(templates_dir, exist_ok=True)
 app.mount("/static", StaticFiles(directory=static_dir), name="static")
 templates = Jinja2Templates(directory=templates_dir)
 
+
+@app.exception_handler(404)
+async def not_found_handler(request: Request, exc):
+    return HTMLResponse(
+        status_code=404,
+        content=templates.get_template("404.html").render(request=request),
+    )
+
 # API routers
-app.include_router(auth_router)
-app.include_router(router)
-app.include_router(dir_router)
-app.include_router(pos_router)
-app.include_router(org_router)
-app.include_router(cp_router)
-app.include_router(req_router)
-app.include_router(eq_router)
-app.include_router(inv_router)
-app.include_router(pay_router)
-app.include_router(settings_router)
-app.include_router(users_router)
-app.include_router(mat_router)
-app.include_router(mod_router)
-app.include_router(pages_router)
+app.include_router(auth_router, prefix="/reg")
+app.include_router(router, prefix="/reg")
+app.include_router(dir_router, prefix="/reg")
+app.include_router(pos_router, prefix="/reg")
+app.include_router(org_router, prefix="/reg")
+app.include_router(cp_router, prefix="/reg")
+app.include_router(req_router, prefix="/reg")
+app.include_router(eq_router, prefix="/reg")
+app.include_router(inv_router, prefix="/reg")
+app.include_router(pay_router, prefix="/reg")
+app.include_router(settings_router, prefix="/reg")
+app.include_router(users_router, prefix="/reg")
+app.include_router(mat_router, prefix="/reg")
+app.include_router(mod_router, prefix="/reg")
+app.include_router(pages_router, prefix="/reg")
 
 
 if __name__ == "__main__":
