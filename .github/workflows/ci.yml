@@ -2,10 +2,10 @@ name: CI/CD
 
 on:
   push:
-    branches: [feature/calc-module]
+    branches: [main]
 
   pull_request:
-    branches: [feature/calc-module]
+    branches: [main]
 
 
 jobs:
@@ -75,7 +75,7 @@ jobs:
 
     runs-on: ubuntu-latest
 
-    if: github.ref == 'refs/heads/feature/calc-module' && github.event_name == 'push'
+    if: github.ref == 'refs/heads/main' && github.event_name == 'push'
 
     steps:
       - name: Checkout
@@ -108,23 +108,23 @@ jobs:
 
             git remote set-url origin https://github.com/TorchinAE/FastAPIRegister.git
 
-            git fetch origin feature/calc-module
+            git fetch origin main
 
-            git reset --hard origin/feature/calc-module
+            git reset --hard origin/main
 
             # --------------------------------------
-            # Python environment
+            # Python environment (uv)
             # --------------------------------------
 
             echo "Setting up Python environment..."
 
-            python3 -m venv venv 2>/dev/null || true
+            export PATH="$HOME/.local/bin:$PATH"
 
-            source venv/bin/activate
+            if ! command -v uv &>/dev/null; then
+              curl -LsSf https://astral.sh/uv/install.sh | sh
+            fi
 
-            python -m pip install --upgrade pip
-
-            pip install -r requirements.txt
+            uv sync
 
             # --------------------------------------
             # Systemd service

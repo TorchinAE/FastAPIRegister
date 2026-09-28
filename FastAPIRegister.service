@@ -7,9 +7,9 @@ Type=simple
 User=root
 Group=root
 WorkingDirectory=/root/FastAPIRegister
-Environment="PATH=/root/FastAPIRegister/venv/bin"
+Environment="PATH=/root/FastAPIRegister/.venv/bin"
 EnvironmentFile=/root/FastAPIRegister/.env
-ExecStart=/root/FastAPIRegister/venv/bin/uvicorn main:app --host 127.0.0.1 --port 8000
+ExecStart=/root/FastAPIRegister/.venv/bin/uvicorn main:app --host 127.0.0.1 --port 8000
 Restart=always
 RestartSec=3
 
