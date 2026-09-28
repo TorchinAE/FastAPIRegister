@@ -6,7 +6,10 @@
         <h1>{{ mod.name }}</h1>
         <div class="subtitle">Модуль #{{ mod.id }} &middot; Стоимость: {{ "%.2f"|format(mod.total_price) }}</div>
     </div>
-    <a href="{{ back_to or '/modules' }}" class="btn btn-ghost">← Назад</a>
+    <div style="display:flex;gap:0.5rem;">
+        <a href="/reg/api/modules/{{ mod.id }}/export-excel" class="btn btn-ghost" download>Скачать Excel</a>
+        <a href="{{ back_to or '/modules' }}" class="btn btn-ghost">← Назад</a>
+    </div>
 </div>
 
 <div class="card">
@@ -63,7 +66,7 @@
             {% for item in mod.items %}
             <tr data-item-id="{{ item.id }}">
                 <td>{% if item.material_id %}Материал{% else %}Модуль{% endif %}</td>
-                <td>{% if item.material %}{{ item.material.name }}{% elif item.sub_module_name %}{{ item.sub_module_name }}{% endif %}</td>
+                <td>{% if item.material %}<a href="/reg/materials/{{ item.material_id }}" onclick="event.stopPropagation()">{{ item.material.name }}</a>{% elif item.sub_module %}<a href="/reg/modules/{{ item.sub_module_id }}" onclick="event.stopPropagation()">{{ item.sub_module.name }}</a>{% endif %}</td>
                 <td>{% if item.material %}{{ "%.2f"|format(item.material.price) }}{% endif %}</td>
                 <td>{{ item.quantity }}</td>
                 <td>{% if item.material %}{{ "%.2f"|format(item.material.price * item.quantity) }}{% endif %}</td>
@@ -163,7 +166,7 @@ async function addItem() {
 
 async function deleteItem(itemId, btn) {
     if (!confirm('Удалить компонент?')) return;
-    const resp = await fetch(`/api/modules/items/${itemId}`, {method: 'DELETE'});
+    const resp = await fetch(`/reg/api/modules/items/${itemId}`, {method: 'DELETE'});
     if (resp.ok) { btn.closest('tr').remove(); showToast('Удалено'); } else { showToast('Ошибка'); }
 }
 

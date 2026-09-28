@@ -172,10 +172,9 @@ function showToast(msg) {
 document.querySelectorAll('.tf-input').forEach(input => {
     input.addEventListener('input', function() {
         const col = parseInt(this.dataset.col);
-        const minLen = parseInt(this.dataset.min) || 3;
         const val = this.value.toLowerCase();
         document.querySelectorAll('#dataTable tbody tr:not(.empty-row)').forEach(row => {
-            if (val.length < minLen) { row.style.display = ''; return; }
+            if (val.length < 1) { row.style.display = ''; return; }
             const cell = row.cells[col];
             row.style.display = cell && cell.textContent.toLowerCase().includes(val) ? '' : 'none';
         });

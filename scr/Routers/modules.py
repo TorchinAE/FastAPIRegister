@@ -167,6 +167,32 @@ async def import_modules_excel(
     return {"message": f"Импортировано модулей: {imported}", "imported": imported}
 
 
+@mod_router.get("/{mod_id}/export-excel")
+async def export_module_excel(mod_id: int, session: AsyncSession = Depends(db_helper.session_dependency)):
+    mod = await crud_modules.get_module_by_id(session=session, mod_id=mod_id)
+    if not mod:
+        raise HTTPException(status_code=404, detail="Модуль не найден")
+    wb = Workbook()
+    ws = wb.active
+    ws.title = "Состав модуля"
+    ws.append(["Тип", "Название", "Цена за ед.", "Количество", "Сумма"])
+    for item in mod.items:
+        if item.material:
+            ws.append(["Материал", item.material.name, float(item.material.price), item.quantity, float(item.material.price) * item.quantity])
+        elif item.sub_module:
+            ws.append(["Модуль", item.sub_module.name, float(item.sub_module.total_price), item.quantity, float(item.sub_module.total_price) * item.quantity])
+    ws.append([])
+    ws.append(["", "", "", "Итого:", float(mod.total_price)])
+    buf = io.BytesIO()
+    wb.save(buf)
+    buf.seek(0)
+    return StreamingResponse(
+        buf,
+        media_type="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
+        headers={"Content-Disposition": f"attachment; filename=module_{mod_id}.xlsx"},
+    )
+
+
 @mod_router.get("/{mod_id}", response_model=ModuleFullResponseSchema)
 async def read_module(mod_id: int, session: AsyncSession = Depends(db_helper.session_dependency)):
     mod = await crud_modules.get_module_by_id(session=session, mod_id=mod_id)

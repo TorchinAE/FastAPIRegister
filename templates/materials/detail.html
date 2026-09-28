@@ -74,6 +74,7 @@ document.getElementById('editMatForm').addEventListener('submit', async function
     });
     if (resp.ok) {
         showToast('Сохранено');
+        setTimeout(() => window.location.href = '/reg/materials/', 800);
     } else {
         const err = await resp.json();
         showToast('Ошибка: ' + (err.detail || 'не удалось сохранить'));

@@ -41,6 +41,7 @@ document.getElementById('editForm').addEventListener('submit', async function(e)
     });
     if (resp.ok) {
         showToast('Сохранено');
+        setTimeout(() => window.location.href = '/reg/material-types/', 800);
     } else {
         const err = await resp.json();
         showToast('Ошибка: ' + (err.detail || 'не удалось сохранить'));
