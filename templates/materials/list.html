@@ -42,22 +42,39 @@
         <label>URL агент</label>
         <input type="text" name="url_agent" placeholder="URL">
     </div>
+    <div class="form-group" style="flex:1; min-width:80px; margin-bottom:0;">
+        <label>Ном Ток</label>
+        <input type="number" name="nom_tok" value="0" min="0" max="7000">
+    </div>
+    <div class="form-group" style="display:flex;gap:0.75rem;flex-wrap:wrap;margin-bottom:0;">
+        <label style="display:flex;align-items:center;gap:0.25rem;"><input type="checkbox" name="stats" checked> стац</label>
+        <label style="display:flex;align-items:center;gap:0.25rem;"><input type="checkbox" name="vtych"> втыч</label>
+        <label style="display:flex;align-items:center;gap:0.25rem;"><input type="checkbox" name="vykat"> выкат</label>
+        <label style="display:flex;align-items:center;gap:0.25rem;"><input type="checkbox" name="ruchn" checked> ручн</label>
+        <label style="display:flex;align-items:center;gap:0.25rem;"><input type="checkbox" name="el_priv"> эл.прив</label>
+    </div>
     <button type="submit" class="btn btn-success" style="height:38px;">Добавить</button>
 </form>
 <div class="table-wrap">
     <table id="dataTable">
         <thead>
             <tr>
-                <th>ID</th><th>Тип</th><th>Название</th><th>Цена</th><th>Код 1С</th><th>Код агент</th><th>URL агент</th><th></th>
+                <th>ID</th><th>Тип</th><th>Название</th><th>Цена</th><th>Ном Ток</th><th>стац</th><th>втыч</th><th>выкат</th><th>ручн</th><th>эл.прив</th><th>Код 1С</th><th>Код агент</th><th>URL агент</th><th></th>
             </tr>
             <tr class="table-filter">
                 <th><input type="text" data-col="0" data-min="1" placeholder="Фильтр..." class="tf-input"></th>
                 <th><input type="text" data-col="1" placeholder="Фильтр..." class="tf-input"></th>
                 <th><input type="text" data-col="2" placeholder="Фильтр..." class="tf-input"></th>
                 <th><input type="text" data-col="3" placeholder="Фильтр..." class="tf-input"></th>
-                <th><input type="text" data-col="4" placeholder="Фильтр..." class="tf-input"></th>
-                <th><input type="text" data-col="5" placeholder="Фильтр..." class="tf-input"></th>
-                <th><input type="text" data-col="6" placeholder="Фильтр..." class="tf-input"></th>
+                <th></th>
+                <th></th>
+                <th></th>
+                <th></th>
+                <th></th>
+                <th></th>
+                <th><input type="text" data-col="10" placeholder="Фильтр..." class="tf-input"></th>
+                <th><input type="text" data-col="11" placeholder="Фильтр..." class="tf-input"></th>
+                <th><input type="text" data-col="12" placeholder="Фильтр..." class="tf-input"></th>
                 <th></th>
             </tr>
         </thead>
@@ -68,6 +85,12 @@
                 <td>{% if item.type %}<a href="/reg/material-types/{{ item.type_id }}" onclick="event.stopPropagation()">{{ item.type.name }}</a>{% endif %}</td>
                 <td>{{ item.name }}</td>
                 <td>{{ item.price|money }}</td>
+                <td>{{ item.nom_tok }}</td>
+                <td style="text-align:center">{{ '✓' if item.stats else '' }}</td>
+                <td style="text-align:center">{{ '✓' if item.vtych else '' }}</td>
+                <td style="text-align:center">{{ '✓' if item.vykat else '' }}</td>
+                <td style="text-align:center">{{ '✓' if item.ruchn else '' }}</td>
+                <td style="text-align:center">{{ '✓' if item.el_priv else '' }}</td>
                 <td>{{ item.code_1c or '' }}</td>
                 <td>{{ item.code_agent or '' }}</td>
                 <td>{{ item.url_agent or '' }}</td>
@@ -76,7 +99,7 @@
                 </td>
             </tr>
             {% endfor %}
-            {% if not items %}<tr class="empty-row"><td colspan="8">Нет материалов</td></tr>{% endif %}
+            {% if not items %}<tr class="empty-row"><td colspan="14">Нет материалов</td></tr>{% endif %}
         </tbody>
     </table>
 </div>

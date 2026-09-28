@@ -984,6 +984,12 @@ async def materials_create_submit(
             "code_1c": form.get("code_1c") or None,
             "code_agent": form.get("code_agent") or None,
             "url_agent": form.get("url_agent") or None,
+            "nom_tok": int(form.get("nom_tok", 0)),
+            "stats": form.get("stats") == "on",
+            "vtych": form.get("vtych") == "on",
+            "vykat": form.get("vykat") == "on",
+            "ruchn": form.get("ruchn") == "on",
+            "el_priv": form.get("el_priv") == "on",
         }
         if form.get("type_id"):
             data["type_id"] = int(form["type_id"])

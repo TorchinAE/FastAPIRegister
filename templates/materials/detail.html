@@ -43,6 +43,27 @@
                 <input type="text" name="url_agent" value="{{ mat.url_agent or '' }}" style="width:100%;min-width:0">
             </div>
         </div>
+        <div class="form-row" style="grid-template-columns: 1fr 1fr 1fr 1fr 1fr 1fr;">
+            <div class="form-group">
+                <label>Ном Ток</label>
+                <input type="number" name="nom_tok" value="{{ mat.nom_tok }}" min="0" max="7000" style="width:100%;min-width:0">
+            </div>
+            <div class="form-group" style="display:flex;align-items:flex-end;">
+                <label style="display:flex;align-items:center;gap:0.25rem;padding-bottom:0.5rem;"><input type="checkbox" name="stats" {{ 'checked' if mat.stats else '' }}> стац</label>
+            </div>
+            <div class="form-group" style="display:flex;align-items:flex-end;">
+                <label style="display:flex;align-items:center;gap:0.25rem;padding-bottom:0.5rem;"><input type="checkbox" name="vtych" {{ 'checked' if mat.vtych else '' }}> втыч</label>
+            </div>
+            <div class="form-group" style="display:flex;align-items:flex-end;">
+                <label style="display:flex;align-items:center;gap:0.25rem;padding-bottom:0.5rem;"><input type="checkbox" name="vykat" {{ 'checked' if mat.vykat else '' }}> выкат</label>
+            </div>
+            <div class="form-group" style="display:flex;align-items:flex-end;">
+                <label style="display:flex;align-items:center;gap:0.25rem;padding-bottom:0.5rem;"><input type="checkbox" name="ruchn" {{ 'checked' if mat.ruchn else '' }}> ручн</label>
+            </div>
+            <div class="form-group" style="display:flex;align-items:flex-end;">
+                <label style="display:flex;align-items:center;gap:0.25rem;padding-bottom:0.5rem;"><input type="checkbox" name="el_priv" {{ 'checked' if mat.el_priv else '' }}> эл.прив</label>
+            </div>
+        </div>
         <div class="actions">
             <button type="submit" class="btn btn-primary">Сохранить</button>
             <button type="button" class="btn btn-danger" onclick="deleteMat()">Удалить</button>
@@ -66,6 +87,12 @@ document.getElementById('editMatForm').addEventListener('submit', async function
         code_agent: fd.get('code_agent') || null,
         url_agent: fd.get('url_agent') || null,
         type_id: fd.get('type_id') ? parseInt(fd.get('type_id')) : null,
+        nom_tok: parseInt(fd.get('nom_tok')) || 0,
+        stats: this.querySelector('[name="stats"]').checked,
+        vtych: this.querySelector('[name="vtych"]').checked,
+        vykat: this.querySelector('[name="vykat"]').checked,
+        ruchn: this.querySelector('[name="ruchn"]').checked,
+        el_priv: this.querySelector('[name="el_priv"]').checked,
     };
     const resp = await fetch('/reg/api/materials/', {
         method: 'PATCH',

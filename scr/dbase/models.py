@@ -278,6 +278,12 @@ class Material(BaseID):
     code_agent: Mapped[str | None] = mapped_column(String(100), nullable=True)
     url_agent: Mapped[str | None] = mapped_column(String(500), nullable=True)
     type_id: Mapped[int | None] = mapped_column(ForeignKey("material_types.id", ondelete="SET NULL"), nullable=True)
+    nom_tok: Mapped[int] = mapped_column(Integer, default=0, nullable=False)
+    stats: Mapped[bool] = mapped_column(default=True, nullable=False)
+    vtych: Mapped[bool] = mapped_column(default=False, nullable=False)
+    vykat: Mapped[bool] = mapped_column(default=False, nullable=False)
+    ruchn: Mapped[bool] = mapped_column(default=True, nullable=False)
+    el_priv: Mapped[bool] = mapped_column(default=False, nullable=False)
 
     type: Mapped[Optional["MaterialType"]] = relationship(foreign_keys=[type_id])
 

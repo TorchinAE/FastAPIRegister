@@ -23,6 +23,7 @@
         </div>
         <div class="actions">
             <button type="submit" class="btn btn-primary">Сохранить</button>
+            <button type="button" class="btn btn-ghost" onclick="duplicateMod()">Дублировать</button>
             <button type="button" class="btn btn-danger" onclick="deleteMod()">Удалить</button>
         </div>
     </form>
@@ -182,6 +183,16 @@ document.getElementById('editModForm').addEventListener('submit', async function
     if (resp.ok) showToast('Сохранено');
     else showToast('Ошибка сохранения');
 });
+
+async function duplicateMod() {
+    const resp = await fetch('/reg/api/modules/{{ mod.id }}/duplicate', {method: 'POST'});
+    if (resp.ok) {
+        const data = await resp.json();
+        window.location.href = '/reg/modules/' + data.id;
+    } else {
+        showToast('Ошибка дублирования');
+    }
+}
 
 async function deleteMod() {
     if (!confirm('Удалить модуль {{ mod.name }}?')) return;

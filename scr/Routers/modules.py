@@ -209,6 +209,36 @@ async def export_module_excel(mod_id: int, session: AsyncSession = Depends(db_he
     )
 
 
+@mod_router.post("/{mod_id}/duplicate", response_model=ModuleFullResponseSchema)
+async def duplicate_module(mod_id: int, session: AsyncSession = Depends(db_helper.session_dependency)):
+    mod = await crud_modules.get_module_by_id(session=session, mod_id=mod_id)
+    if not mod:
+        raise HTTPException(status_code=404, detail="Модуль не найден")
+    new_name = f"{mod.name} - копия"
+    new_mod = await crud_modules.add_module(session=session, in_mod=ModuleCreateSchema(name=new_name))
+    await session.flush()
+    for item in mod.items:
+        await crud_modules.add_module_item(
+            session,
+            new_mod.id,
+            ModuleItemCreateSchema(
+                material_id=item.material_id,
+                sub_module_id=item.sub_module_id,
+                quantity=item.quantity,
+            ),
+        )
+    await session.commit()
+    new_mod = await crud_modules.get_module_by_id(session=session, mod_id=new_mod.id)
+    items_resp = [_module_item_to_response(i) for i in new_mod.items]
+    return ModuleFullResponseSchema(
+        id=new_mod.id,
+        name=new_mod.name,
+        items=items_resp,
+        total_price=new_mod.total_price,
+        created_by=new_mod.created_by,
+    )
+
+
 @mod_router.get("/{mod_id}", response_model=ModuleFullResponseSchema)
 async def read_module(mod_id: int, session: AsyncSession = Depends(db_helper.session_dependency)):
     mod = await crud_modules.get_module_by_id(session=session, mod_id=mod_id)

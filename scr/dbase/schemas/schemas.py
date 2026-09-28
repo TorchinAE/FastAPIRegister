@@ -214,6 +214,12 @@ class MaterialCreateSchema(BaseModel):
     code_agent: str | None = None
     url_agent: str | None = None
     type_id: int | None = None
+    nom_tok: int = Field(0, ge=0, le=7000)
+    stats: bool = True
+    vtych: bool = False
+    vykat: bool = False
+    ruchn: bool = True
+    el_priv: bool = False
 
 
 class MaterialUpdateSchema(BaseModel):
@@ -226,6 +232,12 @@ class MaterialUpdateSchema(BaseModel):
     code_agent: str | None = None
     url_agent: str | None = None
     type_id: int | None = None
+    nom_tok: int | None = Field(None, ge=0, le=7000)
+    stats: bool | None = None
+    vtych: bool | None = None
+    vykat: bool | None = None
+    ruchn: bool | None = None
+    el_priv: bool | None = None
 
 
 class MaterialResponseSchema(BaseModel):
@@ -239,6 +251,12 @@ class MaterialResponseSchema(BaseModel):
     url_agent: str | None = None
     type_id: int | None = None
     type_name: str | None = None
+    nom_tok: int = 0
+    stats: bool = True
+    vtych: bool = False
+    vykat: bool = False
+    ruchn: bool = True
+    el_priv: bool = False
     created_by: str | None = None
 
 

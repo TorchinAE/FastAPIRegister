@@ -425,7 +425,7 @@ document.getElementById('factory-order-num').addEventListener('input', function(
 });
 
 // === Payment items ===
-document.getElementById('payment-items').addEventListener('input', e => {
+function handlePaymentInput(e) {
     const row = e.target.closest('.payment-row');
     if (!row) return;
     const cost = getCost();
@@ -442,7 +442,9 @@ document.getElementById('payment-items').addEventListener('input', e => {
         }
     }
     savePayment(row);
-});
+}
+document.getElementById('payment-items').addEventListener('input', handlePaymentInput);
+document.getElementById('payment-items').addEventListener('change', handlePaymentInput);
 
 function highlightPaymentRow(row) {
     const amount = parseNum(row.querySelector('.pay-amount')?.value);
