@@ -15,6 +15,7 @@ from scr.Routers.counterparties import cp_router
 from scr.Routers.directors import dir_router
 from scr.Routers.equipment import eq_router
 from scr.Routers.invoices import inv_router
+from scr.Routers.material_types import mt_router
 from scr.Routers.materials import mat_router
 from scr.Routers.modules import mod_router
 from scr.Routers.pages import pages_router
@@ -80,6 +81,7 @@ app.include_router(pay_router, prefix="/reg")
 app.include_router(settings_router, prefix="/reg")
 app.include_router(users_router, prefix="/reg")
 app.include_router(mat_router, prefix="/reg")
+app.include_router(mt_router, prefix="/reg")
 app.include_router(mod_router, prefix="/reg")
 app.include_router(pages_router, prefix="/reg")
 

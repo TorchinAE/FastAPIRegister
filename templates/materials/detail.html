@@ -12,7 +12,7 @@
 <div class="card">
     <form id="editMatForm">
         <input type="hidden" name="id" value="{{ mat.id }}">
-        <div class="form-row" style="grid-template-columns: 1fr 1fr;">
+        <div class="form-row" style="grid-template-columns: 1fr 1fr 1fr;">
             <div class="form-group">
                 <label>Название</label>
                 <input type="text" name="name" value="{{ mat.name }}" required style="width:100%;min-width:0">
@@ -20,6 +20,13 @@
             <div class="form-group">
                 <label>Цена</label>
                 <input type="number" name="price" value="{{ mat.price }}" step="0.01" min="0" style="width:100%;min-width:0">
+            </div>
+            <div class="form-group">
+                <label>Тип</label>
+                <select name="type_id" style="width:100%;min-width:0">
+                    <option value="">—</option>
+                    {% for t in types %}<option value="{{ t.id }}" {{ 'selected' if mat.type_id == t.id else '' }}>{{ t.name }}</option>{% endfor %}
+                </select>
             </div>
         </div>
         <div class="form-row" style="grid-template-columns: 1fr 1fr 1fr;">
@@ -58,6 +65,7 @@ document.getElementById('editMatForm').addEventListener('submit', async function
         code_1c: fd.get('code_1c') || null,
         code_agent: fd.get('code_agent') || null,
         url_agent: fd.get('url_agent') || null,
+        type_id: fd.get('type_id') ? parseInt(fd.get('type_id')) : null,
     };
     const resp = await fetch('/reg/api/materials/', {
         method: 'PATCH',

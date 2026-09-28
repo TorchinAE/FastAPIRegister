@@ -10,7 +10,7 @@
         <a href="/reg/api/materials/export-excel" class="btn btn-ghost" download>Скачать Excel</a>
         <label class="btn btn-ghost" style="cursor:pointer;">
             Загрузить Excel
-            <input type="file" accept=".xlsx,.xls" style="display:none" onchange="importExcel(this)">
+            <input type="file" accept=".xlsx,.xls" style="display:none" id="excelInput" onchange="importExcel(this)">
         </label>
     </div>
 </div>
@@ -22,6 +22,13 @@
     <div class="form-group" style="flex:1; min-width:100px; margin-bottom:0;">
         <label>Цена</label>
         <input type="number" name="price" placeholder="0" step="0.01" min="0" value="0">
+    </div>
+    <div class="form-group" style="flex:1; min-width:120px; margin-bottom:0;">
+        <label>Тип</label>
+        <select name="type_id">
+            <option value="">—</option>
+            {% for t in types %}<option value="{{ t.id }}">{{ t.name }}</option>{% endfor %}
+        </select>
     </div>
     <div class="form-group" style="flex:1; min-width:100px; margin-bottom:0;">
         <label>Код 1С</label>
@@ -41,7 +48,7 @@
     <table id="dataTable">
         <thead>
             <tr>
-                <th>ID</th><th>Название</th><th>Цена</th><th>Код 1С</th><th>Код агент</th><th>URL агент</th><th></th>
+                <th>ID</th><th>Тип</th><th>Название</th><th>Цена</th><th>Код 1С</th><th>Код агент</th><th>URL агент</th><th></th>
             </tr>
             <tr class="table-filter">
                 <th><input type="text" data-col="0" data-min="1" placeholder="Фильтр..." class="tf-input"></th>
@@ -50,6 +57,7 @@
                 <th><input type="text" data-col="3" placeholder="Фильтр..." class="tf-input"></th>
                 <th><input type="text" data-col="4" placeholder="Фильтр..." class="tf-input"></th>
                 <th><input type="text" data-col="5" placeholder="Фильтр..." class="tf-input"></th>
+                <th><input type="text" data-col="6" placeholder="Фильтр..." class="tf-input"></th>
                 <th></th>
             </tr>
         </thead>
@@ -57,6 +65,7 @@
             {% for item in items %}
             <tr style="cursor:pointer" onclick="location.href='/reg/materials/{{ item.id }}'">
                 <td><strong>{{ item.id }}</strong></td>
+                <td>{% if item.type %}<a href="/reg/material-types/{{ item.type_id }}" onclick="event.stopPropagation()">{{ item.type.name }}</a>{% endif %}</td>
                 <td>{{ item.name }}</td>
                 <td>{{ "%.2f"|format(item.price) }}</td>
                 <td>{{ item.code_1c or '' }}</td>
@@ -67,7 +76,7 @@
                 </td>
             </tr>
             {% endfor %}
-            {% if not items %}<tr class="empty-row"><td colspan="7">Нет материалов</td></tr>{% endif %}
+            {% if not items %}<tr class="empty-row"><td colspan="8">Нет материалов</td></tr>{% endif %}
         </tbody>
     </table>
 </div>
@@ -78,30 +87,84 @@
     {% endfor %}
 </div>
 {% endif %}
+
+<!-- Conflict confirmation modal -->
+<div id="conflictModal" style="display:none;position:fixed;top:0;left:0;width:100%;height:100%;background:rgba(0,0,0,0.5);z-index:1000;justify-content:center;align-items:center;">
+    <div style="background:#fff;padding:1.5rem;border-radius:8px;max-width:600px;width:90%;max-height:80vh;overflow-y:auto;">
+        <h3 style="margin-top:0;">Найдены совпадения</h3>
+        <p>Следующие материалы совпадают по ID и цене:</p>
+        <table style="width:100%;border-collapse:collapse;margin-bottom:1rem;">
+            <thead><tr style="border-bottom:2px solid #ccc;"><th style="text-align:left;padding:4px;">ID</th><th style="text-align:left;padding:4px;">Имя</th><th style="text-align:left;padding:4px;">Цена</th></tr></thead>
+            <tbody id="conflictList"></tbody>
+        </table>
+        <div style="display:flex;gap:0.5rem;justify-content:flex-end;">
+            <button class="btn btn-ghost" onclick="closeModal()">Отмена</button>
+            <button class="btn btn-danger" onclick="confirmImport()">Перезаписать всё</button>
+        </div>
+    </div>
+</div>
+
 <div id="toast" class="toast" style="display:none"></div>
 {% endblock %}
 
 {% block scripts %}
 <script>
+let pendingFile = null;
+
 async function deleteMat(id, btn) {
     if (!confirm('Удалить материал?')) return;
-    const resp = await fetch(`/api/materials/${id}`, {method: 'DELETE'});
+    const resp = await fetch(`/reg/api/materials/${id}`, {method: 'DELETE'});
     if (resp.ok) { btn.closest('tr').remove(); showToast('Удалено'); } else { showToast('Ошибка удаления'); }
 }
+
 async function importExcel(input) {
     if (!input.files.length) return;
+    pendingFile = input.files[0];
     const fd = new FormData();
-    fd.append('file', input.files[0]);
+    fd.append('file', pendingFile);
     const resp = await fetch('/reg/api/materials/import-excel', {method: 'POST', body: fd});
     if (resp.ok) {
         const data = await resp.json();
-        showToast(data.message);
-        setTimeout(() => location.reload(), 1000);
+        if (data.status === 'confirm') {
+            showConflictModal(data.conflicts);
+        } else {
+            showToast(data.message);
+            setTimeout(() => location.reload(), 1000);
+        }
     } else {
         showToast('Ошибка импорта');
     }
     input.value = '';
 }
+
+function showConflictModal(conflicts) {
+    const list = document.getElementById('conflictList');
+    list.innerHTML = conflicts.map(c =>
+        `<tr style="border-bottom:1px solid #eee;"><td style="padding:4px;">${c.id}</td><td style="padding:4px;">${c.old_name} → ${c.name}</td><td style="padding:4px;">${c.price}</td></tr>`
+    ).join('');
+    document.getElementById('conflictModal').style.display = 'flex';
+}
+
+function closeModal() {
+    document.getElementById('conflictModal').style.display = 'none';
+    pendingFile = null;
+}
+
+async function confirmImport() {
+    if (!pendingFile) return;
+    const fd = new FormData();
+    fd.append('file', pendingFile);
+    const resp = await fetch('/reg/api/materials/import-excel-confirm', {method: 'POST', body: fd});
+    if (resp.ok) {
+        const data = await resp.json();
+        showToast(data.message);
+        closeModal();
+        setTimeout(() => location.reload(), 1000);
+    } else {
+        showToast('Ошибка импорта');
+    }
+}
+
 function showToast(msg) {
     const t = document.getElementById('toast'); t.textContent = msg;
     t.style.display = 'block'; setTimeout(() => t.style.display = 'none', 2500);

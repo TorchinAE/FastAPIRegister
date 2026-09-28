@@ -8,6 +8,7 @@ from scr.dbase import (
     crud_directors,
     crud_equipment,
     crud_invoices,
+    crud_material_types,
     crud_materials,
     crud_modules,
     crud_organizations,
@@ -935,6 +936,7 @@ async def materials_page(
     if not user:
         return RedirectResponse("/reg/", status_code=302)
     items, total = await crud_materials.get_materials(session, page=page)
+    types, _ = await crud_material_types.get_all_types(session, per_page=10000)
     per_page = 20
     return templates.TemplateResponse(
         "materials/list.html",
@@ -942,6 +944,7 @@ async def materials_page(
             "request": request,
             "user": user,
             "items": items,
+            "types": types,
             "page": page,
             "pages": (total + per_page - 1) // per_page,
             "total": total,
@@ -970,6 +973,8 @@ async def materials_create_submit(
             "code_agent": form.get("code_agent") or None,
             "url_agent": form.get("url_agent") or None,
         }
+        if form.get("type_id"):
+            data["type_id"] = int(form["type_id"])
         await crud_materials.add_material(session, MaterialCreateSchema(**data), created_by=user.name)
         await session.commit()
     return RedirectResponse("/reg/materials", status_code=302)
@@ -988,9 +993,73 @@ async def materials_detail_page(
     mat = await crud_materials.get_material_by_id(session, mat_id)
     if not mat:
         return HTMLResponse("Материал не найден", status_code=404)
+    types, _ = await crud_material_types.get_all_types(session, per_page=10000)
     return templates.TemplateResponse(
         "materials/detail.html",
-        {"request": request, "user": user, "mat": mat, "back_to": back_to, "active_page": "materials"},
+        {"request": request, "user": user, "mat": mat, "types": types, "back_to": back_to, "active_page": "materials"},
+    )
+
+
+# --- Material Types ---
+@pages_router.get("/material-types", response_class=HTMLResponse)
+async def material_types_page(
+    request: Request,
+    page: int = 1,
+    session: AsyncSession = Depends(db_helper.session_dependency),
+):
+    user = await get_current_user(request, session)
+    if not user:
+        return RedirectResponse("/reg/", status_code=302)
+    items, total = await crud_material_types.get_all_types(session, page=page)
+    per_page = 20
+    return templates.TemplateResponse(
+        "material_types/list.html",
+        {
+            "request": request,
+            "user": user,
+            "items": items,
+            "page": page,
+            "pages": (total + per_page - 1) // per_page,
+            "total": total,
+            "active_page": "material_types",
+        },
+    )
+
+
+@pages_router.post("/material-types", response_class=HTMLResponse)
+async def material_types_create_submit(
+    request: Request,
+    session: AsyncSession = Depends(db_helper.session_dependency),
+):
+    user = await get_current_user(request, session)
+    if not user:
+        return RedirectResponse("/reg/", status_code=302)
+    form = await request.form()
+    name = form.get("name", "").strip()
+    if name:
+        from scr.dbase.schemas.schemas import MaterialTypeCreateSchema
+
+        await crud_material_types.add_type(session, MaterialTypeCreateSchema(name=name), created_by=user.name)
+        await session.commit()
+    return RedirectResponse("/reg/material-types", status_code=302)
+
+
+@pages_router.get("/material-types/{type_id}", response_class=HTMLResponse)
+async def material_types_detail_page(
+    type_id: int,
+    request: Request,
+    back_to: str | None = None,
+    session: AsyncSession = Depends(db_helper.session_dependency),
+):
+    user = await get_current_user(request, session)
+    if not user:
+        return RedirectResponse("/reg/", status_code=302)
+    mt = await crud_material_types.get_type_by_id(session, type_id)
+    if not mt:
+        return HTMLResponse("Тип не найден", status_code=404)
+    return templates.TemplateResponse(
+        "material_types/detail.html",
+        {"request": request, "user": user, "mt": mt, "back_to": back_to, "active_page": "material_types"},
     )
 
 

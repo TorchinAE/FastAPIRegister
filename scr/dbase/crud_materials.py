@@ -1,5 +1,6 @@
 from sqlalchemy import Result, func, select
 from sqlalchemy.ext.asyncio import AsyncSession
+from sqlalchemy.orm import selectinload
 
 from scr.dbase.models import Material
 from scr.dbase.schemas.schemas import MaterialCreateSchema, MaterialUpdateSchema
@@ -8,7 +9,7 @@ from scr.dbase.schemas.schemas import MaterialCreateSchema, MaterialUpdateSchema
 async def get_materials(
     session: AsyncSession, search: str | None = None, page: int = 1, per_page: int = 20
 ) -> tuple[list[Material], int]:
-    stmt = select(Material).order_by(Material.name)
+    stmt = select(Material).options(selectinload(Material.type)).order_by(Material.name)
     count_stmt = select(func.count(Material.id))
 
     if search:
@@ -19,17 +20,19 @@ async def get_materials(
     total = (await session.execute(count_stmt)).scalar() or 0
     stmt = stmt.offset((page - 1) * per_page).limit(per_page)
     result: Result = await session.execute(stmt)
-    return list(result.scalars().all()), total
+    return list(result.scalars().unique().all()), total
 
 
 async def get_all_materials(session: AsyncSession) -> list[Material]:
-    stmt = select(Material).order_by(Material.name)
+    stmt = select(Material).options(selectinload(Material.type)).order_by(Material.name)
     result: Result = await session.execute(stmt)
-    return list(result.scalars().all())
+    return list(result.scalars().unique().all())
 
 
 async def get_material_by_id(session: AsyncSession, mat_id: int) -> Material | None:
-    return await session.get(Material, mat_id)
+    stmt = select(Material).options(selectinload(Material.type)).where(Material.id == mat_id)
+    result: Result = await session.execute(stmt)
+    return result.scalar_one_or_none()
 
 
 async def get_material_by_name(session: AsyncSession, name: str) -> Material | None:

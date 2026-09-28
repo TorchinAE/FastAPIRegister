@@ -262,6 +262,14 @@ class Setting(Base):
     value: Mapped[str] = mapped_column(Text, nullable=False, default="")
 
 
+class MaterialType(BaseID):
+    __tablename__ = "material_types"
+    name: Mapped[str] = mapped_column(String(20), nullable=False)
+
+    def __repr__(self) -> str:
+        return f"MaterialType(id={self.id}, name='{self.name}')"
+
+
 class Material(BaseID):
     __tablename__ = "materials"
     name: Mapped[str] = mapped_column(String(200), nullable=False)
@@ -269,6 +277,9 @@ class Material(BaseID):
     code_1c: Mapped[str | None] = mapped_column(String(100), nullable=True)
     code_agent: Mapped[str | None] = mapped_column(String(100), nullable=True)
     url_agent: Mapped[str | None] = mapped_column(String(500), nullable=True)
+    type_id: Mapped[int | None] = mapped_column(ForeignKey("material_types.id", ondelete="SET NULL"), nullable=True)
+
+    type: Mapped[Optional["MaterialType"]] = relationship(foreign_keys=[type_id])
 
     def __repr__(self) -> str:
         return f"Material(id={self.id}, name='{self.name}', price={self.price})"

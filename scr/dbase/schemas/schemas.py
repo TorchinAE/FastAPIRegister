@@ -178,6 +178,30 @@ class CounterpartyResponseSchema(BaseModel):
     created_by: str | None = None
 
 
+# --- Material Type ---
+
+
+class MaterialTypeCreateSchema(BaseModel):
+    model_config = ConfigDict(from_attributes=True)
+
+    name: str
+
+
+class MaterialTypeUpdateSchema(BaseModel):
+    model_config = ConfigDict(from_attributes=True)
+
+    id: int
+    name: str | None = None
+
+
+class MaterialTypeResponseSchema(BaseModel):
+    model_config = ConfigDict(from_attributes=True)
+
+    id: int
+    name: str
+    created_by: str | None = None
+
+
 # --- Material ---
 
 
@@ -189,6 +213,7 @@ class MaterialCreateSchema(BaseModel):
     code_1c: str | None = None
     code_agent: str | None = None
     url_agent: str | None = None
+    type_id: int | None = None
 
 
 class MaterialUpdateSchema(BaseModel):
@@ -200,6 +225,7 @@ class MaterialUpdateSchema(BaseModel):
     code_1c: str | None = None
     code_agent: str | None = None
     url_agent: str | None = None
+    type_id: int | None = None
 
 
 class MaterialResponseSchema(BaseModel):
@@ -211,6 +237,8 @@ class MaterialResponseSchema(BaseModel):
     code_1c: str | None = None
     code_agent: str | None = None
     url_agent: str | None = None
+    type_id: int | None = None
+    type_name: str | None = None
     created_by: str | None = None
 
 
