@@ -178,9 +178,25 @@ async def export_module_excel(mod_id: int, session: AsyncSession = Depends(db_he
     ws.append(["Тип", "Название", "Цена за ед.", "Количество", "Сумма"])
     for item in mod.items:
         if item.material:
-            ws.append(["Материал", item.material.name, float(item.material.price), item.quantity, float(item.material.price) * item.quantity])
+            ws.append(
+                [
+                    "Материал",
+                    item.material.name,
+                    float(item.material.price),
+                    item.quantity,
+                    float(item.material.price) * item.quantity,
+                ]
+            )
         elif item.sub_module:
-            ws.append(["Модуль", item.sub_module.name, float(item.sub_module.total_price), item.quantity, float(item.sub_module.total_price) * item.quantity])
+            ws.append(
+                [
+                    "Модуль",
+                    item.sub_module.name,
+                    float(item.sub_module.total_price),
+                    item.quantity,
+                    float(item.sub_module.total_price) * item.quantity,
+                ]
+            )
     ws.append([])
     ws.append(["", "", "", "Итого:", float(mod.total_price)])
     buf = io.BytesIO()
