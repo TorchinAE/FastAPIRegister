@@ -83,17 +83,39 @@ async def read_all_modules(
 async def export_modules_excel(
     session: AsyncSession = Depends(db_helper.session_dependency),
 ):
+    from openpyxl.styles import Border, Font, Side
+
     modules = await crud_modules.get_all_modules(session=session)
     wb = Workbook()
 
+    header_font = Font(color="999999", bold=True)
+    thin_border = Border(
+        left=Side(style="thin"), right=Side(style="thin"),
+        top=Side(style="thin"), bottom=Side(style="thin"),
+    )
+
+    def _style_header(ws, cols):
+        for col_idx in range(1, cols + 1):
+            cell = ws.cell(1, col_idx)
+            cell.font = header_font
+            cell.border = thin_border
+
+    def _style_row(ws, row_num, cols):
+        for col_idx in range(1, cols + 1):
+            ws.cell(row_num, col_idx).border = thin_border
+
     ws1 = wb.active
     ws1.title = "Модули"
-    ws1.append(["ID", "Название"])
+    ws1.append(["ID", "Название", "Компонентов", "Стоимость"])
+    _style_header(ws1, 4)
     for mod in modules:
-        ws1.append([mod.id, mod.name])
+        ws1.append([mod.id, mod.name, mod.items_count, float(mod.total_price)])
+        _style_row(ws1, ws1.max_row, 4)
+        ws1.cell(ws1.max_row, 4).number_format = '# ##0.00'
 
     ws2 = wb.create_sheet("Состав")
     ws2.append(["Модуль", "Тип компонента", "Название компонента", "Количество"])
+    _style_header(ws2, 4)
     for mod in modules:
         items = await crud_modules.get_module_items(session, mod.id)
         for item in items:
@@ -101,6 +123,7 @@ async def export_modules_excel(
                 ws2.append([mod.name, "материал", item.material.name, item.quantity])
             elif item.sub_module:
                 ws2.append([mod.name, "модуль", item.sub_module.name, item.quantity])
+            _style_row(ws2, ws2.max_row, 4)
 
     buf = io.BytesIO()
     wb.save(buf)
@@ -169,36 +192,118 @@ async def import_modules_excel(
 
 @mod_router.get("/{mod_id}/export-excel")
 async def export_module_excel(mod_id: int, session: AsyncSession = Depends(db_helper.session_dependency)):
+    from openpyxl.styles import Alignment, Border, Font, PatternFill, Side
+
     mod = await crud_modules.get_module_by_id(session=session, mod_id=mod_id)
     if not mod:
         raise HTTPException(status_code=404, detail="Модуль не найден")
+
     wb = Workbook()
     ws = wb.active
     ws.title = "Состав модуля"
-    ws.append(["Тип", "Название", "Цена за ед.", "Количество", "Сумма"])
+
+    header_font = Font(color="999999", bold=True)
+    money_fmt = '# ##0.00'
+    thin_border = Border(
+        left=Side(style="thin"),
+        right=Side(style="thin"),
+        top=Side(style="thin"),
+        bottom=Side(style="thin"),
+    )
+
+    def _bom_flat(module, qty=1):
+        result = []
+        for it in module.items:
+            if it.material:
+                result.append({"name": it.material.name, "price": float(it.material.price), "quantity": it.quantity * qty})
+            elif it.sub_module:
+                result.extend(_bom_flat(it.sub_module, it.quantity * qty))
+        return result
+
+    # Row 1: module name
+    ws.append([mod.name])
+    ws.merge_cells(start_row=1, start_column=1, end_row=1, end_column=5)
+    ws.cell(1, 1).font = Font(bold=True, size=14)
+
+    # Row 2: headers
+    headers = ["Тип", "Название", "Цена за ед.", "Количество", "Сумма"]
+    ws.append(headers)
+    for col_idx, _ in enumerate(headers, 1):
+        cell = ws.cell(2, col_idx)
+        cell.font = header_font
+        cell.border = thin_border
+
+    # Rows 3+: items
     for item in mod.items:
         if item.material:
-            ws.append(
-                [
-                    "Материал",
-                    item.material.name,
-                    float(item.material.price),
-                    item.quantity,
-                    float(item.material.price) * item.quantity,
-                ]
-            )
+            row_data = ["Материал", item.material.name, float(item.material.price), item.quantity, None]
         elif item.sub_module:
-            ws.append(
-                [
-                    "Модуль",
-                    item.sub_module.name,
-                    float(item.sub_module.total_price),
-                    item.quantity,
-                    float(item.sub_module.total_price) * item.quantity,
-                ]
-            )
-    ws.append([])
-    ws.append(["", "", "", "Итого:", float(mod.total_price)])
+            row_data = ["Модуль", item.sub_module.name, float(item.sub_module.total_price), item.quantity, None]
+        else:
+            continue
+        ws.append(row_data)
+        row_num = ws.max_row
+        ws.cell(row_num, 3).number_format = money_fmt
+        ws.cell(row_num, 5).number_format = money_fmt
+        # SUM formula: price * quantity
+        ws.cell(row_num, 5).value = f"=C{row_num}*D{row_num}"
+        for col_idx in range(1, 6):
+            ws.cell(row_num, col_idx).border = thin_border
+
+    # Total row with SUM formula
+    items_start = 3
+    items_end = ws.max_row
+    ws.append(["", "", "", "Итого:", f"=SUM(E{items_start}:E{items_end})"])
+    total_row = ws.max_row
+    ws.cell(total_row, 4).font = Font(bold=True)
+    ws.cell(total_row, 5).font = Font(bold=True)
+    ws.cell(total_row, 5).number_format = money_fmt
+    for col_idx in range(1, 6):
+        ws.cell(total_row, col_idx).border = thin_border
+
+    # BOM section
+    bom_items = _bom_flat(mod)
+    if bom_items:
+        ws.append([])
+        ws.append(["Раскрытие состава (BOM)"])
+        bom_title_row = ws.max_row
+        ws.merge_cells(start_row=bom_title_row, start_column=1, end_row=bom_title_row, end_column=5)
+        ws.cell(bom_title_row, 1).font = Font(bold=True, size=12)
+
+        bom_headers = ["", "Материал", "Цена за ед.", "Кол-во", "Сумма"]
+        ws.append(bom_headers)
+        bom_hdr_row = ws.max_row
+        for col_idx, _ in enumerate(bom_headers, 1):
+            cell = ws.cell(bom_hdr_row, col_idx)
+            cell.font = header_font
+            cell.border = thin_border
+
+        for bi in bom_items:
+            ws.append(["", bi["name"], bi["price"], bi["quantity"], None])
+            row_num = ws.max_row
+            ws.cell(row_num, 3).number_format = money_fmt
+            ws.cell(row_num, 5).number_format = money_fmt
+            ws.cell(row_num, 5).value = f"=C{row_num}*D{row_num}"
+            for col_idx in range(1, 6):
+                ws.cell(row_num, col_idx).border = thin_border
+
+        bom_start = bom_hdr_row + 1
+        bom_end = ws.max_row
+        ws.append(["", "", "", "Итого:", f"=SUM(E{bom_start}:E{bom_end})"])
+        bom_total_row = ws.max_row
+        ws.cell(bom_total_row, 4).font = Font(bold=True)
+        ws.cell(bom_total_row, 5).font = Font(bold=True)
+        ws.cell(bom_total_row, 5).number_format = money_fmt
+        for col_idx in range(1, 6):
+            ws.cell(bom_total_row, col_idx).border = thin_border
+
+    # Column widths
+    ws.column_dimensions["A"].width = 14
+    ws.column_dimensions["B"].width = 40
+    ws.column_dimensions["C"].width = 16
+    ws.column_dimensions["D"].width = 14
+    ws.column_dimensions["E"].width = 16
+
     buf = io.BytesIO()
     wb.save(buf)
     buf.seek(0)
