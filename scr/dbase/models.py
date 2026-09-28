@@ -1,6 +1,6 @@
 # models.py
 import enum
-from datetime import datetime, timezone
+from datetime import UTC, datetime, timezone
 from typing import Optional
 
 from sqlalchemy import CheckConstraint, DateTime, Enum, ForeignKey, Integer, Numeric, String, Text, UniqueConstraint
@@ -63,11 +63,11 @@ class BaseID(Base):
 
     id: Mapped[int] = mapped_column(primary_key=True)
     created_by: Mapped[str | None] = mapped_column(String(100), nullable=True)
-    created_at: Mapped[datetime] = mapped_column(DateTime, default=lambda: datetime.now(timezone.utc))
+    created_at: Mapped[datetime] = mapped_column(DateTime, default=lambda: datetime.now(UTC))
     updated_at: Mapped[datetime] = mapped_column(
         DateTime,
-        default=lambda: datetime.now(timezone.utc),
-        onupdate=lambda: datetime.now(timezone.utc),
+        default=lambda: datetime.now(UTC),
+        onupdate=lambda: datetime.now(UTC),
     )
     changed_by_id: Mapped[int | None] = mapped_column(ForeignKey("users.id"), nullable=True)
 
@@ -81,7 +81,7 @@ class User(Base):
     phone: Mapped[str | None] = mapped_column(String(20), nullable=True)
     city: Mapped[str] = mapped_column(String(50), nullable=False, default="ив")
     signature: Mapped[str | None] = mapped_column(String(200), nullable=True)
-    created_at: Mapped[datetime] = mapped_column(DateTime, default=lambda: datetime.now(timezone.utc))
+    created_at: Mapped[datetime] = mapped_column(DateTime, default=lambda: datetime.now(UTC))
 
 
 class Organization(BaseID):
@@ -190,7 +190,7 @@ class Request(BaseID):
     equipment_id: Mapped[int | None] = mapped_column(ForeignKey("equipment.id"), nullable=True)
     probability_id: Mapped[int | None] = mapped_column(ForeignKey("probabilities.id"), nullable=True)
     project_stamp: Mapped[str | None] = mapped_column(String(200), nullable=True)
-    request_date: Mapped[datetime] = mapped_column(DateTime, default=lambda: datetime.now(timezone.utc))
+    request_date: Mapped[datetime] = mapped_column(DateTime, default=lambda: datetime.now(UTC))
     issue_date: Mapped[datetime | None] = mapped_column(DateTime, nullable=True)
     status: Mapped[RequestStatus] = mapped_column(Enum(RequestStatus), default=RequestStatus.ZAPROS, nullable=False)
     cost: Mapped[float] = mapped_column(Numeric(12, 2), default=0)
@@ -231,7 +231,7 @@ class Invoice(BaseID):
     __tablename__ = "invoices"
     request_id: Mapped[int] = mapped_column(ForeignKey("requests.id"), nullable=False)
     invoice_num: Mapped[str | None] = mapped_column(String(100), nullable=True)
-    invoice_date: Mapped[datetime] = mapped_column(DateTime, default=lambda: datetime.now(timezone.utc))
+    invoice_date: Mapped[datetime] = mapped_column(DateTime, default=lambda: datetime.now(UTC))
     percent: Mapped[float] = mapped_column(Numeric(5, 2), default=0)
     amount: Mapped[float] = mapped_column(Numeric(12, 2), default=0)
     paid_amount: Mapped[float] = mapped_column(Numeric(12, 2), default=0, nullable=False)

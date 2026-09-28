@@ -65,6 +65,7 @@ async def not_found_handler(request: Request, exc):
         content=templates.get_template("404.html").render(request=request),
     )
 
+
 # API routers
 app.include_router(auth_router, prefix="/reg")
 app.include_router(router, prefix="/reg")
