@@ -6,8 +6,8 @@ from openpyxl import Workbook
 
 @pytest.mark.asyncio
 async def test_export_materials_excel(client):
-    await client.post("/api/materials/", json={"name": "ExcelTest", "price": 42})
-    response = await client.get("/api/materials/export-excel")
+    await client.post("/reg/api/materials/", json={"name": "ExcelTest", "price": 42})
+    response = await client.get("/reg/api/materials/export-excel")
     assert response.status_code == 200
     assert "spreadsheetml" in response.headers["content-type"]
     wb = load_workbook_from_bytes(response.content)
@@ -27,18 +27,18 @@ async def test_import_materials_excel(client):
     wb.save(buf)
     buf.seek(0)
     files = {"file": ("materials.xlsx", buf, "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet")}
-    response = await client.post("/api/materials/import-excel", files=files)
+    response = await client.post("/reg/api/materials/import-excel", files=files)
     assert response.status_code == 200
     data = response.json()
     assert data["imported"] == 2
-    resp = await client.get("/api/materials/?search=ИмпортМат1")
+    resp = await client.get("/reg/api/materials/?search=ИмпортМат1")
     assert resp.json()["total"] >= 1
 
 
 @pytest.mark.asyncio
 async def test_export_modules_excel(client):
-    await client.post("/api/modules/", json={"name": "ExcelModule"})
-    response = await client.get("/api/modules/export-excel")
+    await client.post("/reg/api/modules/", json={"name": "ExcelModule"})
+    response = await client.get("/reg/api/modules/export-excel")
     assert response.status_code == 200
     assert "spreadsheetml" in response.headers["content-type"]
 
@@ -56,7 +56,7 @@ async def test_import_modules_excel(client):
     wb.save(buf)
     buf.seek(0)
     files = {"file": ("modules.xlsx", buf, "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet")}
-    response = await client.post("/api/modules/import-excel", files=files)
+    response = await client.post("/reg/api/modules/import-excel", files=files)
     assert response.status_code == 200
     assert response.json()["imported"] >= 1
 

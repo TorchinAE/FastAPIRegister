@@ -3,14 +3,14 @@ import pytest
 
 @pytest.mark.asyncio
 async def test_home(client):
-    response = await client.get("/")
+    response = await client.get("/reg/")
     assert response.status_code == 200
     assert "login" in response.text.lower() or "вход" in response.text.lower()
 
 
 @pytest.mark.asyncio
 async def test_create_position(client):
-    response = await client.post("/api/positions/", json={"name": "Директор"})
+    response = await client.post("/reg/api/positions/", json={"name": "Директор"})
     assert response.status_code == 200
     data = response.json()
     assert data["name"] == "Директор"
@@ -19,7 +19,7 @@ async def test_create_position(client):
 
 @pytest.mark.asyncio
 async def test_read_positions(client):
-    response = await client.get("/api/positions/")
+    response = await client.get("/reg/api/positions/")
     assert response.status_code == 200
     data = response.json()
     assert "items" in data
@@ -34,7 +34,7 @@ async def test_add_dir(client):
         "phone": "+79991112233",
         "position_id": 1,
     }
-    response = await client.post("/api/directors/", json=director_data)
+    response = await client.post("/reg/api/directors/", json=director_data)
     assert response.status_code == 200
     data = response.json()
     assert data["name"] == "Тест Иван Петрович"
@@ -42,7 +42,7 @@ async def test_add_dir(client):
 
 @pytest.mark.asyncio
 async def test_read_dirs(client):
-    response = await client.get("/api/directors/")
+    response = await client.get("/reg/api/directors/")
     assert response.status_code == 200
     data = response.json()
     assert "items" in data
