@@ -194,7 +194,7 @@ async def import_modules_excel(
 
 @mod_router.get("/{mod_id}/export-excel")
 async def export_module_excel(mod_id: int, session: AsyncSession = Depends(db_helper.session_dependency)):
-    from openpyxl.styles import Alignment, Border, Font, PatternFill, Side
+    from openpyxl.styles import Border, Font, Side
 
     mod = await crud_modules.get_module_by_id(session=session, mod_id=mod_id)
     if not mod:
@@ -213,7 +213,7 @@ async def export_module_excel(mod_id: int, session: AsyncSession = Depends(db_he
         bottom=Side(style="thin"),
     )
 
-    def _bom_flat(module, qty=1):
+    async def _bom_flat(module, qty=1):
         result = []
         for it in module.items:
             if it.material:
@@ -221,7 +221,9 @@ async def export_module_excel(mod_id: int, session: AsyncSession = Depends(db_he
                     {"name": it.material.name, "price": float(it.material.price), "quantity": it.quantity * qty}
                 )
             elif it.sub_module:
-                result.extend(_bom_flat(it.sub_module, it.quantity * qty))
+                sub = await crud_modules.get_module_by_id(session, it.sub_module.id)
+                if sub:
+                    result.extend(await _bom_flat(sub, it.quantity * qty))
         return result
 
     # Row 1: module name
@@ -266,7 +268,7 @@ async def export_module_excel(mod_id: int, session: AsyncSession = Depends(db_he
         ws.cell(total_row, col_idx).border = thin_border
 
     # BOM section
-    bom_items = _bom_flat(mod)
+    bom_items = await _bom_flat(mod)
     if bom_items:
         ws.append([])
         ws.append(["Раскрытие состава (BOM)"])
