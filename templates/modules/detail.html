@@ -4,7 +4,7 @@
 <div class="page-header">
     <div>
         <h1>{{ mod.name }}</h1>
-        <div class="subtitle">Модуль #{{ mod.id }} &middot; Стоимость: {{ "%.2f"|format(mod.total_price) }}</div>
+        <div class="subtitle">Модуль #{{ mod.id }} &middot; Стоимость: {{ mod.total_price|money }}</div>
     </div>
     <div style="display:flex;gap:0.5rem;">
         <a href="/reg/api/modules/{{ mod.id }}/export-excel" class="btn btn-ghost" download>Скачать Excel</a>
@@ -43,7 +43,7 @@
             <label>Компонент</label>
             <select id="itemId" style="width:100%;">
                 {% for mat in materials %}
-                <option value="{{ mat.id }}">{{ mat.name }} ({{ "%.2f"|format(mat.price) }})</option>
+                <option value="{{ mat.id }}">{{ mat.name }} ({{ mat.price|money }})</option>
                 {% endfor %}
             </select>
         </div>
@@ -67,9 +67,9 @@
             <tr data-item-id="{{ item.id }}">
                 <td>{% if item.material_id %}Материал{% else %}Модуль{% endif %}</td>
                 <td>{% if item.material %}<a href="/reg/materials/{{ item.material_id }}" onclick="event.stopPropagation()">{{ item.material.name }}</a>{% elif item.sub_module %}<a href="/reg/modules/{{ item.sub_module_id }}" onclick="event.stopPropagation()">{{ item.sub_module.name }}</a>{% endif %}</td>
-                <td>{% if item.material %}{{ "%.2f"|format(item.material.price) }}{% endif %}</td>
+                <td>{% if item.material %}{{ item.material.price|money }}{% elif item.sub_module %}{{ item.sub_module.total_price|money }}{% endif %}</td>
                 <td>{{ item.quantity }}</td>
-                <td>{% if item.material %}{{ "%.2f"|format(item.material.price * item.quantity) }}{% endif %}</td>
+                <td>{% if item.material %}{{ (item.material.price * item.quantity)|money }}{% elif item.sub_module %}{{ (item.sub_module.total_price * item.quantity)|money }}{% endif %}</td>
                 <td style="text-align:center;width:40px">
                     <button class="btn btn-danger btn-sm btn-icon" title="Удалить" onclick="deleteItem({{ item.id }}, this)">&#10005;</button>
                 </td>
@@ -80,7 +80,7 @@
         <tfoot>
             <tr>
                 <td colspan="4" style="text-align:right;font-weight:bold;">Итого:</td>
-                <td style="font-weight:bold;" id="totalPrice">{{ "%.2f"|format(mod.total_price) }}</td>
+                <td style="font-weight:bold;" id="totalPrice">{{ mod.total_price|money }}</td>
                 <td></td>
             </tr>
         </tfoot>
@@ -98,16 +98,16 @@
             {% for bi in bom_items %}
             <tr>
                 <td>{{ bi.name }}</td>
-                <td>{{ "%.2f"|format(bi.price) }}</td>
+                <td>{{ bi.price|money }}</td>
                 <td>{{ bi.quantity }}</td>
-                <td>{{ "%.2f"|format(bi.price * bi.quantity) }}</td>
+                <td>{{ (bi.price * bi.quantity)|money }}</td>
             </tr>
             {% endfor %}
         </tbody>
         <tfoot>
             <tr>
                 <td colspan="3" style="text-align:right;font-weight:bold;">Итого:</td>
-                <td style="font-weight:bold;">{{ "%.2f"|format(bom_total) }}</td>
+                <td style="font-weight:bold;">{{ bom_total|money }}</td>
             </tr>
         </tfoot>
     </table>

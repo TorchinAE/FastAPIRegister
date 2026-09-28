@@ -67,7 +67,7 @@
                 <td><strong>{{ item.id }}</strong></td>
                 <td>{% if item.type %}<a href="/reg/material-types/{{ item.type_id }}" onclick="event.stopPropagation()">{{ item.type.name }}</a>{% endif %}</td>
                 <td>{{ item.name }}</td>
-                <td>{{ "%.2f"|format(item.price) }}</td>
+                <td>{{ item.price|money }}</td>
                 <td>{{ item.code_1c or '' }}</td>
                 <td>{{ item.code_agent or '' }}</td>
                 <td>{{ item.url_agent or '' }}</td>

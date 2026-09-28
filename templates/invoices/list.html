@@ -39,7 +39,7 @@
                 <td><strong>{{ inv.request.tkp_num if inv.request else '-' }}</strong></td>
                 <td>{{ inv.invoice_num or '-' }}</td>
                 <td>{{ inv.invoice_date.strftime('%d.%m.%Y') if inv.invoice_date else '-' }}</td>
-                <td style="text-align:right;white-space:nowrap;">{{ "{:,.2f}".format(inv.amount).replace(",", " ") if inv.amount else '0.00' }}</td>
+                <td style="text-align:right;white-space:nowrap;">{{ inv.amount|money if inv.amount else '0.00' }}</td>
                 <td>{{ inv.percent }}</td>
                 <td>{{ inv.request.company.name if inv.request and inv.request.company else '-' }}</td>
                 <td>{{ inv.request.manager.name if inv.request and inv.request.manager else '-' }}</td>

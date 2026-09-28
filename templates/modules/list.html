@@ -41,7 +41,7 @@
                 <td><strong>{{ item.id }}</strong></td>
                 <td>{{ item.name }}</td>
                 <td>{{ item.items_count }}</td>
-                <td>{{ "%.2f"|format(item.total_price) }}</td>
+                <td>{{ item.total_price|money }}</td>
                 <td style="text-align:center;width:40px">
                     <button class="btn btn-danger btn-sm btn-icon" title="Удалить" onclick="event.stopPropagation(); deleteMod({{ item.id }}, this)">&#10005;</button>
                 </td>

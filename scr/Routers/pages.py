@@ -22,6 +22,18 @@ from scr.dbase.database import db_helper
 from scr.dbase.models import Probability, RequestStatus
 
 templates = Jinja2Templates(directory="templates")
+
+
+def _money(value):
+    try:
+        parts = f"{float(value):,.2f}".replace(",", " ")
+        return parts
+    except (ValueError, TypeError):
+        return "0.00"
+
+
+templates.env.filters["money"] = _money
+
 pages_router = APIRouter(tags=["Pages"])
 
 SESSION_KEY = "user_email"

@@ -111,7 +111,7 @@
                             <td><strong>{{ r.tkp_num or '-' }}</strong></td>
                             <td>{{ r.request_date.strftime('%d.%m.%Y') if r.request_date else '-' }}</td>
                             <td>{{ r.equipment.name if r.equipment else '-' }}</td>
-                            <td style="text-align:right;white-space:nowrap;">{{ "{:,.2f}".format(r.cost).replace(",", " ") if r.cost else '0.00' }}</td>
+                            <td style="text-align:right;white-space:nowrap;">{{ r.cost|money if r.cost else '0.00' }}</td>
                             <td>{{ (r.description[:40] + '...') if r.description and r.description|length > 40 else (r.description or '-') }}</td>
                             <td style="color:#dc2626;font-weight:600;">{{ r.project_stamp or '-' }}</td>
                         </tr>
@@ -121,7 +121,7 @@
                             <td><strong>{{ r.tkp_num or '-' }}</strong></td>
                             <td>{{ r.request_date.strftime('%d.%m.%Y') if r.request_date else '-' }}</td>
                             <td>{{ r.equipment.name if r.equipment else '-' }}</td>
-                            <td style="text-align:right;white-space:nowrap;">{{ "{:,.2f}".format(r.cost).replace(",", " ") if r.cost else '0.00' }}</td>
+                            <td style="text-align:right;white-space:nowrap;">{{ r.cost|money if r.cost else '0.00' }}</td>
                             <td>{{ (r.description[:40] + '...') if r.description and r.description|length > 40 else (r.description or '-') }}</td>
                             <td>{{ r.project_stamp or '-' }}</td>
                         </tr>
@@ -470,7 +470,7 @@ async function savePayment(row) {
         else if (inp.dataset.field === 'paid_date') data.paid_date = inp.value || null;
     });
     highlightPaymentRow(row);
-    await fetch(`/api/payments/${id}`, {
+    await fetch(`/reg/api/payments/${id}`, {
         method: 'PUT',
         headers: {'Content-Type': 'application/json'},
         body: JSON.stringify(data)
@@ -559,7 +559,7 @@ async function addInvoice() {
 }
 
 async function deleteInvoice(id, btn) {
-    await fetch(`/api/invoices/${id}`, {method: 'DELETE'});
+    await fetch(`/reg/api/invoices/${id}`, {method: 'DELETE'});
     btn.closest('.invoice-row').remove();
     checkOversum();
 }
@@ -575,7 +575,7 @@ async function saveInvoice(row) {
         else if (inp.dataset.field === 'paid_amount') data.paid_amount = parseNum(inp.value);
         else if (inp.dataset.field === 'paid_date') data.paid_date = inp.value || null;
     });
-    await fetch(`/api/invoices/${id}`, {
+    await fetch(`/reg/api/invoices/${id}`, {
         method: 'PUT',
         headers: {'Content-Type': 'application/json'},
         body: JSON.stringify(data)

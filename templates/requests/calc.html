@@ -16,7 +16,7 @@
             <select id="moduleSelect" style="width:100%;">
                 <option value="">-- Выберите модуль --</option>
                 {% for mod in modules %}
-                <option value="{{ mod.id }}">{{ mod.name }} ({{ "%.2f"|format(mod.total_price) }})</option>
+                <option value="{{ mod.id }}">{{ mod.name }} ({{ mod.total_price|money }})</option>
                 {% endfor %}
             </select>
         </div>
@@ -35,7 +35,7 @@
             <select id="materialSelect" style="width:100%;">
                 <option value="">-- Выберите материал --</option>
                 {% for mat in materials %}
-                <option value="{{ mat.id }}" data-price="{{ mat.price }}">{{ mat.name }} ({{ "%.2f"|format(mat.price) }})</option>
+                <option value="{{ mat.id }}" data-price="{{ mat.price }}">{{ mat.name }} ({{ mat.price|money }})</option>
                 {% endfor %}
             </select>
         </div>
