@@ -8,8 +8,8 @@ FastAPI async app for registering business requests (Russian-language domain). M
 
 - **uv** is the package manager (`uv.lock` present). Use `uv sync` to install, `uv run <cmd>` to execute.
 - Python >= 3.12 required.
-- `.env` must exist with `NAME_BASE=registration` (the DB filename stem). No `.env.example` committed.
-- Formatter: `black` (in dependencies, no config file — uses defaults).
+- `.env` must exist with `NAME_BASE=registration` (the DB filename stem). CI creates it automatically in the test job.
+- Formatter/linter: **ruff** (`pyproject.toml` [tool.ruff] section, line-length=120).
 
 ## Run & test commands
 
@@ -17,7 +17,8 @@ FastAPI async app for registering business requests (Russian-language domain). M
 uv run uvicorn main:app --reload          # dev server on :8000
 uv run pytest                              # run tests
 uv run pytest tests/test_director_routes.py  # single file
-uv run black .                             # format
+uv run ruff format .                       # format
+uv run ruff check . --fix                  # lint + auto-fix
 ```
 
 No lint/typecheck tool is configured (no ruff, mypy, or pyright in dependencies).
