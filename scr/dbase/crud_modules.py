@@ -106,6 +106,14 @@ async def add_module_item(session: AsyncSession, module_id: int, item_in: Module
     return item
 
 
+async def update_module_item_quantity(session: AsyncSession, item_id: int, quantity: int) -> ModuleItem | None:
+    item = await session.get(ModuleItem, item_id)
+    if item:
+        item.quantity = quantity
+        await session.flush()
+    return item
+
+
 async def delete_module_item(session: AsyncSession, item_id: int) -> ModuleItem | None:
     item = await session.get(ModuleItem, item_id)
     if item:

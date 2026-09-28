@@ -66,12 +66,12 @@
                 <th><input type="text" data-col="1" placeholder="Фильтр..." class="tf-input"></th>
                 <th><input type="text" data-col="2" placeholder="Фильтр..." class="tf-input"></th>
                 <th><input type="text" data-col="3" placeholder="Фильтр..." class="tf-input"></th>
-                <th></th>
-                <th></th>
-                <th></th>
-                <th></th>
-                <th></th>
-                <th></th>
+                <th><input type="text" data-col="4" placeholder="Фильтр..." class="tf-input"></th>
+                <th><select data-col="5" class="tf-select"><option value="">—</option><option value="✓">✓</option><option value="—">—</option></select></th>
+                <th><select data-col="6" class="tf-select"><option value="">—</option><option value="✓">✓</option><option value="—">—</option></select></th>
+                <th><select data-col="7" class="tf-select"><option value="">—</option><option value="✓">✓</option><option value="—">—</option></select></th>
+                <th><select data-col="8" class="tf-select"><option value="">—</option><option value="✓">✓</option><option value="—">—</option></select></th>
+                <th><select data-col="9" class="tf-select"><option value="">—</option><option value="✓">✓</option><option value="—">—</option></select></th>
                 <th><input type="text" data-col="10" placeholder="Фильтр..." class="tf-input"></th>
                 <th><input type="text" data-col="11" placeholder="Фильтр..." class="tf-input"></th>
                 <th><input type="text" data-col="12" placeholder="Фильтр..." class="tf-input"></th>
@@ -200,6 +200,22 @@ document.querySelectorAll('.tf-input').forEach(input => {
             if (val.length < 1) { row.style.display = ''; return; }
             const cell = row.cells[col];
             row.style.display = cell && cell.textContent.toLowerCase().includes(val) ? '' : 'none';
+        });
+    });
+});
+document.querySelectorAll('.tf-select').forEach(sel => {
+    sel.addEventListener('change', function() {
+        const col = parseInt(this.dataset.col);
+        const val = this.value;
+        document.querySelectorAll('#dataTable tbody tr:not(.empty-row)').forEach(row => {
+            if (!val) { row.style.display = ''; return; }
+            const cell = row.cells[col];
+            const cellText = cell ? cell.textContent.trim() : '';
+            if (val === '✓') {
+                row.style.display = cellText === '✓' ? '' : 'none';
+            } else {
+                row.style.display = cellText !== '✓' ? '' : 'none';
+            }
         });
     });
 });

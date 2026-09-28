@@ -295,6 +295,25 @@ async def add_module_item(
     return _module_item_to_response(item)
 
 
+@mod_router.patch("/items/{item_id}", response_model=ModuleItemResponseSchema)
+async def update_module_item(
+    item_id: int,
+    data: dict,
+    session: AsyncSession = Depends(db_helper.session_dependency),
+):
+    quantity = data.get("quantity", 1)
+    item = await crud_modules.update_module_item_quantity(session, item_id, quantity)
+    if not item:
+        raise HTTPException(status_code=404, detail="Элемент не найден")
+    await session.commit()
+    await session.refresh(item)
+    if item.material_id:
+        await session.refresh(item, ["material"])
+    if item.sub_module_id:
+        await session.refresh(item, ["sub_module"])
+    return _module_item_to_response(item)
+
+
 @mod_router.delete("/items/{item_id}")
 async def delete_module_item(item_id: int, session: AsyncSession = Depends(db_helper.session_dependency)):
     result = await crud_modules.delete_module_item(session, item_id)

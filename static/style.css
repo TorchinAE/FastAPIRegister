@@ -62,6 +62,8 @@ tr:hover td { background: #f8fafc; }
 .table-filter .tf-input { width: 100%; padding: 0.55rem 0.75rem; border: 1.5px solid var(--border); border-radius: 6px; font-size: 0.9rem; color: var(--text); background: #fff; outline: none; font-family: inherit; transition: border-color var(--transition), box-shadow var(--transition); }
 .table-filter .tf-input:focus { border-color: var(--primary); box-shadow: 0 0 0 3px rgba(79,70,229,0.15); }
 .table-filter .tf-input::placeholder { color: var(--text-muted); }
+.table-filter .tf-select { width: 100%; padding: 0.45rem 0.5rem; border: 1.5px solid var(--border); border-radius: 6px; font-size: 0.85rem; color: var(--text); background: #fff; outline: none; font-family: inherit; transition: border-color var(--transition), box-shadow var(--transition); cursor: pointer; }
+.table-filter .tf-select:focus { border-color: var(--primary); box-shadow: 0 0 0 3px rgba(79,70,229,0.15); }
 tr { transition: background var(--transition); }
 .empty-row td { text-align: center; padding: 2rem; color: var(--text-muted); font-style: italic; }
 

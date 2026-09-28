@@ -60,27 +60,28 @@
     <table id="itemsTable">
         <thead>
             <tr>
-                <th>Тип</th><th>Название</th><th>Цена за ед.</th><th>Кол-во</th><th>Сумма</th><th></th>
+                <th>Тип</th><th>Тип материала</th><th>Название</th><th>Цена за ед.</th><th>Кол-во</th><th>Сумма</th><th></th>
             </tr>
         </thead>
         <tbody>
             {% for item in mod.items %}
             <tr data-item-id="{{ item.id }}">
                 <td>{% if item.material_id %}Материал{% else %}Модуль{% endif %}</td>
+                <td>{% if item.material and item.material.type %}{{ item.material.type.name }}{% endif %}</td>
                 <td>{% if item.material %}<a href="/reg/materials/{{ item.material_id }}" onclick="event.stopPropagation()">{{ item.material.name }}</a>{% elif item.sub_module %}<a href="/reg/modules/{{ item.sub_module_id }}" onclick="event.stopPropagation()">{{ item.sub_module.name }}</a>{% endif %}</td>
                 <td>{% if item.material %}{{ item.material.price|money }}{% elif item.sub_module %}{{ item.sub_module.total_price|money }}{% endif %}</td>
-                <td>{{ item.quantity }}</td>
+                <td><input type="number" value="{{ item.quantity }}" min="1" style="width:60px;text-align:center;" onchange="updateQty({{ item.id }}, this)" onclick="event.stopPropagation()"></td>
                 <td>{% if item.material %}{{ (item.material.price * item.quantity)|money }}{% elif item.sub_module %}{{ (item.sub_module.total_price * item.quantity)|money }}{% endif %}</td>
                 <td style="text-align:center;width:40px">
                     <button class="btn btn-danger btn-sm btn-icon" title="Удалить" onclick="deleteItem({{ item.id }}, this)">&#10005;</button>
                 </td>
             </tr>
             {% endfor %}
-            {% if not mod.items %}<tr class="empty-row"><td colspan="6">Нет компонентов</td></tr>{% endif %}
+            {% if not mod.items %}<tr class="empty-row"><td colspan="7">Нет компонентов</td></tr>{% endif %}
         </tbody>
         <tfoot>
             <tr>
-                <td colspan="4" style="text-align:right;font-weight:bold;">Итого:</td>
+                <td colspan="5" style="text-align:right;font-weight:bold;">Итого:</td>
                 <td style="font-weight:bold;" id="totalPrice">{{ mod.total_price|money }}</td>
                 <td></td>
             </tr>
@@ -162,6 +163,21 @@ async function addItem() {
         setTimeout(() => location.reload(), 500);
     } else {
         showToast('Ошибка добавления');
+    }
+}
+
+async function updateQty(itemId, inp) {
+    const qty = parseInt(inp.value) || 1;
+    const resp = await fetch(`/reg/api/modules/items/${itemId}`, {
+        method: 'PATCH',
+        headers: {'Content-Type': 'application/json'},
+        body: JSON.stringify({quantity: qty}),
+    });
+    if (resp.ok) {
+        showToast('Количество обновлено');
+        setTimeout(() => location.reload(), 500);
+    } else {
+        showToast('Ошибка обновления');
     }
 }
 
