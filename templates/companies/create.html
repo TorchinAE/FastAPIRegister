@@ -80,7 +80,7 @@ document.getElementById('newCompanyForm').addEventListener('submit', async funct
         director_id: parseInt(dirId),
     };
     try {
-        const resp = await fetch('/api/companies/', {
+        const resp = await fetch('/reg/api/companies/', {
             method: 'POST',
             headers: {'Content-Type': 'application/json'},
             body: JSON.stringify(data),

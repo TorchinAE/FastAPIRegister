@@ -7,7 +7,7 @@
         <div class="subtitle">Всего: {{ total }}</div>
     </div>
 </div>
-<form method="post" action="/directors" style="display:flex; gap:0.75rem; align-items:flex-end; margin-bottom:1rem; padding:1rem 1.25rem; flex-wrap:wrap;">
+<form method="post" action="/reg/directors" style="display:flex; gap:0.75rem; align-items:flex-end; margin-bottom:1rem; padding:1rem 1.25rem; flex-wrap:wrap;">
     <div class="form-group" style="flex:2; min-width:180px; margin-bottom:0;">
         <label>Имя</label>
         <input type="text" name="name" placeholder="ФИО директора" required>
@@ -46,7 +46,7 @@
         </thead>
         <tbody>
             {% for item in items %}
-            <tr style="cursor:pointer" onclick="location.href='/directors/{{ item.id }}'">
+            <tr style="cursor:pointer" onclick="location.href='/reg/directors/{{ item.id }}'">
                 <td><strong>{{ item.id }}</strong></td>
                 <td>{{ item.name }}</td>
                 <td>{{ item.email or '-' }}</td>
@@ -64,7 +64,7 @@
 {% if pages > 1 %}
 <div class="pagination">
     {% for p in range(1, pages + 1) %}
-    <a href="/directors?page={{ p }}" class="{{ 'active' if p == page else '' }}">{{ p }}</a>
+    <a href="/reg/directors?page={{ p }}" class="{{ 'active' if p == page else '' }}">{{ p }}</a>
     {% endfor %}
 </div>
 {% endif %}

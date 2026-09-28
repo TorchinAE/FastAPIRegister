@@ -34,7 +34,7 @@
         </thead>
         <tbody>
             {% for inv in items %}
-            <tr class="clickable-row" onclick="window.location='/requests/{{ inv.request_id }}'">
+            <tr class="clickable-row" onclick="window.location='/reg/requests/{{ inv.request_id }}'">
                 <td>{{ inv.id }}</td>
                 <td><strong>{{ inv.request.tkp_num if inv.request else '-' }}</strong></td>
                 <td>{{ inv.invoice_num or '-' }}</td>
@@ -56,7 +56,7 @@
 {% if pages > 1 %}
 <div class="pagination">
     {% for p in range(1, pages + 1) %}
-    <a href="/invoices?page={{ p }}" class="{{ 'active' if p == page else '' }}">{{ p }}</a>
+    <a href="/reg/invoices?page={{ p }}" class="{{ 'active' if p == page else '' }}">{{ p }}</a>
     {% endfor %}
 </div>
 {% endif %}

@@ -6,7 +6,7 @@
         <h1>Дашборд</h1>
         <div class="subtitle">Последние 15 запросов</div>
     </div>
-    <a href="/requests/create" class="btn btn-success">+ Создать запрос</a>
+    <a href="/reg/requests/create" class="btn btn-success">+ Создать запрос</a>
 </div>
 <div class="table-wrap">
     <table>
@@ -35,7 +35,7 @@
                     {% else %}<span class="badge">{{ status or '-' }}</span>{% endif %}
                 </td>
                 <td>{{ (req.description or '-')[:50] }}</td>
-                <td><a href="/requests/{{ req.id }}" class="btn btn-primary btn-sm">Детали</a></td>
+                <td><a href="/reg/requests/{{ req.id }}" class="btn btn-primary btn-sm">Детали</a></td>
             </tr>
             {% endfor %}
             {% if not requests %}

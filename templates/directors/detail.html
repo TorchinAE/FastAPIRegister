@@ -55,7 +55,7 @@ document.getElementById('editDirForm').addEventListener('submit', async function
         phone: fd.get('phone') || null,
         position_id: parseInt(fd.get('position_id')),
     };
-    const resp = await fetch('/api/directors/', {
+    const resp = await fetch('/reg/api/directors/', {
         method: 'PATCH',
         headers: {'Content-Type': 'application/json'},
         body: JSON.stringify(data),

@@ -33,7 +33,7 @@ document.getElementById('editPosForm').addEventListener('submit', async function
     e.preventDefault();
     const fd = new FormData(this);
     const data = { id: parseInt(fd.get('id')), name: fd.get('name') };
-    const resp = await fetch('/api/positions/', {
+    const resp = await fetch('/reg/api/positions/', {
         method: 'PATCH',
         headers: {'Content-Type': 'application/json'},
         body: JSON.stringify(data),

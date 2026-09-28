@@ -6,7 +6,7 @@
         <h1>{{ cp.name }}</h1>
         <div class="subtitle">Контрагент #{{ cp.id }}</div>
     </div>
-    <a href="/counterparties" class="btn btn-ghost">← Назад</a>
+    <a href="/reg/counterparties" class="btn btn-ghost">← Назад</a>
 </div>
 
 <div class="card" style="margin-bottom:1.5rem">
@@ -34,8 +34,8 @@
                     {% endfor %}
                 </select>
                 <div style="display:flex;flex-direction:column;gap:0.35rem;margin-top:0.35rem">
-                    <a href="/companies/{{ cp.company_id }}/edit?back_to=/counterparties/{{ cp.id }}" id="editCompanyLink" class="btn btn-ghost btn-sm" style="font-size:0.8rem">Изменить данные компании</a>
-                    <a href="/companies/create?back_to=/counterparties/{{ cp.id }}" class="btn btn-ghost btn-sm" style="font-size:0.8rem">+ Новая компания</a>
+                    <a href="/reg/companies/{{ cp.company_id }}/edit?back_to=/counterparties/{{ cp.id }}" id="editCompanyLink" class="btn btn-ghost btn-sm" style="font-size:0.8rem">Изменить данные компании</a>
+                    <a href="/reg/companies/create?back_to=/counterparties/{{ cp.id }}" class="btn btn-ghost btn-sm" style="font-size:0.8rem">+ Новая компания</a>
                 </div>
             </div>
         </div>
@@ -61,7 +61,7 @@
             </thead>
             <tbody>
                 {% for r in reqs %}
-                <tr style="cursor:pointer" onclick="location.href='/requests/{{ r.id }}'">
+                <tr style="cursor:pointer" onclick="location.href='/reg/requests/{{ r.id }}'">
                     <td>{{ r.tkp_num or '-' }}</td>
                     <td>{{ r.request_date.strftime('%d.%m.%Y') }}</td>
                     <td><span class="badge badge-new">{{ r.status.value }}</span></td>
@@ -98,7 +98,7 @@ if (newCompanyId) {
     }
     if (!found) {
         // Fetch company name and add option
-        fetch('/api/companies/' + newCompanyId).then(r => r.json()).then(c => {
+        fetch('/reg/api/companies/' + newCompanyId).then(r => r.json()).then(c => {
             const opt = document.createElement('option');
             opt.value = c.id;
             opt.textContent = c.name;
@@ -122,7 +122,7 @@ document.getElementById('editCpForm').addEventListener('submit', async function(
         phone: fd.get('phone') || null,
         company_id: parseInt(fd.get('company_id')),
     };
-    const resp = await fetch('/api/counterparties/', {
+    const resp = await fetch('/reg/api/counterparties/', {
         method: 'PATCH',
         headers: {'Content-Type': 'application/json'},
         body: JSON.stringify(data),
@@ -136,9 +136,9 @@ document.getElementById('editCpForm').addEventListener('submit', async function(
 
 async function deleteCp() {
     if (!confirm('Удалить контрагента {{ cp.name }}?')) return;
-    const resp = await fetch('/counterparties/{{ cp.id }}/delete', {method: 'DELETE'});
+    const resp = await fetch('/reg/counterparties/{{ cp.id }}/delete', {method: 'DELETE'});
     if (resp.ok) {
-        window.location.href = '/counterparties';
+        window.location.href = '/reg/counterparties';
     } else {
         showToast('Ошибка удаления');
     }

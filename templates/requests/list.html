@@ -3,7 +3,7 @@
 {% block content %}
 <div class="page-header" style="gap:1rem; flex-wrap:wrap;">
     <div style="display:flex; align-items:center; gap:0.75rem;">
-        <a href="/requests/create" class="btn btn-success">+ Создать ТКП</a>
+        <a href="/reg/requests/create" class="btn btn-success">+ Создать ТКП</a>
         <button type="button" class="btn btn-ghost" onclick="resetFilters()">Сбросить фильтры</button>
         <h1>Реестр ТКП</h1>
     </div>
@@ -71,7 +71,7 @@
         </thead>
         <tbody>
             {% for req in items %}
-            <tr class="clickable-row" onclick="window.location='/requests/{{ req.id }}'">
+            <tr class="clickable-row" onclick="window.location='/reg/requests/{{ req.id }}'">
                 <td><strong>#{{ req.id }}</strong></td>
                 <td>{{ req.tkp_num or '-' }}</td>
                 <td data-sort="{{ req.request_date.strftime('%Y%m%d') if req.request_date else '' }}">{{ req.request_date.strftime('%d.%m.%Y') if req.request_date else '-' }}</td>
@@ -111,7 +111,7 @@
 {% if pages > 1 %}
 <div class="pagination">
     {% for p in range(1, pages + 1) %}
-    <a href="/requests?page={{ p }}" class="{{ 'active' if p == page else '' }}">{{ p }}</a>
+    <a href="/reg/requests?page={{ p }}" class="{{ 'active' if p == page else '' }}">{{ p }}</a>
     {% endfor %}
 </div>
 {% endif %}

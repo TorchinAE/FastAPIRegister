@@ -59,7 +59,7 @@ document.getElementById('editMatForm').addEventListener('submit', async function
         code_agent: fd.get('code_agent') || null,
         url_agent: fd.get('url_agent') || null,
     };
-    const resp = await fetch('/api/materials/', {
+    const resp = await fetch('/reg/api/materials/', {
         method: 'PATCH',
         headers: {'Content-Type': 'application/json'},
         body: JSON.stringify(data),
@@ -74,9 +74,9 @@ document.getElementById('editMatForm').addEventListener('submit', async function
 
 async function deleteMat() {
     if (!confirm('Удалить материал {{ mat.name }}?')) return;
-    const resp = await fetch('/api/materials/{{ mat.id }}', {method: 'DELETE'});
+    const resp = await fetch('/reg/api/materials/{{ mat.id }}', {method: 'DELETE'});
     if (resp.ok) {
-        window.location.href = '/materials';
+        window.location.href = '/reg/materials';
     } else {
         showToast('Ошибка удаления');
     }

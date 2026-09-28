@@ -51,7 +51,7 @@ async def login_submit(
             "login.html",
             {"request": request, "error": "Неверный email или пароль", "user": None},
         )
-    response = RedirectResponse("/requests", status_code=302)
+    response = RedirectResponse("/reg/requests", status_code=302)
     response.set_cookie(key=SESSION_KEY, value=user.email, httponly=True)
     return response
 
@@ -79,14 +79,14 @@ async def register_submit(
         )
     user = await crud_users.create_user(session, UserCreate(name=name, email=email, password=password))
     await session.commit()
-    response = RedirectResponse("/requests", status_code=302)
+    response = RedirectResponse("/reg/requests", status_code=302)
     response.set_cookie(key=SESSION_KEY, value=user.email, httponly=True)
     return response
 
 
 @pages_router.get("/logout")
 async def logout():
-    response = RedirectResponse("/", status_code=302)
+    response = RedirectResponse("/reg/", status_code=302)
     response.delete_cookie(key=SESSION_KEY)
     return response
 
@@ -100,7 +100,7 @@ async def requests_page(
 ):
     user = await get_current_user(request, session)
     if not user:
-        return RedirectResponse("/", status_code=302)
+        return RedirectResponse("/reg/", status_code=302)
     requests_list, total = await crud_requests.get_requests(session, page=page)
     per_page = 20
     pages = (total + per_page - 1) // per_page
@@ -126,7 +126,7 @@ async def request_create_page(
 ):
     user = await get_current_user(request, session)
     if not user:
-        return RedirectResponse("/", status_code=302)
+        return RedirectResponse("/reg/", status_code=302)
     from scr.dbase.schemas.schemas import RequestCreateSchema
 
     # Create minimal request with auto-filled fields
@@ -145,7 +145,7 @@ async def request_create_submit(
 ):
     user = await get_current_user(request, session)
     if not user:
-        return RedirectResponse("/", status_code=302)
+        return RedirectResponse("/reg/", status_code=302)
     form = await request.form()
     from scr.dbase.models import RequestStatus as RS
     from scr.dbase.schemas.schemas import RequestCreateSchema
@@ -186,7 +186,7 @@ async def request_create_submit(
     schema = RequestCreateSchema(**data)
     await crud_requests.add_request(session, schema, manager_id=manager_id, created_by=user.name, user_city=user.city)
     await session.commit()
-    return RedirectResponse("/requests", status_code=302)
+    return RedirectResponse("/reg/requests", status_code=302)
 
 
 @pages_router.get("/requests/{req_id}", response_class=HTMLResponse)
@@ -197,7 +197,7 @@ async def request_detail_page(
 ):
     user = await get_current_user(request, session)
     if not user:
-        return RedirectResponse("/", status_code=302)
+        return RedirectResponse("/reg/", status_code=302)
     req = await crud_requests.get_request_by_id(session, req_id)
     if not req:
         return HTMLResponse("ТКП не найдена", status_code=404)
@@ -245,7 +245,7 @@ async def request_edit_submit(
 ):
     user = await get_current_user(request, session)
     if not user:
-        return RedirectResponse("/", status_code=302)
+        return RedirectResponse("/reg/", status_code=302)
     form = await request.form()
     from scr.dbase.schemas.schemas import RequestUpdateSchema
 
@@ -297,7 +297,7 @@ async def counterparties_page(
 ):
     user = await get_current_user(request, session)
     if not user:
-        return RedirectResponse("/", status_code=302)
+        return RedirectResponse("/reg/", status_code=302)
     items, total = await crud_counterparties.get_counterparties(session, page=page)
     companies, _ = await crud_organizations.get_organizations(session, per_page=100)
     per_page = 20
@@ -324,7 +324,7 @@ async def counterparties_create_submit(
 ):
     user = await get_current_user(request, session)
     if not user:
-        return RedirectResponse("/", status_code=302)
+        return RedirectResponse("/reg/", status_code=302)
     form = await request.form()
     name = form.get("name", "").strip()
     email = form.get("email", "").strip()
@@ -339,7 +339,7 @@ async def counterparties_create_submit(
         }
         await crud_counterparties.add_counterparty(session, CounterpartyCreateSchema(**data), created_by=user.name)
         await session.commit()
-    return RedirectResponse("/counterparties", status_code=302)
+    return RedirectResponse("/reg/counterparties", status_code=302)
 
 
 @pages_router.get("/counterparties/{cp_id}", response_class=HTMLResponse)
@@ -350,7 +350,7 @@ async def counterparties_detail_page(
 ):
     user = await get_current_user(request, session)
     if not user:
-        return RedirectResponse("/", status_code=302)
+        return RedirectResponse("/reg/", status_code=302)
     cp = await crud_counterparties.get_counterparty_by_id(session, cp_id)
     if not cp:
         return HTMLResponse("Контрагент не найден", status_code=404)
@@ -397,7 +397,7 @@ async def companies_page(
 ):
     user = await get_current_user(request, session)
     if not user:
-        return RedirectResponse("/", status_code=302)
+        return RedirectResponse("/reg/", status_code=302)
     items, total = await crud_organizations.get_organizations(session, page=page)
     directors, _ = await crud_directors.get_dirs(session, per_page=100)
     per_page = 20
@@ -423,7 +423,7 @@ async def companies_create_submit(
 ):
     user = await get_current_user(request, session)
     if not user:
-        return RedirectResponse("/", status_code=302)
+        return RedirectResponse("/reg/", status_code=302)
     form = await request.form()
     name = form.get("name", "").strip()
     if name:
@@ -437,7 +437,7 @@ async def companies_create_submit(
         }
         await crud_organizations.add_organization(session, OrganizationAddSchema(**data), created_by=user.name)
         await session.commit()
-    return RedirectResponse("/companies", status_code=302)
+    return RedirectResponse("/reg/companies", status_code=302)
 
 
 @pages_router.get("/companies/create", response_class=HTMLResponse)
@@ -448,7 +448,7 @@ async def companies_create_page(
 ):
     user = await get_current_user(request, session)
     if not user:
-        return RedirectResponse("/", status_code=302)
+        return RedirectResponse("/reg/", status_code=302)
     directors, _ = await crud_directors.get_dirs(session, per_page=100)
     return templates.TemplateResponse(
         "companies/create.html",
@@ -465,7 +465,7 @@ async def companies_edit_page(
 ):
     user = await get_current_user(request, session)
     if not user:
-        return RedirectResponse("/", status_code=302)
+        return RedirectResponse("/reg/", status_code=302)
     org = await crud_organizations.get_organization_by_id(session, org_id)
     if not org:
         return HTMLResponse("Компания не найдена", status_code=404)
@@ -494,7 +494,7 @@ async def users_page(
 ):
     user = await get_current_user(request, session)
     if not user:
-        return RedirectResponse("/", status_code=302)
+        return RedirectResponse("/reg/", status_code=302)
     items, total = await crud_users.get_users(session, page=page)
     per_page = 20
     return templates.TemplateResponse(
@@ -518,7 +518,7 @@ async def users_create_submit(
 ):
     user = await get_current_user(request, session)
     if not user:
-        return RedirectResponse("/", status_code=302)
+        return RedirectResponse("/reg/", status_code=302)
     form = await request.form()
     name = form.get("name", "").strip()
     email = form.get("email", "").strip()
@@ -538,7 +538,7 @@ async def users_create_submit(
                 ),
             )
             await session.commit()
-    return RedirectResponse("/users", status_code=302)
+    return RedirectResponse("/reg/users", status_code=302)
 
 
 @pages_router.get("/users/{user_id}", response_class=HTMLResponse)
@@ -550,7 +550,7 @@ async def users_detail_page(
 ):
     user = await get_current_user(request, session)
     if not user:
-        return RedirectResponse("/", status_code=302)
+        return RedirectResponse("/reg/", status_code=302)
     target = await crud_users.get_user_by_id(session, user_id)
     if not target:
         return HTMLResponse("Пользователь не найден", status_code=404)
@@ -585,7 +585,7 @@ async def directors_page(
 ):
     user = await get_current_user(request, session)
     if not user:
-        return RedirectResponse("/", status_code=302)
+        return RedirectResponse("/reg/", status_code=302)
     items, total = await crud_directors.get_dirs(session, page=page)
     positions, _ = await crud_positions.get_all_positions(session, per_page=100)
     per_page = 20
@@ -611,7 +611,7 @@ async def directors_create_submit(
 ):
     user = await get_current_user(request, session)
     if not user:
-        return RedirectResponse("/", status_code=302)
+        return RedirectResponse("/reg/", status_code=302)
     form = await request.form()
     name = form.get("name", "").strip()
     if name:
@@ -625,7 +625,7 @@ async def directors_create_submit(
         }
         await crud_directors.add_dir(session, DirectorSchema(**data), created_by=user.name)
         await session.commit()
-    return RedirectResponse("/directors", status_code=302)
+    return RedirectResponse("/reg/directors", status_code=302)
 
 
 @pages_router.get("/directors/{dir_id}", response_class=HTMLResponse)
@@ -637,7 +637,7 @@ async def directors_detail_page(
 ):
     user = await get_current_user(request, session)
     if not user:
-        return RedirectResponse("/", status_code=302)
+        return RedirectResponse("/reg/", status_code=302)
     dir = await crud_directors.get_dir_to_id(session, dir_id)
     if not dir:
         return HTMLResponse("Директор не найден", status_code=404)
@@ -680,7 +680,7 @@ async def positions_page(
 ):
     user = await get_current_user(request, session)
     if not user:
-        return RedirectResponse("/", status_code=302)
+        return RedirectResponse("/reg/", status_code=302)
     items, total = await crud_positions.get_all_positions(session, page=page)
     per_page = 20
     return templates.TemplateResponse(
@@ -704,7 +704,7 @@ async def positions_create_submit(
 ):
     user = await get_current_user(request, session)
     if not user:
-        return RedirectResponse("/", status_code=302)
+        return RedirectResponse("/reg/", status_code=302)
     form = await request.form()
     name = form.get("name", "").strip()
     if name:
@@ -712,7 +712,7 @@ async def positions_create_submit(
 
         await crud_positions.add_position(session, PositionCreateSchema(name=name), created_by=user.name)
         await session.commit()
-    return RedirectResponse("/positions", status_code=302)
+    return RedirectResponse("/reg/positions", status_code=302)
 
 
 @pages_router.get("/positions/{pos_id}", response_class=HTMLResponse)
@@ -724,7 +724,7 @@ async def positions_detail_page(
 ):
     user = await get_current_user(request, session)
     if not user:
-        return RedirectResponse("/", status_code=302)
+        return RedirectResponse("/reg/", status_code=302)
     pos = await crud_positions.get_position_id(session, pos_id)
     if not pos:
         return HTMLResponse("Должность не найдена", status_code=404)
@@ -743,7 +743,7 @@ async def equipment_page(
 ):
     user = await get_current_user(request, session)
     if not user:
-        return RedirectResponse("/", status_code=302)
+        return RedirectResponse("/reg/", status_code=302)
     items, total = await crud_equipment.get_equipment_list(session, page=page)
     per_page = 20
     return templates.TemplateResponse(
@@ -767,7 +767,7 @@ async def equipment_create_submit(
 ):
     user = await get_current_user(request, session)
     if not user:
-        return RedirectResponse("/", status_code=302)
+        return RedirectResponse("/reg/", status_code=302)
     form = await request.form()
     name = form.get("name", "").strip()
     if name:
@@ -775,7 +775,7 @@ async def equipment_create_submit(
 
         await crud_equipment.add_equipment(session, EquipmentCreateSchema(name=name), created_by=user.name)
         await session.commit()
-    return RedirectResponse("/equipment", status_code=302)
+    return RedirectResponse("/reg/equipment", status_code=302)
 
 
 @pages_router.get("/equipment/{eq_id}", response_class=HTMLResponse)
@@ -787,7 +787,7 @@ async def equipment_detail_page(
 ):
     user = await get_current_user(request, session)
     if not user:
-        return RedirectResponse("/", status_code=302)
+        return RedirectResponse("/reg/", status_code=302)
     eq = await crud_equipment.get_equipment_by_id(session, eq_id)
     if not eq:
         return HTMLResponse("Оборудование не найдено", status_code=404)
@@ -821,7 +821,7 @@ async def settings_page(
 ):
     user = await get_current_user(request, session)
     if not user:
-        return RedirectResponse("/", status_code=302)
+        return RedirectResponse("/reg/", status_code=302)
     all_settings = await crud_settings.get_all_settings(session)
     return templates.TemplateResponse(
         "settings/list.html",
@@ -837,7 +837,7 @@ async def invoices_page(
 ):
     user = await get_current_user(request, session)
     if not user:
-        return RedirectResponse("/", status_code=302)
+        return RedirectResponse("/reg/", status_code=302)
     from sqlalchemy import func, select
     from sqlalchemy.orm import selectinload
 
@@ -880,7 +880,7 @@ async def request_calc_page(
 ):
     user = await get_current_user(request, session)
     if not user:
-        return RedirectResponse("/", status_code=302)
+        return RedirectResponse("/reg/", status_code=302)
     req = await crud_requests.get_request_by_id(session, req_id)
     if not req:
         return HTMLResponse("ТКП не найдена", status_code=404)
@@ -933,7 +933,7 @@ async def materials_page(
 ):
     user = await get_current_user(request, session)
     if not user:
-        return RedirectResponse("/", status_code=302)
+        return RedirectResponse("/reg/", status_code=302)
     items, total = await crud_materials.get_materials(session, page=page)
     per_page = 20
     return templates.TemplateResponse(
@@ -957,7 +957,7 @@ async def materials_create_submit(
 ):
     user = await get_current_user(request, session)
     if not user:
-        return RedirectResponse("/", status_code=302)
+        return RedirectResponse("/reg/", status_code=302)
     form = await request.form()
     name = form.get("name", "").strip()
     if name:
@@ -972,7 +972,7 @@ async def materials_create_submit(
         }
         await crud_materials.add_material(session, MaterialCreateSchema(**data), created_by=user.name)
         await session.commit()
-    return RedirectResponse("/materials", status_code=302)
+    return RedirectResponse("/reg/materials", status_code=302)
 
 
 @pages_router.get("/materials/{mat_id}", response_class=HTMLResponse)
@@ -984,7 +984,7 @@ async def materials_detail_page(
 ):
     user = await get_current_user(request, session)
     if not user:
-        return RedirectResponse("/", status_code=302)
+        return RedirectResponse("/reg/", status_code=302)
     mat = await crud_materials.get_material_by_id(session, mat_id)
     if not mat:
         return HTMLResponse("Материал не найден", status_code=404)
@@ -1003,7 +1003,7 @@ async def modules_page(
 ):
     user = await get_current_user(request, session)
     if not user:
-        return RedirectResponse("/", status_code=302)
+        return RedirectResponse("/reg/", status_code=302)
     items, total = await crud_modules.get_modules(session, page=page)
     per_page = 20
     return templates.TemplateResponse(
@@ -1027,7 +1027,7 @@ async def modules_create_submit(
 ):
     user = await get_current_user(request, session)
     if not user:
-        return RedirectResponse("/", status_code=302)
+        return RedirectResponse("/reg/", status_code=302)
     form = await request.form()
     name = form.get("name", "").strip()
     if name:
@@ -1035,7 +1035,7 @@ async def modules_create_submit(
 
         await crud_modules.add_module(session, ModuleCreateSchema(name=name), created_by=user.name)
         await session.commit()
-    return RedirectResponse("/modules", status_code=302)
+    return RedirectResponse("/reg/modules", status_code=302)
 
 
 @pages_router.get("/modules/{mod_id}", response_class=HTMLResponse)
@@ -1047,7 +1047,7 @@ async def modules_detail_page(
 ):
     user = await get_current_user(request, session)
     if not user:
-        return RedirectResponse("/", status_code=302)
+        return RedirectResponse("/reg/", status_code=302)
     mod = await crud_modules.get_module_by_id(session, mod_id)
     if not mod:
         return HTMLResponse("Модуль не найден", status_code=404)

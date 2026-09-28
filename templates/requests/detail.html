@@ -7,13 +7,13 @@
         <div class="subtitle">Код: {{ req.id }} &middot; {{ req.tkp_num or '' }}</div>
     </div>
 </div>
-<form id="main-form" method="post" action="/requests/{{ req.id }}" class="edit-form" style="padding:1rem;" data-is-new="{{ '1' if not req.counterparty_id else '' }}">
+<form id="main-form" method="post" action="/reg/requests/{{ req.id }}" class="edit-form" style="padding:1rem;" data-is-new="{{ '1' if not req.counterparty_id else '' }}">
 <div style="display:flex;gap:0.5rem;margin-bottom:0.75rem;flex-wrap:wrap;">
-    <a href="/requests" class="btn btn-ghost">← Назад к списку</a>
-    <a href="/requests/create" class="btn btn-success">+ Новое ТКП</a>
+    <a href="/reg/requests" class="btn btn-ghost">← Назад к списку</a>
+    <a href="/reg/requests/create" class="btn btn-success">+ Новое ТКП</a>
     <button type="button" class="btn btn-ghost" onclick="openFolderTKP()">Открыть папку ТКП</button>
     <button type="button" id="btn-open-zz" class="btn btn-ghost" onclick="openFolderZZ()" style="display:none;">Открыть папку ЗЗ</button>
-    <a href="/requests/{{ req.id }}/calc" class="btn btn-ghost">Расчет ТКП</a>
+    <a href="/reg/requests/{{ req.id }}/calc" class="btn btn-ghost">Расчет ТКП</a>
 </div>
 <div class="edit-compact">
 
@@ -107,7 +107,7 @@
                             {% endif %}
                         {% endfor %}
                         {% for r in matching %}
-                        <tr class="clickable-row" style="background:#fef2f2;" onclick="window.location='/requests/{{ r.id }}'">
+                        <tr class="clickable-row" style="background:#fef2f2;" onclick="window.location='/reg/requests/{{ r.id }}'">
                             <td><strong>{{ r.tkp_num or '-' }}</strong></td>
                             <td>{{ r.request_date.strftime('%d.%m.%Y') if r.request_date else '-' }}</td>
                             <td>{{ r.equipment.name if r.equipment else '-' }}</td>
@@ -117,7 +117,7 @@
                         </tr>
                         {% endfor %}
                         {% for r in rest %}
-                        <tr class="clickable-row {{ 'current-row' if r.id == req.id else '' }}" onclick="window.location='/requests/{{ r.id }}'">
+                        <tr class="clickable-row {{ 'current-row' if r.id == req.id else '' }}" onclick="window.location='/reg/requests/{{ r.id }}'">
                             <td><strong>{{ r.tkp_num or '-' }}</strong></td>
                             <td>{{ r.request_date.strftime('%d.%m.%Y') if r.request_date else '-' }}</td>
                             <td>{{ r.equipment.name if r.equipment else '-' }}</td>
@@ -534,7 +534,7 @@ document.getElementById('invoices-list').addEventListener('change', e => {
 });
 
 async function addInvoice() {
-    const resp = await fetch('/api/invoices/', {
+    const resp = await fetch('/reg/api/invoices/', {
         method: 'POST',
         headers: {'Content-Type': 'application/json'},
         body: JSON.stringify({request_id: REQ_ID, percent: 0, amount: 0})

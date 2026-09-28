@@ -53,7 +53,7 @@ document.getElementById('editUserForm').addEventListener('submit', async functio
         city: fd.get('city') || 'ив',
         signature: fd.get('signature') || null,
     };
-    const resp = await fetch('/api/users/' + data.id, {
+    const resp = await fetch('/reg/api/users/' + data.id, {
         method: 'PATCH',
         headers: {'Content-Type': 'application/json'},
         body: JSON.stringify(data),

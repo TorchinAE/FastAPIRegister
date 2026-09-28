@@ -7,14 +7,14 @@
         <div class="subtitle">Всего: {{ total }}</div>
     </div>
     <div style="display:flex;gap:0.5rem;">
-        <a href="/api/materials/export-excel" class="btn btn-ghost" download>Скачать Excel</a>
+        <a href="/reg/api/materials/export-excel" class="btn btn-ghost" download>Скачать Excel</a>
         <label class="btn btn-ghost" style="cursor:pointer;">
             Загрузить Excel
             <input type="file" accept=".xlsx,.xls" style="display:none" onchange="importExcel(this)">
         </label>
     </div>
 </div>
-<form method="post" action="/materials" style="display:flex; gap:0.75rem; align-items:flex-end; margin-bottom:1rem; padding:1rem 1.25rem; flex-wrap:wrap;">
+<form method="post" action="/reg/materials" style="display:flex; gap:0.75rem; align-items:flex-end; margin-bottom:1rem; padding:1rem 1.25rem; flex-wrap:wrap;">
     <div class="form-group" style="flex:2; min-width:200px; margin-bottom:0;">
         <label>Название</label>
         <input type="text" name="name" placeholder="Название материала" required>
@@ -55,7 +55,7 @@
         </thead>
         <tbody>
             {% for item in items %}
-            <tr style="cursor:pointer" onclick="location.href='/materials/{{ item.id }}'">
+            <tr style="cursor:pointer" onclick="location.href='/reg/materials/{{ item.id }}'">
                 <td><strong>{{ item.id }}</strong></td>
                 <td>{{ item.name }}</td>
                 <td>{{ "%.2f"|format(item.price) }}</td>
@@ -74,7 +74,7 @@
 {% if pages > 1 %}
 <div class="pagination">
     {% for p in range(1, pages + 1) %}
-    <a href="/materials?page={{ p }}" class="{{ 'active' if p == page else '' }}">{{ p }}</a>
+    <a href="/reg/materials?page={{ p }}" class="{{ 'active' if p == page else '' }}">{{ p }}</a>
     {% endfor %}
 </div>
 {% endif %}
@@ -92,7 +92,7 @@ async function importExcel(input) {
     if (!input.files.length) return;
     const fd = new FormData();
     fd.append('file', input.files[0]);
-    const resp = await fetch('/api/materials/import-excel', {method: 'POST', body: fd});
+    const resp = await fetch('/reg/api/materials/import-excel', {method: 'POST', body: fd});
     if (resp.ok) {
         const data = await resp.json();
         showToast(data.message);

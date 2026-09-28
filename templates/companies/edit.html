@@ -36,7 +36,7 @@
                     <option value="{{ d.id }}" {{ 'selected' if d.id == org.director_id else '' }}>{{ d.name }}</option>
                     {% endfor %}
                 </select>
-                <a href="/directors/{{ org.director_id }}?back_to=/companies/{{ org.id }}/edit" id="editDirectorLink" class="btn btn-ghost btn-sm" style="margin-top:0.35rem;font-size:0.8rem">Изменить данные директора</a>
+                <a href="/reg/directors/{{ org.director_id }}?back_to=/companies/{{ org.id }}/edit" id="editDirectorLink" class="btn btn-ghost btn-sm" style="margin-top:0.35rem;font-size:0.8rem">Изменить данные директора</a>
             </div>
         </div>
         <div class="actions">
@@ -55,7 +55,7 @@
             </thead>
             <tbody>
                 {% for r in reqs %}
-                <tr style="cursor:pointer" onclick="location.href='/requests/{{ r.id }}'">
+                <tr style="cursor:pointer" onclick="location.href='/reg/requests/{{ r.id }}'">
                     <td>{{ r.tkp_num or '-' }}</td>
                     <td>{{ r.request_date.strftime('%d.%m.%Y') }}</td>
                     <td><span class="badge badge-new">{{ r.status.value }}</span></td>
@@ -96,7 +96,7 @@ document.getElementById('editCompanyForm').addEventListener('submit', async func
         server_address_slug: fd.get('server_address_slug'),
         director_id: parseInt(fd.get('director_id')),
     };
-    const resp = await fetch('/api/companies/', {
+    const resp = await fetch('/reg/api/companies/', {
         method: 'PATCH',
         headers: {'Content-Type': 'application/json'},
         body: JSON.stringify(data),

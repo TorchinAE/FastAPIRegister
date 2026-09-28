@@ -148,7 +148,7 @@ async function addItem() {
     if (type === 'material') data.material_id = id;
     else data.sub_module_id = id;
 
-    const resp = await fetch('/api/modules/{{ mod.id }}/items', {
+    const resp = await fetch('/reg/api/modules/{{ mod.id }}/items', {
         method: 'POST',
         headers: {'Content-Type': 'application/json'},
         body: JSON.stringify(data),
@@ -171,7 +171,7 @@ document.getElementById('editModForm').addEventListener('submit', async function
     e.preventDefault();
     const fd = new FormData(this);
     const data = { id: parseInt(fd.get('id')), name: fd.get('name') };
-    const resp = await fetch('/api/modules/', {
+    const resp = await fetch('/reg/api/modules/', {
         method: 'PATCH',
         headers: {'Content-Type': 'application/json'},
         body: JSON.stringify(data),
@@ -182,8 +182,8 @@ document.getElementById('editModForm').addEventListener('submit', async function
 
 async function deleteMod() {
     if (!confirm('Удалить модуль {{ mod.name }}?')) return;
-    const resp = await fetch('/api/modules/{{ mod.id }}', {method: 'DELETE'});
-    if (resp.ok) window.location.href = '/modules';
+    const resp = await fetch('/reg/api/modules/{{ mod.id }}', {method: 'DELETE'});
+    if (resp.ok) window.location.href = '/reg/modules';
     else showToast('Ошибка удаления');
 }
 

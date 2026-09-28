@@ -29,7 +29,7 @@ async function saveRow(btn) {
     const key = tr.querySelector('[data-field="key"]').value.trim();
     const value = tr.querySelector('[data-field="value"]').value;
     if (!key) return;
-    await fetch('/api/settings/', {
+    await fetch('/reg/api/settings/', {
         method: 'PUT',
         headers: {'Content-Type': 'application/json'},
         body: JSON.stringify({key, value})
