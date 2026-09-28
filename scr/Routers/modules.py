@@ -90,8 +90,10 @@ async def export_modules_excel(
 
     header_font = Font(color="999999", bold=True)
     thin_border = Border(
-        left=Side(style="thin"), right=Side(style="thin"),
-        top=Side(style="thin"), bottom=Side(style="thin"),
+        left=Side(style="thin"),
+        right=Side(style="thin"),
+        top=Side(style="thin"),
+        bottom=Side(style="thin"),
     )
 
     def _style_header(ws, cols):
@@ -111,7 +113,7 @@ async def export_modules_excel(
     for mod in modules:
         ws1.append([mod.id, mod.name, mod.items_count, float(mod.total_price)])
         _style_row(ws1, ws1.max_row, 4)
-        ws1.cell(ws1.max_row, 4).number_format = '# ##0.00'
+        ws1.cell(ws1.max_row, 4).number_format = "# ##0.00"
 
     ws2 = wb.create_sheet("Состав")
     ws2.append(["Модуль", "Тип компонента", "Название компонента", "Количество"])
@@ -203,7 +205,7 @@ async def export_module_excel(mod_id: int, session: AsyncSession = Depends(db_he
     ws.title = "Состав модуля"
 
     header_font = Font(color="999999", bold=True)
-    money_fmt = '# ##0.00'
+    money_fmt = "# ##0.00"
     thin_border = Border(
         left=Side(style="thin"),
         right=Side(style="thin"),
@@ -215,7 +217,9 @@ async def export_module_excel(mod_id: int, session: AsyncSession = Depends(db_he
         result = []
         for it in module.items:
             if it.material:
-                result.append({"name": it.material.name, "price": float(it.material.price), "quantity": it.quantity * qty})
+                result.append(
+                    {"name": it.material.name, "price": float(it.material.price), "quantity": it.quantity * qty}
+                )
             elif it.sub_module:
                 result.extend(_bom_flat(it.sub_module, it.quantity * qty))
         return result

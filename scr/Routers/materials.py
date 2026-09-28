@@ -81,8 +81,10 @@ async def export_materials_excel(
 
     header_font = Font(color="999999", bold=True)
     thin_border = Border(
-        left=Side(style="thin"), right=Side(style="thin"),
-        top=Side(style="thin"), bottom=Side(style="thin"),
+        left=Side(style="thin"),
+        right=Side(style="thin"),
+        top=Side(style="thin"),
+        bottom=Side(style="thin"),
     )
 
     ws.append(["ID", "Название", "Цена", "Код 1С", "Код агент", "URL агент", "Тип"])
@@ -104,7 +106,7 @@ async def export_materials_excel(
             ]
         )
         row_num = ws.max_row
-        ws.cell(row_num, 3).number_format = '# ##0.00'
+        ws.cell(row_num, 3).number_format = "# ##0.00"
         for col_idx in range(1, 8):
             ws.cell(row_num, col_idx).border = thin_border
 
