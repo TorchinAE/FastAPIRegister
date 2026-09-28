@@ -72,14 +72,15 @@ async def read_all_materials(
 async def export_materials_excel(
     session: AsyncSession = Depends(db_helper.session_dependency),
 ):
-    from openpyxl.styles import Border, Font, Side
+    from openpyxl.styles import Border, Font, PatternFill, Side
 
     items = await crud_materials.get_all_materials(session=session)
     wb = Workbook()
     ws = wb.active
     ws.title = "Материалы"
 
-    header_font = Font(color="999999", bold=True)
+    header_font = Font(bold=True)
+    header_fill = PatternFill(start_color="D9D9D9", end_color="D9D9D9", fill_type="solid")
     thin_border = Border(
         left=Side(style="thin"),
         right=Side(style="thin"),
@@ -91,6 +92,7 @@ async def export_materials_excel(
     for col_idx in range(1, 8):
         cell = ws.cell(1, col_idx)
         cell.font = header_font
+        cell.fill = header_fill
         cell.border = thin_border
 
     for item in items:

@@ -83,12 +83,13 @@ async def read_all_modules(
 async def export_modules_excel(
     session: AsyncSession = Depends(db_helper.session_dependency),
 ):
-    from openpyxl.styles import Border, Font, Side
+    from openpyxl.styles import Border, Font, PatternFill, Side
 
     modules = await crud_modules.get_all_modules(session=session)
     wb = Workbook()
 
-    header_font = Font(color="999999", bold=True)
+    header_font = Font(bold=True)
+    header_fill = PatternFill(start_color="D9D9D9", end_color="D9D9D9", fill_type="solid")
     thin_border = Border(
         left=Side(style="thin"),
         right=Side(style="thin"),
@@ -96,10 +97,11 @@ async def export_modules_excel(
         bottom=Side(style="thin"),
     )
 
-    def _style_header(ws, cols):
+    def _style_header(ws, cols, row_num=1):
         for col_idx in range(1, cols + 1):
-            cell = ws.cell(1, col_idx)
+            cell = ws.cell(row_num, col_idx)
             cell.font = header_font
+            cell.fill = header_fill
             cell.border = thin_border
 
     def _style_row(ws, row_num, cols):
@@ -194,7 +196,7 @@ async def import_modules_excel(
 
 @mod_router.get("/{mod_id}/export-excel")
 async def export_module_excel(mod_id: int, session: AsyncSession = Depends(db_helper.session_dependency)):
-    from openpyxl.styles import Border, Font, Side
+    from openpyxl.styles import Border, Font, PatternFill, Side
 
     mod = await crud_modules.get_module_by_id(session=session, mod_id=mod_id)
     if not mod:
@@ -204,7 +206,8 @@ async def export_module_excel(mod_id: int, session: AsyncSession = Depends(db_he
     ws = wb.active
     ws.title = "Состав модуля"
 
-    header_font = Font(color="999999", bold=True)
+    header_font = Font(bold=True)
+    header_fill = PatternFill(start_color="D9D9D9", end_color="D9D9D9", fill_type="solid")
     money_fmt = "# ##0.00"
     thin_border = Border(
         left=Side(style="thin"),
@@ -237,6 +240,7 @@ async def export_module_excel(mod_id: int, session: AsyncSession = Depends(db_he
     for col_idx, _ in enumerate(headers, 1):
         cell = ws.cell(2, col_idx)
         cell.font = header_font
+        cell.fill = header_fill
         cell.border = thin_border
 
     # Rows 3+: items
@@ -282,6 +286,7 @@ async def export_module_excel(mod_id: int, session: AsyncSession = Depends(db_he
         for col_idx, _ in enumerate(bom_headers, 1):
             cell = ws.cell(bom_hdr_row, col_idx)
             cell.font = header_font
+            cell.fill = header_fill
             cell.border = thin_border
 
         for bi in bom_items:
