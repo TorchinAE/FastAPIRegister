@@ -12,8 +12,9 @@ async def test_export_materials_excel(client):
     assert "spreadsheetml" in response.headers["content-type"]
     wb = load_workbook_from_bytes(response.content)
     ws = wb.active
-    assert ws.cell(1, 1).value == "ID"
-    assert ws.cell(1, 2).value == "Название"
+    assert ws.cell(1, 1).value == "Материалы"
+    assert ws.cell(2, 1).value == "ID"
+    assert ws.cell(2, 2).value == "Название"
 
 
 @pytest.mark.asyncio

@@ -88,8 +88,7 @@ def _auto_fit_columns(ws):
         for cell in col_cells:
             if cell.value is not None:
                 cell_len = len(str(cell.value))
-                if cell_len > max_len:
-                    max_len = cell_len
+                max_len = max(max_len, cell_len)
         ws.column_dimensions[col_letter].width = min(max_len + 3, 60)
 
 
