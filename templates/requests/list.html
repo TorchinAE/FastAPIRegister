@@ -5,6 +5,7 @@
     <div style="display:flex; align-items:center; gap:0.75rem;">
         <a href="/reg/requests/create" class="btn btn-success">+ Создать ТКП</a>
         <button type="button" class="btn btn-ghost" onclick="resetFilters()">Сбросить фильтры</button>
+        <button type="button" class="btn btn-ghost" onclick="exportFilteredExcel()">Скачать Excel</button>
         <h1>Реестр ТКП</h1>
     </div>
     <span class="subtitle">Всего: {{ total }}</span>
@@ -118,6 +119,7 @@
 {% endblock %}
 
 {% block scripts %}
+<script src="https://cdnjs.cloudflare.com/ajax/libs/xlsx/0.18.5/xlsx.full.min.js"></script>
 <style>
 #dataTable th, #dataTable td { white-space: nowrap; padding: 0.5rem 0.75rem; vertical-align: middle; }
 #dataTable td.desc-cell {
@@ -174,5 +176,37 @@ document.querySelectorAll('.tf-date').forEach(input => {
         });
     });
 });
+
+function exportFilteredExcel() {
+    const headers = [];
+    document.querySelectorAll('#dataTable thead tr:first-child th').forEach(th => {
+        headers.push(th.textContent.trim());
+    });
+    const rows = [];
+    document.querySelectorAll('#dataTable tbody tr:not(.empty-row)').forEach(tr => {
+        if (tr.style.display === 'none') return;
+        const row = [];
+        tr.querySelectorAll('td').forEach(td => {
+            let val = td.textContent.trim();
+            val = val.replace(/\s+/g, ' ');
+            row.push(val);
+        });
+        if (row.length === headers.length) rows.push(row);
+    });
+    if (rows.length === 0) { alert('Нет видимых строк для экспорта'); return; }
+    const ws = XLSX.utils.aoa_to_sheet([headers, ...rows]);
+    ws['!cols'] = headers.map((h, i) => {
+        let maxLen = h.length;
+        rows.forEach(r => { const l = String(r[i] || '').length; if (l > maxLen) maxLen = l; });
+        return { wch: Math.min(maxLen + 2, 50) };
+    });
+    const wb = XLSX.utils.book_new();
+    XLSX.utils.book_append_sheet(wb, ws, 'ТКП');
+    const now = new Date();
+    const dateStr = now.getFullYear() +
+        String(now.getMonth() + 1).padStart(2, '0') +
+        String(now.getDate()).padStart(2, '0');
+    XLSX.writeFile(wb, 'tkp_' + dateStr + '.xlsx');
+}
 </script>
 {% endblock %}
