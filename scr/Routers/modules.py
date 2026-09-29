@@ -79,10 +79,26 @@ async def read_all_modules(
     return [_module_to_response(i) for i in items]
 
 
+def _auto_fit_columns(ws):
+    from openpyxl.utils import get_column_letter
+
+    for col_cells in ws.columns:
+        max_len = 0
+        col_letter = get_column_letter(col_cells[0].column)
+        for cell in col_cells:
+            if cell.value is not None:
+                cell_len = len(str(cell.value))
+                if cell_len > max_len:
+                    max_len = cell_len
+        ws.column_dimensions[col_letter].width = min(max_len + 3, 60)
+
+
 @mod_router.get("/export-excel")
 async def export_modules_excel(
     session: AsyncSession = Depends(db_helper.session_dependency),
 ):
+    from datetime import datetime as dt
+
     from openpyxl.styles import Border, Font, PatternFill, Side
 
     modules = await crud_modules.get_all_modules(session=session)
@@ -116,6 +132,7 @@ async def export_modules_excel(
         ws1.append([mod.id, mod.name, mod.items_count, float(mod.total_price)])
         _style_row(ws1, ws1.max_row, 4)
         ws1.cell(ws1.max_row, 4).number_format = "# ##0.00"
+    _auto_fit_columns(ws1)
 
     ws2 = wb.create_sheet("Состав")
     ws2.append(["Модуль", "Тип компонента", "Название компонента", "Количество"])
@@ -128,14 +145,20 @@ async def export_modules_excel(
             elif item.sub_module:
                 ws2.append([mod.name, "модуль", item.sub_module.name, item.quantity])
             _style_row(ws2, ws2.max_row, 4)
+    _auto_fit_columns(ws2)
 
+    from urllib.parse import quote
+
+    date_str = dt.now().strftime("%Y%m%d")
     buf = io.BytesIO()
     wb.save(buf)
     buf.seek(0)
+    filename = f"modules_{date_str}.xlsx"
+    encoded = quote(filename)
     return StreamingResponse(
         buf,
         media_type="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
-        headers={"Content-Disposition": "attachment; filename=modules.xlsx"},
+        headers={"Content-Disposition": f"attachment; filename*=UTF-8''{encoded}"},
     )
 
 
@@ -196,6 +219,8 @@ async def import_modules_excel(
 
 @mod_router.get("/{mod_id}/export-excel")
 async def export_module_excel(mod_id: int, session: AsyncSession = Depends(db_helper.session_dependency)):
+    from datetime import datetime as dt
+
     from openpyxl.styles import Border, Font, PatternFill, Side
 
     mod = await crud_modules.get_module_by_id(session=session, mod_id=mod_id)
@@ -215,6 +240,18 @@ async def export_module_excel(mod_id: int, session: AsyncSession = Depends(db_he
         top=Side(style="thin"),
         bottom=Side(style="thin"),
     )
+
+    async def _get_sub_module_price(sub_mod):
+        full = await crud_modules.get_module_by_id(session, sub_mod.id)
+        if not full:
+            return 0.0
+        total = 0.0
+        for it in full.items:
+            if it.material:
+                total += float(it.material.price) * it.quantity
+            elif it.sub_module:
+                total += (await _get_sub_module_price(it.sub_module)) * it.quantity
+        return total
 
     async def _bom_flat(module, qty=1):
         result = []
@@ -248,7 +285,8 @@ async def export_module_excel(mod_id: int, session: AsyncSession = Depends(db_he
         if item.material:
             row_data = ["Материал", item.material.name, float(item.material.price), item.quantity, None]
         elif item.sub_module:
-            row_data = ["Модуль", item.sub_module.name, float(item.sub_module.total_price), item.quantity, None]
+            sub_price = await _get_sub_module_price(item.sub_module)
+            row_data = ["Модуль", item.sub_module.name, sub_price, item.quantity, None]
         else:
             continue
         ws.append(row_data)
@@ -308,20 +346,22 @@ async def export_module_excel(mod_id: int, session: AsyncSession = Depends(db_he
         for col_idx in range(1, 6):
             ws.cell(bom_total_row, col_idx).border = thin_border
 
-    # Column widths
-    ws.column_dimensions["A"].width = 14
-    ws.column_dimensions["B"].width = 40
-    ws.column_dimensions["C"].width = 16
-    ws.column_dimensions["D"].width = 14
-    ws.column_dimensions["E"].width = 16
+    # Column widths - auto-fit
+    _auto_fit_columns(ws)
+
+    from urllib.parse import quote
 
     buf = io.BytesIO()
     wb.save(buf)
     buf.seek(0)
+    safe_name = mod.name.replace("/", "_").replace("\\", "_").replace(" ", "_")[:50]
+    date_str = dt.now().strftime("%Y%m%d")
+    filename = f"{safe_name}_{date_str}.xlsx"
+    encoded = quote(filename)
     return StreamingResponse(
         buf,
         media_type="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
-        headers={"Content-Disposition": f"attachment; filename=module_{mod_id}.xlsx"},
+        headers={"Content-Disposition": f"attachment; filename*=UTF-8''{encoded}"},
     )
 
 

@@ -1,10 +1,10 @@
 {% extends "base.html" %}
 {% block title %}Контрагенты{% endblock %}
 {% block content %}
-<div class="page-header">
-    <div>
+<div class="page-header" style="gap:1rem; flex-wrap:wrap;">
+    <div style="display:flex; align-items:center; gap:0.75rem;">
         <h1>Контрагенты</h1>
-        <div class="subtitle">Всего: {{ total }}</div>
+        <span class="subtitle">Всего: {{ total }}</span>
     </div>
 </div>
 <form method="post" action="/reg/counterparties" style="display:flex; gap:0.75rem; align-items:flex-end; margin-bottom:1rem; padding:1rem 1.25rem; flex-wrap:wrap;">

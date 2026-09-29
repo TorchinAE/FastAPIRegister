@@ -1,9 +1,11 @@
 {% extends "base.html" %}
 {% block title %}Счета{% endblock %}
 {% block content %}
-<div class="page-header">
-    <h1>Счета</h1>
-    <div class="subtitle">Всего: {{ total }}</div>
+<div class="page-header" style="gap:1rem; flex-wrap:wrap;">
+    <div style="display:flex; align-items:center; gap:0.75rem;">
+        <h1>Счета</h1>
+        <span class="subtitle">Всего: {{ total }}</span>
+    </div>
 </div>
 
 <div class="table-wrap">

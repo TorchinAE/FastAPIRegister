@@ -804,9 +804,19 @@ async def equipment_detail_page(
     eq = await crud_equipment.get_equipment_by_id(session, eq_id)
     if not eq:
         return HTMLResponse("Оборудование не найдено", status_code=404)
+    reqs, _ = await crud_requests.get_requests(session, per_page=1000)
+    eq_reqs = [r for r in reqs if r.equipment_id == eq_id]
     return templates.TemplateResponse(
         "equipment/detail.html",
-        {"request": request, "user": user, "eq": eq, "back_to": back_to, "active_page": "equipment"},
+        {
+            "request": request,
+            "user": user,
+            "eq": eq,
+            "eq_reqs": eq_reqs,
+            "back_to": back_to,
+            "active_page": "equipment",
+            "statuses": RequestStatus,
+        },
     )
 
 

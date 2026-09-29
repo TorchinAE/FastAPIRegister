@@ -25,6 +25,37 @@
     </form>
 </div>
 
+{% if eq_reqs %}
+<div class="form-section" style="margin-top:1rem;">
+    <h3 class="form-section-title">ТКП с оборудованием «{{ eq.name }}»</h3>
+    <div class="table-wrap" style="margin-top:0.25rem;">
+        <table>
+            <thead><tr><th>ТКП</th><th>Дата</th><th>Менеджер</th><th>Компания</th><th>Цена</th><th>Статус</th><th>Объект</th></tr></thead>
+            <tbody>
+                {% for r in eq_reqs %}
+                <tr class="clickable-row" onclick="window.location='/reg/requests/{{ r.id }}'">
+                    <td><strong>{{ r.tkp_num or '-' }}</strong></td>
+                    <td>{{ r.request_date.strftime('%d.%m.%Y') if r.request_date else '-' }}</td>
+                    <td>{{ r.manager.name if r.manager else '-' }}</td>
+                    <td>{{ r.company.name if r.company else '-' }}</td>
+                    <td style="text-align:right;white-space:nowrap;">{{ r.cost|money if r.cost else '0.00' }}</td>
+                    <td>
+                        {% set status = r.status.value if r.status else '' %}
+                        {% if status == 'запрос' %}<span class="badge badge-new">{{ status }}</span>
+                        {% elif status == 'тендер' %}<span class="badge badge-progress">{{ status }}</span>
+                        {% elif status == 'заказ' %}<span class="badge badge-done">{{ status }}</span>
+                        {% elif status == 'не актуально' %}<span class="badge badge-cancel">{{ status }}</span>
+                        {% else %}<span class="badge">{{ status or '-' }}</span>{% endif %}
+                    </td>
+                    <td>{{ (r.description[:40] + '...') if r.description and r.description|length > 40 else (r.description or '-') }}</td>
+                </tr>
+                {% endfor %}
+            </tbody>
+        </table>
+    </div>
+</div>
+{% endif %}
+
 <div id="toast" class="toast" style="display:none"></div>
 {% endblock %}
 

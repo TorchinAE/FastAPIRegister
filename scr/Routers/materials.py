@@ -72,7 +72,9 @@ async def read_all_materials(
 async def export_materials_excel(
     session: AsyncSession = Depends(db_helper.session_dependency),
 ):
-    from openpyxl.styles import Border, Font, PatternFill, Side
+    from datetime import datetime as dt
+
+    from openpyxl.styles import Alignment, Border, Font, PatternFill, Side
 
     items = await crud_materials.get_all_materials(session=session)
     wb = Workbook()
@@ -88,9 +90,15 @@ async def export_materials_excel(
         bottom=Side(style="thin"),
     )
 
+    # Title row
+    ws.append(["Материалы"])
+    ws.merge_cells(start_row=1, start_column=1, end_row=1, end_column=7)
+    ws.cell(1, 1).font = Font(bold=True, size=14)
+    ws.cell(1, 1).alignment = Alignment(horizontal="center")
+
     ws.append(["ID", "Название", "Цена", "Код 1С", "Код агент", "URL агент", "Тип"])
     for col_idx in range(1, 8):
-        cell = ws.cell(1, col_idx)
+        cell = ws.cell(2, col_idx)
         cell.font = header_font
         cell.fill = header_fill
         cell.border = thin_border
@@ -112,13 +120,31 @@ async def export_materials_excel(
         for col_idx in range(1, 8):
             ws.cell(row_num, col_idx).border = thin_border
 
+    # Auto-fit columns
+    from openpyxl.utils import get_column_letter
+
+    for col_cells in ws.columns:
+        max_len = 0
+        col_letter = get_column_letter(col_cells[0].column)
+        for cell in col_cells:
+            if cell.value is not None:
+                cell_len = len(str(cell.value))
+                if cell_len > max_len:
+                    max_len = cell_len
+        ws.column_dimensions[col_letter].width = min(max_len + 3, 60)
+
+    date_str = dt.now().strftime("%Y%m%d")
     buf = io.BytesIO()
     wb.save(buf)
     buf.seek(0)
+    filename = f"materials_{date_str}.xlsx"
+    from urllib.parse import quote
+
+    encoded = quote(filename)
     return StreamingResponse(
         buf,
         media_type="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
-        headers={"Content-Disposition": "attachment; filename=materials.xlsx"},
+        headers={"Content-Disposition": f"attachment; filename*=UTF-8''{encoded}"},
     )
 
 

@@ -1,10 +1,10 @@
 {% extends "base.html" %}
 {% block title %}Материалы{% endblock %}
 {% block content %}
-<div class="page-header">
-    <div>
+<div class="page-header" style="gap:1rem; flex-wrap:wrap;">
+    <div style="display:flex; align-items:center; gap:0.75rem;">
         <h1>Материалы</h1>
-        <div class="subtitle">Всего: {{ total }}</div>
+        <span class="subtitle">Всего: {{ total }}</span>
     </div>
     <div style="display:flex;gap:0.5rem;">
         <a href="/reg/api/materials/export-excel" class="btn btn-ghost" download>Скачать Excel</a>
@@ -67,11 +67,11 @@
                 <th><input type="text" data-col="2" placeholder="Фильтр..." class="tf-input"></th>
                 <th><input type="text" data-col="3" placeholder="Фильтр..." class="tf-input"></th>
                 <th><input type="text" data-col="4" placeholder="Фильтр..." class="tf-input"></th>
-                <th><select data-col="5" class="tf-select"><option value="">—</option><option value="✓">✓</option><option value="—">—</option></select></th>
-                <th><select data-col="6" class="tf-select"><option value="">—</option><option value="✓">✓</option><option value="—">—</option></select></th>
-                <th><select data-col="7" class="tf-select"><option value="">—</option><option value="✓">✓</option><option value="—">—</option></select></th>
-                <th><select data-col="8" class="tf-select"><option value="">—</option><option value="✓">✓</option><option value="—">—</option></select></th>
-                <th><select data-col="9" class="tf-select"><option value="">—</option><option value="✓">✓</option><option value="—">—</option></select></th>
+                <th><select data-col="5" class="tf-select"><option value="">—</option><option value="✓">✓</option><option value="✗">✗</option></select></th>
+                <th><select data-col="6" class="tf-select"><option value="">—</option><option value="✓">✓</option><option value="✗">✗</option></select></th>
+                <th><select data-col="7" class="tf-select"><option value="">—</option><option value="✓">✓</option><option value="✗">✗</option></select></th>
+                <th><select data-col="8" class="tf-select"><option value="">—</option><option value="✓">✓</option><option value="✗">✗</option></select></th>
+                <th><select data-col="9" class="tf-select"><option value="">—</option><option value="✓">✓</option><option value="✗">✗</option></select></th>
                 <th><input type="text" data-col="10" placeholder="Фильтр..." class="tf-input"></th>
                 <th><input type="text" data-col="11" placeholder="Фильтр..." class="tf-input"></th>
                 <th><input type="text" data-col="12" placeholder="Фильтр..." class="tf-input"></th>
@@ -86,11 +86,11 @@
                 <td>{{ item.name }}</td>
                 <td>{{ item.price|money }}</td>
                 <td>{{ item.nom_tok }}</td>
-                <td style="text-align:center">{{ '✓' if item.stats else '' }}</td>
-                <td style="text-align:center">{{ '✓' if item.vtych else '' }}</td>
-                <td style="text-align:center">{{ '✓' if item.vykat else '' }}</td>
-                <td style="text-align:center">{{ '✓' if item.ruchn else '' }}</td>
-                <td style="text-align:center">{{ '✓' if item.el_priv else '' }}</td>
+                <td style="text-align:center">{{ '✓' if item.stats else '✗' }}</td>
+                <td style="text-align:center">{{ '✓' if item.vtych else '✗' }}</td>
+                <td style="text-align:center">{{ '✓' if item.vykat else '✗' }}</td>
+                <td style="text-align:center">{{ '✓' if item.ruchn else '✗' }}</td>
+                <td style="text-align:center">{{ '✓' if item.el_priv else '✗' }}</td>
                 <td>{{ item.code_1c or '' }}</td>
                 <td>{{ item.code_agent or '' }}</td>
                 <td>{{ item.url_agent or '' }}</td>
@@ -214,7 +214,7 @@ document.querySelectorAll('.tf-select').forEach(sel => {
             if (val === '✓') {
                 row.style.display = cellText === '✓' ? '' : 'none';
             } else {
-                row.style.display = cellText !== '✓' ? '' : 'none';
+                row.style.display = cellText === '✗' ? '' : 'none';
             }
         });
     });

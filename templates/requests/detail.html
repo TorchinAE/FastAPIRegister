@@ -425,6 +425,8 @@ document.getElementById('factory-order-num').addEventListener('input', function(
 });
 
 // === Payment items ===
+let paymentSaveTimers = {};
+
 function handlePaymentInput(e) {
     const row = e.target.closest('.payment-row');
     if (!row) return;
@@ -441,7 +443,9 @@ function handlePaymentInput(e) {
             paidDateField.value = new Date().toISOString().split('T')[0];
         }
     }
-    savePayment(row);
+    const id = row.dataset.id;
+    clearTimeout(paymentSaveTimers[id]);
+    paymentSaveTimers[id] = setTimeout(() => savePayment(row), 300);
 }
 document.getElementById('payment-items').addEventListener('input', handlePaymentInput);
 document.getElementById('payment-items').addEventListener('change', handlePaymentInput);
