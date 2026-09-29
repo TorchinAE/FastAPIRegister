@@ -237,14 +237,26 @@ async function exportFilteredExcel() {
         };
     });
 
+    // Columns that are integers (0-indexed: 10-20 = БКТПБ..ПАРН)
+    const intCols = new Set([10, 11, 12, 13, 14, 15, 16, 17, 18, 19, 20]);
+    const costCol = 9; // Стоимость с НДС
+
     // Rows 3+: data
     rows.forEach(r => {
         const dataRow = ws.addRow(r);
-        dataRow.eachCell(cell => {
+        dataRow.eachCell({ includeEmpty: true }, (cell, colNumber) => {
+            const ci = colNumber - 1;
             cell.border = {
                 top: { style: 'thin' }, bottom: { style: 'thin' },
                 left: { style: 'thin' }, right: { style: 'thin' }
             };
+            if (intCols.has(ci)) {
+                const n = parseInt(String(cell.value).replace(/\s/g, ''), 10);
+                if (!isNaN(n)) { cell.value = n; }
+            } else if (ci === costCol) {
+                const n = parseFloat(String(cell.value).replace(/\s/g, '').replace(',', '.'));
+                if (!isNaN(n)) { cell.value = n; cell.numFmt = '#,##0.00'; }
+            }
         });
     });
 
