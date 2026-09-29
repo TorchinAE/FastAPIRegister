@@ -13,7 +13,9 @@ pay_router = APIRouter(prefix="/api/payments", tags=["Payments"])
 
 @pay_router.get("/by-request/{request_id}", response_model=list[PaymentItemResponseSchema])
 async def read_payments(request_id: int, session: AsyncSession = Depends(db_helper.session_dependency)):
-    return await crud_payments.ensure_payment_items(session, request_id)
+    items = await crud_payments.ensure_payment_items(session, request_id)
+    await session.commit()
+    return items
 
 
 @pay_router.put("/{item_id}", response_model=PaymentItemResponseSchema)

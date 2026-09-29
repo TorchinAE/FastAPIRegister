@@ -600,7 +600,7 @@ async function autoSaveForm() {
     amountInputs.forEach(inp => unformatInput(inp));
     const formData = new FormData(mainForm);
     amountInputs.forEach(inp => formatInput(inp));
-    await fetch(mainForm.action, { method: 'POST', body: formData });
+    await fetch(mainForm.getAttribute('action'), { method: 'POST', body: formData });
 }
 
 mainForm.addEventListener('input', () => {
