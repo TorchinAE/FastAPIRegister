@@ -1,0 +1,141 @@
+{% extends "base.html" %}
+{% block title %}Договоры — {{ req.company.name if req.company else '' }}{% endblock %}
+{% block content %}
+<div class="page-header">
+    <div>
+        <h1>Договоры и спецификации</h1>
+        <div class="subtitle">{{ req.company.name if req.company else 'Без организации' }}</div>
+    </div>
+    <div style="display:flex;gap:0.5rem;">
+        <a href="/reg/requests/{{ req.id }}" class="btn btn-ghost">&larr; Назад к ТКП</a>
+        <button class="btn btn-success" onclick="newContract({{ req.id }}, {{ req.company_id }})">Новый договор</button>
+        <button class="btn btn-primary" onclick="showNewSpecForm()">Новая спецификация</button>
+    </div>
+</div>
+
+<!-- Form for adding spec to existing contract (hidden by default) -->
+<div id="newSpecForm" class="card" style="display:none;margin-bottom:1rem;">
+    <h3 style="margin-bottom:0.75rem;">Добавить спецификацию к договору</h3>
+    <div style="display:flex;gap:0.75rem;align-items:flex-end;flex-wrap:wrap;">
+        <div class="form-group" style="min-width:150px;margin-bottom:0;">
+            <label>Номер договора</label>
+            <select id="contractSelect" style="width:100%;">
+                <option value="">-- выбрать --</option>
+            </select>
+        </div>
+        <div class="form-group" style="min-width:200px;margin-bottom:0;">
+            <label>ТКП (необязательно)</label>
+            <input type="number" id="specRequestId" placeholder="ID ТКП" style="width:100%;">
+        </div>
+        <button class="btn btn-primary" style="height:38px;" onclick="addSpecToContract()">Добавить</button>
+        <button class="btn btn-ghost" style="height:38px;" onclick="hideNewSpecForm()">Отмена</button>
+    </div>
+</div>
+
+<div class="card">
+    <div class="table-wrap">
+        <table>
+            <thead>
+                <tr>
+                    <th>Договор №</th>
+                    <th>Дата договора</th>
+                    <th>Спецификация №</th>
+                    <th>ТКП</th>
+                    <th style="width:60px;"></th>
+                </tr>
+            </thead>
+            <tbody id="specsBody">
+                {% for spec in specs %}
+                <tr{% if spec.request_id %} style="cursor:pointer" onclick="location.href='/reg/requests/{{ spec.request_id }}/calc'"{% endif %}>
+                    <td><strong>{{ spec.contract_number }}</strong></td>
+                    <td>{{ spec.contract_date.strftime('%d.%m.%Y') if spec.contract_date else '-' }}</td>
+                    <td>{{ spec.specification_number }}</td>
+                    <td>{% if spec.request_id %}#{{ spec.request_id }}{% if spec.request %} — {{ spec.request.tkp_num or '' }}{% endif %}{% else %}-{% endif %}</td>
+                    <td style="text-align:center;">
+                        <button class="btn btn-danger btn-sm btn-icon" onclick="event.stopPropagation();deleteSpec({{ spec.id }})" title="Удалить">&#10005;</button>
+                    </td>
+                </tr>
+                {% endfor %}
+                {% if not specs %}
+                <tr class="empty-row"><td colspan="5" style="text-align:center;color:var(--text-muted);font-style:italic;">Нет договоров</td></tr>
+                {% endif %}
+            </tbody>
+        </table>
+    </div>
+</div>
+
+<div id="toast" class="toast" style="display:none"></div>
+{% endblock %}
+
+{% block scripts %}
+<script>
+const reqId = {{ req.id }};
+const companyId = {{ req.company_id or 0 }};
+
+// Collect existing contract numbers for the dropdown
+const existingContracts = [...new Set([{% for spec in specs %}{{ spec.contract_number }},{% endfor %}])].filter(n => n);
+const contractSelect = document.getElementById('contractSelect');
+existingContracts.sort((a,b) => a - b).forEach(n => {
+    const opt = document.createElement('option');
+    opt.value = n;
+    opt.textContent = 'Договор №' + n;
+    contractSelect.appendChild(opt);
+});
+
+async function newContract(reqId, companyId) {
+    const resp = await fetch('/reg/api/contract-specs/', {
+        method: 'POST',
+        headers: {'Content-Type': 'application/json'},
+        body: JSON.stringify({company_id: companyId, request_id: reqId, new_contract: true}),
+    });
+    if (resp.ok) {
+        location.reload();
+    } else {
+        const err = await resp.json();
+        showToast('Ошибка: ' + (err.detail || ''));
+    }
+}
+
+function showNewSpecForm() {
+    document.getElementById('newSpecForm').style.display = 'block';
+}
+
+function hideNewSpecForm() {
+    document.getElementById('newSpecForm').style.display = 'none';
+}
+
+async function addSpecToContract() {
+    const contractNum = parseInt(contractSelect.value);
+    if (!contractNum) { showToast('Выберите договор'); return; }
+    const requestId = parseInt(document.getElementById('specRequestId').value) || null;
+    const resp = await fetch('/reg/api/contract-specs/', {
+        method: 'POST',
+        headers: {'Content-Type': 'application/json'},
+        body: JSON.stringify({company_id: companyId, contract_number: contractNum, request_id: requestId, new_contract: false}),
+    });
+    if (resp.ok) {
+        location.reload();
+    } else {
+        const err = await resp.json();
+        showToast('Ошибка: ' + (err.detail || ''));
+    }
+}
+
+async function deleteSpec(specId) {
+    if (!confirm('Удалить спецификацию?')) return;
+    const resp = await fetch('/reg/api/contract-specs/' + specId, {method: 'DELETE'});
+    if (resp.ok) {
+        location.reload();
+    } else {
+        showToast('Ошибка удаления');
+    }
+}
+
+function showToast(msg) {
+    const t = document.getElementById('toast');
+    t.textContent = msg;
+    t.style.display = 'block';
+    setTimeout(() => t.style.display = 'none', 2500);
+}
+</script>
+{% endblock %}

@@ -1352,3 +1352,36 @@ async def modules_detail_page(
             "active_page": "modules",
         },
     )
+
+
+# --- Contracts ---
+@pages_router.get("/requests/{req_id}/contracts", response_class=HTMLResponse)
+async def request_contracts_page(
+    req_id: int,
+    request: Request,
+    session: AsyncSession = Depends(db_helper.session_dependency),
+):
+    user = await get_current_user(request, session)
+    if not user:
+        return RedirectResponse("/reg/", status_code=302)
+    req = await crud_requests.get_request_by_id(session, req_id)
+    if not req:
+        return HTMLResponse("ТКП не найдена", status_code=404)
+    if not req.company_id:
+        return HTMLResponse("У ТКП не указана организация", status_code=400)
+
+    from scr.dbase import crud_contract_specs
+
+    specs = await crud_contract_specs.get_specs_by_company(session, req.company_id)
+    await session.commit()
+
+    return templates.TemplateResponse(
+        "requests/contracts.html",
+        {
+            "request": request,
+            "user": user,
+            "req": req,
+            "specs": specs,
+            "active_page": "requests",
+        },
+    )

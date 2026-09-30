@@ -84,10 +84,37 @@ async function clearCost(field) {
     });
     if (resp.ok) {
         document.getElementById('cost-' + field).textContent = '0.00';
+        // Also clear sub-page data for delivery
+        if (field === 'delivery_cost') {
+            await clearDeliveryData();
+        }
         showToast('Стоимость очищена');
     } else {
         showToast('Ошибка');
     }
+}
+
+async function clearDeliveryData() {
+    try {
+        const resp = await fetch('/reg/api/deliveries/by-request/' + reqId);
+        if (resp.ok) {
+            const delivery = await resp.json();
+            if (delivery && delivery.id) {
+                await fetch('/reg/api/deliveries/' + delivery.id, {
+                    method: 'PUT',
+                    headers: {'Content-Type': 'application/json'},
+                    body: JSON.stringify({
+                        id: delivery.id,
+                        address: null,
+                        cost_per_truck: 0,
+                        trucks_count: 1,
+                        profitability_percent: 0,
+                        final_price: 0,
+                    }),
+                });
+            }
+        }
+    } catch(e) {}
 }
 
 function showToast(msg) {

@@ -11,6 +11,7 @@ from scr.dbase.database import db_helper
 from scr.dbase.models import Base
 from scr.Routers.auth import auth_router
 from scr.Routers.companies import org_router
+from scr.Routers.contract_specs import cs_router
 from scr.Routers.counterparties import cp_router
 from scr.Routers.deliveries import del_router
 from scr.Routers.directors import dir_router
@@ -114,6 +115,7 @@ app.include_router(mat_router, prefix="/reg")
 app.include_router(mt_router, prefix="/reg")
 app.include_router(mod_router, prefix="/reg")
 app.include_router(del_router, prefix="/reg")
+app.include_router(cs_router, prefix="/reg")
 app.include_router(pages_router, prefix="/reg")
 
 

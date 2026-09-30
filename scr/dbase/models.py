@@ -281,6 +281,18 @@ class Delivery(BaseID):
     request: Mapped["Request"] = relationship(foreign_keys=[request_id])
 
 
+class ContractSpec(BaseID):
+    __tablename__ = "contract_specs"
+    company_id: Mapped[int] = mapped_column(ForeignKey("organizations.id"), nullable=False)
+    request_id: Mapped[int | None] = mapped_column(ForeignKey("requests.id"), nullable=True)
+    contract_number: Mapped[int] = mapped_column(Integer, nullable=False)
+    contract_date: Mapped[datetime] = mapped_column(DateTime, default=lambda: datetime.now(UTC))
+    specification_number: Mapped[int] = mapped_column(Integer, nullable=False)
+
+    company: Mapped["Organization"] = relationship(foreign_keys=[company_id])
+    request: Mapped[Optional["Request"]] = relationship(foreign_keys=[request_id])
+
+
 class Setting(Base):
     __tablename__ = "settings"
     key: Mapped[str] = mapped_column(String(100), primary_key=True)

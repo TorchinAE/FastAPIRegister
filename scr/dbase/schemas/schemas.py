@@ -600,6 +600,31 @@ class DeliveryResponseSchema(BaseModel):
     created_by: str | None = None
 
 
+# --- ContractSpec ---
+
+
+class ContractSpecCreateSchema(BaseModel):
+    model_config = ConfigDict(from_attributes=True)
+
+    company_id: int
+    request_id: int | None = None
+    contract_number: int | None = None
+    contract_date: datetime | None = None
+    new_contract: bool = False
+
+
+class ContractSpecResponseSchema(BaseModel):
+    model_config = ConfigDict(from_attributes=True)
+
+    id: int
+    company_id: int
+    request_id: int | None = None
+    contract_number: int
+    contract_date: datetime
+    specification_number: int
+    created_by: str | None = None
+
+
 # --- Pagination ---
 
 

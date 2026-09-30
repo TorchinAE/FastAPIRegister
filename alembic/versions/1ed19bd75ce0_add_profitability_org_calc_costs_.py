@@ -83,8 +83,30 @@ def upgrade() -> None:
                     sa.Column(col_name, sa.Numeric(precision=12, scale=2), server_default="0", nullable=False)
                 )
 
+    # contract_specs table
+    if not _table_exists("contract_specs"):
+        op.create_table(
+            "contract_specs",
+            sa.Column("company_id", sa.Integer(), nullable=False),
+            sa.Column("request_id", sa.Integer(), nullable=True),
+            sa.Column("contract_number", sa.Integer(), nullable=False),
+            sa.Column("contract_date", sa.DateTime(), nullable=False),
+            sa.Column("specification_number", sa.Integer(), nullable=False),
+            sa.Column("id", sa.Integer(), nullable=False),
+            sa.Column("created_by", sa.String(length=100), nullable=True),
+            sa.Column("created_at", sa.DateTime(), nullable=False),
+            sa.Column("updated_at", sa.DateTime(), nullable=False),
+            sa.Column("changed_by_id", sa.Integer(), nullable=True),
+            sa.ForeignKeyConstraint(["changed_by_id"], ["users.id"]),
+            sa.ForeignKeyConstraint(["company_id"], ["organizations.id"]),
+            sa.ForeignKeyConstraint(["request_id"], ["requests.id"]),
+            sa.PrimaryKeyConstraint("id"),
+        )
+
 
 def downgrade() -> None:
+    op.drop_table("contract_specs")
+
     with op.batch_alter_table("requests", schema=None) as batch_op:
         batch_op.drop_column("delivery_cost")
         batch_op.drop_column("pus_cost")
