@@ -1,0 +1,15 @@
+{% extends "base.html" %}
+{% block title %}Расчёт ТКП #{{ req.id }} — {{ section_name }}{% endblock %}
+{% block content %}
+<div class="page-header">
+    <div>
+        <h1>Расчёт ТКП — {{ section_name }}</h1>
+        <div class="subtitle">Код: {{ req.id }} &middot; {{ req.tkp_num or '' }}</div>
+    </div>
+    <a href="/reg/requests/{{ req.id }}/calc" class="btn btn-ghost">&larr; Назад к расчёту</a>
+</div>
+
+<div class="card" style="text-align:center;padding:3rem;color:var(--text-muted);">
+    <p style="font-size:1.1rem;">Раздел «{{ section_name }}» в разработке</p>
+</div>
+{% endblock %}

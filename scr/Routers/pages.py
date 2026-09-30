@@ -71,7 +71,11 @@ async def login_submit(
 
 @pages_router.get("/register", response_class=HTMLResponse)
 async def register_page(request: Request):
-    return templates.TemplateResponse("register.html", {"request": request, "user": None})
+    from config import settings
+
+    return templates.TemplateResponse(
+        "register.html", {"request": request, "user": None, "my_domen": settings.MY_DOMEN}
+    )
 
 
 @pages_router.post("/register", response_class=HTMLResponse)
@@ -82,18 +86,34 @@ async def register_submit(
     password: str = Form(...),
     session: AsyncSession = Depends(db_helper.session_dependency),
 ):
+    from config import settings as app_settings
     from scr.dbase.schemas.schemas import UserCreate
 
     existing = await crud_users.get_user_by_email(session, email)
     if existing:
         return templates.TemplateResponse(
             "register.html",
-            {"request": request, "error": "Email уже зарегистрирован", "user": None},
+            {"request": request, "error": "Email уже зарегистрирован", "user": None, "my_domen": app_settings.MY_DOMEN},
         )
+    if app_settings.MY_DOMEN:
+        domain = email.split("@")[-1].lower()
+        if domain != app_settings.MY_DOMEN.lower():
+            return templates.TemplateResponse(
+                "register.html",
+                {
+                    "request": request,
+                    "error": f"Регистрация только с домена @{app_settings.MY_DOMEN}",
+                    "user": None,
+                    "my_domen": app_settings.MY_DOMEN,
+                },
+            )
     user = await crud_users.create_user(session, UserCreate(name=name, email=email, password=password))
     await session.commit()
     response = RedirectResponse("/reg/requests", status_code=302)
     response.set_cookie(key=SESSION_KEY, value=user.email, httponly=True)
+    from scr.utils.email import send_registration_notification
+
+    await send_registration_notification(user.email, user.name)
     return response
 
 
@@ -907,6 +927,65 @@ async def request_calc_page(
     req = await crud_requests.get_request_by_id(session, req_id)
     if not req:
         return HTMLResponse("ТКП не найдена", status_code=404)
+
+    # Folder creation on calc page visit
+    folder_path = None
+    import os
+    import shutil
+
+    adres_server = await crud_settings.get_setting(session, "adres_server") or ""
+    tkp_template_folder = await crud_settings.get_setting(session, "tkp_template_folder") or ""
+
+    if adres_server and req.company:
+        year = req.request_date.year if req.request_date else 2025
+        slug = req.company.server_address_slug or "default"
+        org_name = req.company.name or "Unknown"
+        folder_path = os.path.join(
+            adres_server, "01_\u0422\u041a\u041f", f"01_\u0422\u041a\u041f_{year}", slug, f"{req.id}_{org_name}"
+        )
+        try:
+            os.makedirs(folder_path, exist_ok=True)
+            os.makedirs(
+                os.path.join(
+                    folder_path, "\u041e\u043f\u0440\u043e\u0441\u043d\u044b\u0435 \u043b\u0438\u0441\u0442\u044b"
+                ),
+                exist_ok=True,
+            )
+            if tkp_template_folder and os.path.isdir(tkp_template_folder):
+                for item in os.listdir(tkp_template_folder):
+                    src = os.path.join(tkp_template_folder, item)
+                    dst = os.path.join(folder_path, item)
+                    if os.path.isfile(src) and not os.path.exists(dst):
+                        shutil.copy2(src, dst)
+        except OSError:
+            pass
+
+    return templates.TemplateResponse(
+        "requests/calc.html",
+        {
+            "request": request,
+            "user": user,
+            "req": req,
+            "folder_path": folder_path or "",
+            "active_page": "requests",
+        },
+    )
+
+
+@pages_router.get("/requests/{req_id}/calc/tkp", response_class=HTMLResponse)
+async def request_calc_tkp_page(
+    req_id: int,
+    request: Request,
+    session: AsyncSession = Depends(db_helper.session_dependency),
+):
+    user = await get_current_user(request, session)
+    if not user:
+        return RedirectResponse("/reg/", status_code=302)
+    req = await crud_requests.get_request_by_id(session, req_id)
+    if not req:
+        return HTMLResponse(
+            "\u0422\u041a\u041f \u043d\u0435 \u043d\u0430\u0439\u0434\u0435\u043d\u0430", status_code=404
+        )
     materials, _ = await crud_materials.get_materials(session, per_page=1000)
     modules_list, _ = await crud_modules.get_modules(session, per_page=1000)
 
@@ -933,7 +1012,7 @@ async def request_calc_page(
     )
 
     return templates.TemplateResponse(
-        "requests/calc.html",
+        "requests/calc_tkp.html",
         {
             "request": request,
             "user": user,
@@ -942,6 +1021,85 @@ async def request_calc_page(
             "materials": materials,
             "modules_json": modules_json,
             "materials_json": materials_json,
+            "active_page": "requests",
+        },
+    )
+
+
+@pages_router.get("/requests/{req_id}/calc/delivery", response_class=HTMLResponse)
+async def request_calc_delivery_page(
+    req_id: int,
+    request: Request,
+    session: AsyncSession = Depends(db_helper.session_dependency),
+):
+    user = await get_current_user(request, session)
+    if not user:
+        return RedirectResponse("/reg/", status_code=302)
+    req = await crud_requests.get_request_by_id(session, req_id)
+    if not req:
+        return HTMLResponse(
+            "\u0422\u041a\u041f \u043d\u0435 \u043d\u0430\u0439\u0434\u0435\u043d\u0430", status_code=404
+        )
+
+    from scr.dbase import crud_deliveries
+
+    delivery = await crud_deliveries.get_or_create_delivery(session, req_id)
+    await session.commit()
+
+    profitability = 0.0
+    if req.company:
+        profitability = float(req.company.profitability) if req.company.profitability else 0.0
+
+    return templates.TemplateResponse(
+        "requests/calc_delivery.html",
+        {
+            "request": request,
+            "user": user,
+            "req": req,
+            "delivery": delivery,
+            "profitability": profitability,
+            "active_page": "requests",
+        },
+    )
+
+
+STUB_SECTIONS = {
+    "corpusa": "\u041a\u043e\u0440\u043f\u0443\u0441\u0430",
+    "kso": "\u041a\u0421\u041e",
+    "kru": "\u041a\u0420\u0423",
+    "sho": "\u0429\u041e",
+    "ktp": "\u041a\u0422\u041f",
+    "pku": "\u041f\u041a\u0423",
+    "pus": "\u041f\u0423\u0421",
+}
+
+
+@pages_router.get("/requests/{req_id}/calc/{section}", response_class=HTMLResponse)
+async def request_calc_stub_page(
+    req_id: int,
+    section: str,
+    request: Request,
+    session: AsyncSession = Depends(db_helper.session_dependency),
+):
+    if section in ("tkp", "delivery"):
+        return RedirectResponse(f"/reg/requests/{req_id}/calc/{section}", status_code=302)
+    user = await get_current_user(request, session)
+    if not user:
+        return RedirectResponse("/reg/", status_code=302)
+    req = await crud_requests.get_request_by_id(session, req_id)
+    if not req:
+        return HTMLResponse(
+            "\u0422\u041a\u041f \u043d\u0435 \u043d\u0430\u0439\u0434\u0435\u043d\u0430", status_code=404
+        )
+    section_name = STUB_SECTIONS.get(section, section)
+    return templates.TemplateResponse(
+        "requests/calc_stub.html",
+        {
+            "request": request,
+            "user": user,
+            "req": req,
+            "section": section,
+            "section_name": section_name,
             "active_page": "requests",
         },
     )

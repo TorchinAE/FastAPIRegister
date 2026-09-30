@@ -12,6 +12,7 @@ from scr.dbase.models import Base
 from scr.Routers.auth import auth_router
 from scr.Routers.companies import org_router
 from scr.Routers.counterparties import cp_router
+from scr.Routers.deliveries import del_router
 from scr.Routers.directors import dir_router
 from scr.Routers.equipment import eq_router
 from scr.Routers.invoices import inv_router
@@ -41,6 +42,24 @@ async def lifespan(_: FastAPI):
             existing = await session.get(Probability, id_)
             if not existing:
                 session.add(Probability(id=id_, name=name, value=value))
+        await session.commit()
+    # Seed default settings
+    from scr.dbase.models import Setting
+
+    DEFAULT_SETTINGS = [
+        ("smtp_host", ""),
+        ("smtp_port", "587"),
+        ("smtp_user", ""),
+        ("smtp_password", ""),
+        ("smtp_from", ""),
+        ("adres_server", ""),
+        ("tkp_template_folder", ""),
+    ]
+    async with db_helper.session_factory() as session:
+        for key, value in DEFAULT_SETTINGS:
+            existing = await session.get(Setting, key)
+            if not existing:
+                session.add(Setting(key=key, value=value))
         await session.commit()
     yield
 
@@ -94,6 +113,7 @@ app.include_router(users_router, prefix="/reg")
 app.include_router(mat_router, prefix="/reg")
 app.include_router(mt_router, prefix="/reg")
 app.include_router(mod_router, prefix="/reg")
+app.include_router(del_router, prefix="/reg")
 app.include_router(pages_router, prefix="/reg")
 
 

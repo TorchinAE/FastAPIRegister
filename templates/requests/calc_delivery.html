@@ -1,0 +1,119 @@
+{% extends "base.html" %}
+{% block title %}Расчёт ТКП #{{ req.id }} — Доставка{% endblock %}
+{% block content %}
+<div class="page-header">
+    <div>
+        <h1>Расчёт ТКП — Доставка</h1>
+        <div class="subtitle">Код: {{ req.id }} &middot; {{ req.tkp_num or '' }}</div>
+    </div>
+    <a href="/reg/requests/{{ req.id }}/calc" class="btn btn-ghost">&larr; Назад к расчёту</a>
+</div>
+
+<div class="card">
+    <form id="deliveryForm">
+        <input type="hidden" name="id" value="{{ delivery.id }}">
+        <div class="form-row" style="grid-template-columns: 1fr 1fr 1fr;">
+            <div class="form-group" style="grid-column: 1 / -1;">
+                <label>Адрес доставки</label>
+                <input type="text" name="address" value="{{ delivery.address or '' }}" style="width:100%;min-width:0" id="address">
+            </div>
+            <div class="form-group">
+                <label>Себестоимость 1 машины (₽)</label>
+                <input type="number" name="cost_per_truck" value="{{ delivery.cost_per_truck }}" min="0" step="0.01" style="width:100%;min-width:0" id="costPerTruck" oninput="recalc()">
+            </div>
+            <div class="form-group">
+                <label>Кол-во машин</label>
+                <input type="number" name="trucks_count" value="{{ delivery.trucks_count }}" min="1" step="1" style="width:100%;min-width:0" id="trucksCount" oninput="recalc()">
+            </div>
+        </div>
+
+        <div class="form-row" style="grid-template-columns: 1fr 1fr 1fr;margin-top:1rem;">
+            <div class="form-group">
+                <label>Сумма себестоимости (₽)</label>
+                <input type="text" id="totalCost" readonly style="width:100%;min-width:0;background:#f8fafc;font-weight:bold;">
+            </div>
+            <div class="form-group">
+                <label>Рентабельность (%)</label>
+                <input type="text" id="profitPercent" readonly value="{{ profitability }}" style="width:100%;min-width:0;background:#f8fafc;">
+            </div>
+            <div class="form-group">
+                <label>Рентабельность (₽)</label>
+                <input type="text" id="profitRub" readonly style="width:100%;min-width:0;background:#f8fafc;">
+            </div>
+        </div>
+
+        <div class="form-row" style="grid-template-columns: 1fr;margin-top:1rem;">
+            <div class="form-group" style="max-width:300px;">
+                <label>Конечная цена (₽)</label>
+                <input type="text" id="finalPrice" readonly style="width:100%;min-width:0;background:#f0fdf4;font-weight:bold;font-size:1.1rem;">
+            </div>
+        </div>
+
+        <div class="actions" style="margin-top:1.5rem;">
+            <button type="submit" class="btn btn-primary">Сохранить</button>
+        </div>
+    </form>
+</div>
+
+<div id="toast" class="toast" style="display:none"></div>
+{% endblock %}
+
+{% block scripts %}
+<script>
+const profitPercent = {{ profitability }};
+const reqId = {{ req.id }};
+const deliveryId = {{ delivery.id }};
+
+function recalc() {
+    const costPerTruck = parseFloat(document.getElementById('costPerTruck').value) || 0;
+    const trucksCount = parseInt(document.getElementById('trucksCount').value) || 1;
+    const totalCost = costPerTruck * trucksCount;
+    const profitRub = totalCost * profitPercent / 100;
+    const finalPrice = totalCost + profitRub;
+
+    document.getElementById('totalCost').value = totalCost.toFixed(2);
+    document.getElementById('profitRub').value = profitRub.toFixed(2);
+    document.getElementById('finalPrice').value = finalPrice.toFixed(2);
+}
+
+// Initial calculation
+recalc();
+
+document.getElementById('deliveryForm').addEventListener('submit', async function(e) {
+    e.preventDefault();
+    const fd = new FormData(this);
+    const finalPrice = parseFloat(document.getElementById('finalPrice').value) || 0;
+    const data = {
+        id: parseInt(fd.get('id')),
+        address: fd.get('address') || null,
+        cost_per_truck: parseFloat(fd.get('cost_per_truck')) || 0,
+        trucks_count: parseInt(fd.get('trucks_count')) || 1,
+        final_price: finalPrice,
+    };
+    const resp = await fetch('/reg/api/deliveries/' + deliveryId, {
+        method: 'PUT',
+        headers: {'Content-Type': 'application/json'},
+        body: JSON.stringify(data),
+    });
+    if (resp.ok) {
+        // Also update delivery_cost on the request
+        await fetch('/reg/api/requests/' + reqId, {
+            method: 'PATCH',
+            headers: {'Content-Type': 'application/json'},
+            body: JSON.stringify({id: reqId, delivery_cost: finalPrice}),
+        });
+        showToast('Сохранено');
+    } else {
+        const err = await resp.json();
+        showToast('Ошибка: ' + (err.detail || 'не удалось сохранить'));
+    }
+});
+
+function showToast(msg) {
+    const t = document.getElementById('toast');
+    t.textContent = msg;
+    t.style.display = 'block';
+    setTimeout(() => t.style.display = 'none', 2500);
+}
+</script>
+{% endblock %}

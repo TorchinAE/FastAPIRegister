@@ -90,6 +90,7 @@ class Organization(BaseID):
     inn: Mapped[str] = mapped_column(String(12), unique=True, nullable=True)
     address: Mapped[str | None] = mapped_column(String(200), nullable=True)
     server_address_slug: Mapped[str] = mapped_column(String(200), nullable=False, default="/02_сторонние_заказчики")
+    profitability: Mapped[float] = mapped_column(Numeric(5, 2), default=0)
     director_id: Mapped[int] = mapped_column(ForeignKey("directors.id"), nullable=False)
 
     director: Mapped["Directors"] = relationship(back_populates="organizations")
@@ -218,6 +219,17 @@ class Request(BaseID):
     pus: Mapped[int] = mapped_column(Integer, default=0, nullable=False)
     parn: Mapped[int] = mapped_column(Integer, default=0, nullable=False)
 
+    # Стоимости разделов расчёта
+    tkp_calc_cost: Mapped[float] = mapped_column(Numeric(12, 2), default=0)
+    corpusa_cost: Mapped[float] = mapped_column(Numeric(12, 2), default=0)
+    kso_cost: Mapped[float] = mapped_column(Numeric(12, 2), default=0)
+    kru_cost: Mapped[float] = mapped_column(Numeric(12, 2), default=0)
+    sho_cost: Mapped[float] = mapped_column(Numeric(12, 2), default=0)
+    ktp_cost: Mapped[float] = mapped_column(Numeric(12, 2), default=0)
+    pku_cost: Mapped[float] = mapped_column(Numeric(12, 2), default=0)
+    pus_cost: Mapped[float] = mapped_column(Numeric(12, 2), default=0)
+    delivery_cost: Mapped[float] = mapped_column(Numeric(12, 2), default=0)
+
     counterparty: Mapped["Counterparty"] = relationship(foreign_keys=[counterparty_id])
     company: Mapped["Organization"] = relationship(foreign_keys=[company_id])
     manager: Mapped["User"] = relationship(foreign_keys=[manager_id])
@@ -225,6 +237,7 @@ class Request(BaseID):
     probability: Mapped[Optional["Probability"]] = relationship(foreign_keys=[probability_id])
     invoices: Mapped[list["Invoice"]] = relationship(back_populates="request", cascade="all, delete-orphan")
     payment_items: Mapped[list["PaymentItem"]] = relationship(back_populates="request", cascade="all, delete-orphan")
+    deliveries: Mapped[list["Delivery"]] = relationship(back_populates="request", cascade="all, delete-orphan")
 
 
 class Invoice(BaseID):
@@ -254,6 +267,17 @@ class PaymentItem(BaseID):
     paid_date: Mapped[datetime | None] = mapped_column(DateTime, nullable=True)
 
     request: Mapped["Request"] = relationship(back_populates="payment_items")
+
+
+class Delivery(BaseID):
+    __tablename__ = "deliveries"
+    request_id: Mapped[int] = mapped_column(ForeignKey("requests.id"), nullable=False)
+    address: Mapped[str | None] = mapped_column(Text, nullable=True)
+    cost_per_truck: Mapped[float] = mapped_column(Numeric(12, 2), default=0)
+    trucks_count: Mapped[int] = mapped_column(Integer, default=1)
+    final_price: Mapped[float] = mapped_column(Numeric(12, 2), default=0)
+
+    request: Mapped["Request"] = relationship(foreign_keys=[request_id])
 
 
 class Setting(Base):

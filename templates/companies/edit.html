@@ -30,6 +30,10 @@
                 <input type="text" name="server_address_slug" value="{{ org.server_address_slug }}" style="width:100%;min-width:0">
             </div>
             <div class="form-group">
+                <label>Рентабельность (%)</label>
+                <input type="number" name="profitability" value="{{ org.profitability }}" min="0" max="100" step="0.01" style="width:100%;min-width:0">
+            </div>
+            <div class="form-group">
                 <label>Директор</label>
                 <select name="director_id" id="directorSelect" required style="width:100%;min-width:0">
                     {% for d in directors %}
@@ -94,6 +98,7 @@ document.getElementById('editCompanyForm').addEventListener('submit', async func
         inn: fd.get('inn') || null,
         address: fd.get('address') || null,
         server_address_slug: fd.get('server_address_slug'),
+        profitability: parseFloat(fd.get('profitability')) || 0,
         director_id: parseInt(fd.get('director_id')),
     };
     const resp = await fetch('/reg/api/companies/', {

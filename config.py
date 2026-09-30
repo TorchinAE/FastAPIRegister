@@ -10,6 +10,8 @@ class Settings(BaseSettings):
     REG_SECRET_KEY: str = "dev-secret-key-change-in-production"
     REG_ADMIN_USERNAME: str = "admin"
     REG_ADMIN_PASSWORD: str = "admin123"
+    MY_DOMEN: str = ""
+    MAIL_TO_REPORT: str = ""
     model_config = SettingsConfigDict(
         env_file=".env",
         env_file_encoding="utf-8",

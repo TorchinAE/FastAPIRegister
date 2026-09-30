@@ -78,6 +78,7 @@ class OrganizationAddSchema(BaseModel):
     inn: str | None = None
     address: str | None = None
     server_address_slug: str = "/02_сторонние_заказчики"
+    profitability: float = 0
     director_id: int
 
 
@@ -89,6 +90,7 @@ class OrganizationUpdateSchema(BaseModel):
     inn: str | None = None
     address: str | None = None
     server_address_slug: str | None = None
+    profitability: float | None = None
     director_id: int | None = None
 
 
@@ -100,6 +102,7 @@ class OrganizationResponseSchema(BaseModel):
     inn: str | None = None
     address: str | None = None
     server_address_slug: str
+    profitability: float = 0
     director_id: int
     created_by: str | None = None
 
@@ -375,6 +378,15 @@ class RequestCreateSchema(BaseModel):
     pku: int = Field(0, ge=0, le=100)
     pus: int = Field(0, ge=0, le=100)
     parn: int = Field(0, ge=0, le=100)
+    tkp_calc_cost: float = Field(0, ge=0)
+    corpusa_cost: float = Field(0, ge=0)
+    kso_cost: float = Field(0, ge=0)
+    kru_cost: float = Field(0, ge=0)
+    sho_cost: float = Field(0, ge=0)
+    ktp_cost: float = Field(0, ge=0)
+    pku_cost: float = Field(0, ge=0)
+    pus_cost: float = Field(0, ge=0)
+    delivery_cost: float = Field(0, ge=0)
 
 
 class RequestUpdateSchema(BaseModel):
@@ -411,6 +423,15 @@ class RequestUpdateSchema(BaseModel):
     pku: int | None = Field(None, ge=0, le=100)
     pus: int | None = Field(None, ge=0, le=100)
     parn: int | None = Field(None, ge=0, le=100)
+    tkp_calc_cost: float | None = Field(None, ge=0)
+    corpusa_cost: float | None = Field(None, ge=0)
+    kso_cost: float | None = Field(None, ge=0)
+    kru_cost: float | None = Field(None, ge=0)
+    sho_cost: float | None = Field(None, ge=0)
+    ktp_cost: float | None = Field(None, ge=0)
+    pku_cost: float | None = Field(None, ge=0)
+    pus_cost: float | None = Field(None, ge=0)
+    delivery_cost: float | None = Field(None, ge=0)
 
 
 class RequestResponseSchema(BaseModel):
@@ -448,6 +469,15 @@ class RequestResponseSchema(BaseModel):
     pku: int = 0
     pus: int = 0
     parn: int = 0
+    tkp_calc_cost: float = 0
+    corpusa_cost: float = 0
+    kso_cost: float = 0
+    kru_cost: float = 0
+    sho_cost: float = 0
+    ktp_cost: float = 0
+    pku_cost: float = 0
+    pus_cost: float = 0
+    delivery_cost: float = 0
     created_by: str | None = None
 
 
@@ -529,6 +559,41 @@ class PaymentItemResponseSchema(BaseModel):
     due_date: datetime | None = None
     paid_amount: float = 0
     paid_date: datetime | None = None
+    created_by: str | None = None
+
+
+# --- Delivery ---
+
+
+class DeliveryCreateSchema(BaseModel):
+    model_config = ConfigDict(from_attributes=True)
+
+    request_id: int
+    address: str | None = None
+    cost_per_truck: float = Field(0, ge=0)
+    trucks_count: int = Field(1, ge=1)
+    final_price: float = Field(0, ge=0)
+
+
+class DeliveryUpdateSchema(BaseModel):
+    model_config = ConfigDict(from_attributes=True)
+
+    id: int
+    address: str | None = None
+    cost_per_truck: float | None = Field(None, ge=0)
+    trucks_count: int | None = Field(None, ge=1)
+    final_price: float | None = Field(None, ge=0)
+
+
+class DeliveryResponseSchema(BaseModel):
+    model_config = ConfigDict(from_attributes=True)
+
+    id: int
+    request_id: int
+    address: str | None = None
+    cost_per_truck: float = 0
+    trucks_count: int = 1
+    final_price: float = 0
     created_by: str | None = None
 
 

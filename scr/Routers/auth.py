@@ -1,6 +1,7 @@
 from fastapi import APIRouter, Depends, HTTPException, Request, Response
 from sqlalchemy.ext.asyncio import AsyncSession
 
+from config import settings
 from scr.dbase import crud_users
 from scr.dbase.database import db_helper
 from scr.dbase.schemas.schemas import UserCreate, UserLogin, UserResponse
@@ -19,9 +20,16 @@ async def register(
     existing = await crud_users.get_user_by_email(session, user_in.email)
     if existing:
         raise HTTPException(status_code=400, detail="Email уже зарегистрирован")
+    if settings.MY_DOMEN:
+        domain = user_in.email.split("@")[-1].lower()
+        if domain != settings.MY_DOMEN.lower():
+            raise HTTPException(status_code=400, detail=f"Регистрация только с домена @{settings.MY_DOMEN}")
     user = await crud_users.create_user(session, user_in)
     await session.commit()
     response.set_cookie(key=SESSION_KEY, value=user.email, httponly=True)
+    from scr.utils.email import send_registration_notification
+
+    await send_registration_notification(user.email, user.name)
     return user
 
 
