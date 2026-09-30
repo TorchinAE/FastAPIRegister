@@ -78,7 +78,7 @@ class OrganizationAddSchema(BaseModel):
     inn: str | None = None
     address: str | None = None
     server_address_slug: str = "/02_сторонние_заказчики"
-    profitability: float = 0
+    profitability: float = 15
     director_id: int
 
 

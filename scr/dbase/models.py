@@ -90,7 +90,7 @@ class Organization(BaseID):
     inn: Mapped[str] = mapped_column(String(12), unique=True, nullable=True)
     address: Mapped[str | None] = mapped_column(String(200), nullable=True)
     server_address_slug: Mapped[str] = mapped_column(String(200), nullable=False, default="/02_сторонние_заказчики")
-    profitability: Mapped[float] = mapped_column(Numeric(5, 2), default=0)
+    profitability: Mapped[float] = mapped_column(Numeric(5, 2), default=15)
     director_id: Mapped[int] = mapped_column(ForeignKey("directors.id"), nullable=False)
 
     director: Mapped["Directors"] = relationship(back_populates="organizations")

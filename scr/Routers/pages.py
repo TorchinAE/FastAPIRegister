@@ -466,6 +466,7 @@ async def companies_create_submit(
             "name": name,
             "inn": form.get("inn") or None,
             "address": form.get("address") or None,
+            "profitability": float(form.get("profitability") or 15),
             "director_id": int(form["director_id"]),
         }
         await crud_organizations.add_organization(session, OrganizationAddSchema(**data), created_by=user.name)
