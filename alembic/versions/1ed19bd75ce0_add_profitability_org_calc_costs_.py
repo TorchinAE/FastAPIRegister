@@ -20,60 +20,62 @@ branch_labels: str | Sequence[str] | None = None
 depends_on: str | Sequence[str] | None = None
 
 
+def _table_exists(name: str) -> bool:
+    conn = op.get_bind()
+    return conn.dialect.has_table(conn, name)
+
+
+def _column_exists(table: str, column: str) -> bool:
+    rows = op.get_bind().execute(sa.text(f"PRAGMA table_info({table})")).fetchall()
+    return any(row[1] == column for row in rows)
+
+
 def upgrade() -> None:
     # deliveries table
-    op.create_table(
-        "deliveries",
-        sa.Column("request_id", sa.Integer(), nullable=False),
-        sa.Column("address", sa.Text(), nullable=True),
-        sa.Column("cost_per_truck", sa.Numeric(precision=12, scale=2), nullable=False),
-        sa.Column("trucks_count", sa.Integer(), nullable=False),
-        sa.Column("final_price", sa.Numeric(precision=12, scale=2), nullable=False),
-        sa.Column("id", sa.Integer(), nullable=False),
-        sa.Column("created_by", sa.String(length=100), nullable=True),
-        sa.Column("created_at", sa.DateTime(), nullable=False),
-        sa.Column("updated_at", sa.DateTime(), nullable=False),
-        sa.Column("changed_by_id", sa.Integer(), nullable=True),
-        sa.ForeignKeyConstraint(["changed_by_id"], ["users.id"]),
-        sa.ForeignKeyConstraint(["request_id"], ["requests.id"]),
-        sa.PrimaryKeyConstraint("id"),
-    )
+    if not _table_exists("deliveries"):
+        op.create_table(
+            "deliveries",
+            sa.Column("request_id", sa.Integer(), nullable=False),
+            sa.Column("address", sa.Text(), nullable=True),
+            sa.Column("cost_per_truck", sa.Numeric(precision=12, scale=2), nullable=False),
+            sa.Column("trucks_count", sa.Integer(), nullable=False),
+            sa.Column("final_price", sa.Numeric(precision=12, scale=2), nullable=False),
+            sa.Column("id", sa.Integer(), nullable=False),
+            sa.Column("created_by", sa.String(length=100), nullable=True),
+            sa.Column("created_at", sa.DateTime(), nullable=False),
+            sa.Column("updated_at", sa.DateTime(), nullable=False),
+            sa.Column("changed_by_id", sa.Integer(), nullable=True),
+            sa.ForeignKeyConstraint(["changed_by_id"], ["users.id"]),
+            sa.ForeignKeyConstraint(["request_id"], ["requests.id"]),
+            sa.PrimaryKeyConstraint("id"),
+        )
 
     # organizations: add profitability
-    with op.batch_alter_table("organizations", schema=None) as batch_op:
-        batch_op.add_column(
-            sa.Column("profitability", sa.Numeric(precision=5, scale=2), server_default="0", nullable=False)
-        )
+    if not _column_exists("organizations", "profitability"):
+        with op.batch_alter_table("organizations", schema=None) as batch_op:
+            batch_op.add_column(
+                sa.Column("profitability", sa.Numeric(precision=5, scale=2), server_default="0", nullable=False)
+            )
 
     # requests: add calc cost columns
-    with op.batch_alter_table("requests", schema=None) as batch_op:
-        batch_op.add_column(
-            sa.Column("tkp_calc_cost", sa.Numeric(precision=12, scale=2), server_default="0", nullable=False)
-        )
-        batch_op.add_column(
-            sa.Column("corpusa_cost", sa.Numeric(precision=12, scale=2), server_default="0", nullable=False)
-        )
-        batch_op.add_column(
-            sa.Column("kso_cost", sa.Numeric(precision=12, scale=2), server_default="0", nullable=False)
-        )
-        batch_op.add_column(
-            sa.Column("kru_cost", sa.Numeric(precision=12, scale=2), server_default="0", nullable=False)
-        )
-        batch_op.add_column(
-            sa.Column("sho_cost", sa.Numeric(precision=12, scale=2), server_default="0", nullable=False)
-        )
-        batch_op.add_column(
-            sa.Column("ktp_cost", sa.Numeric(precision=12, scale=2), server_default="0", nullable=False)
-        )
-        batch_op.add_column(
-            sa.Column("pku_cost", sa.Numeric(precision=12, scale=2), server_default="0", nullable=False)
-        )
-        batch_op.add_column(
-            sa.Column("pus_cost", sa.Numeric(precision=12, scale=2), server_default="0", nullable=False)
-        )
-        batch_op.add_column(
-            sa.Column("delivery_cost", sa.Numeric(precision=12, scale=2), server_default="0", nullable=False)
-        )
+    cost_columns = [
+        "tkp_calc_cost",
+        "corpusa_cost",
+        "kso_cost",
+        "kru_cost",
+        "sho_cost",
+        "ktp_cost",
+        "pku_cost",
+        "pus_cost",
+        "delivery_cost",
+    ]
+    missing = [c for c in cost_columns if not _column_exists("requests", c)]
+    if missing:
+        with op.batch_alter_table("requests", schema=None) as batch_op:
+            for col_name in missing:
+                batch_op.add_column(
+                    sa.Column(col_name, sa.Numeric(precision=12, scale=2), server_default="0", nullable=False)
+                )
 
 
 def downgrade() -> None:
