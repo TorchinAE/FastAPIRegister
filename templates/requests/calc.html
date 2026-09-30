@@ -12,29 +12,32 @@
 <div class="card">
     <div style="display:flex;gap:2rem;align-items:flex-start;">
         <!-- Left: vertical buttons -->
-        <div style="min-width:220px;display:flex;flex-direction:column;gap:0.5rem;">
-            <button class="btn btn-ghost" style="justify-content:flex-start;text-align:left;" onclick="openFolder()">
+        <div style="min-width:260px;display:flex;flex-direction:column;gap:0.5rem;">
+            <button class="btn btn-success" style="justify-content:flex-start;text-align:left;" onclick="openFolder()">
                 Открыть папку
             </button>
             <div style="height:0.5rem;"></div>
 
             {% set sections = [
-                ('tkp', 'ТКП', req.tkp_calc_cost),
-                ('corpusa', 'Корпуса', req.corpusa_cost),
-                ('kso', 'КСО', req.kso_cost),
-                ('kru', 'КРУ', req.kru_cost),
-                ('sho', 'ЩО', req.sho_cost),
-                ('ktp', 'КТП', req.ktp_cost),
-                ('pku', 'ПКУ', req.pku_cost),
-                ('pus', 'ПУС', req.pus_cost),
-                ('delivery', 'Доставка', req.delivery_cost),
+                ('tkp', 'ТКП', 'tkp_calc_cost', req.tkp_calc_cost),
+                ('corpusa', 'Корпуса', 'corpusa_cost', req.corpusa_cost),
+                ('kso', 'КСО', 'kso_cost', req.kso_cost),
+                ('kru', 'КРУ', 'kru_cost', req.kru_cost),
+                ('sho', 'ЩО', 'sho_cost', req.sho_cost),
+                ('ktp', 'КТП', 'ktp_cost', req.ktp_cost),
+                ('pku', 'ПКУ', 'pku_cost', req.pku_cost),
+                ('pus', 'ПУС', 'pus_cost', req.pus_cost),
+                ('delivery', 'Доставка', 'delivery_cost', req.delivery_cost),
             ] %}
 
-            {% for key, label, cost in sections %}
-            <a href="/reg/requests/{{ req.id }}/calc/{{ key }}" class="btn btn-ghost calc-btn" style="display:flex;justify-content:space-between;align-items:center;text-decoration:none;">
-                <span>{{ label }}</span>
-                <span class="calc-cost">{{ "%.2f"|format(cost or 0) }}</span>
-            </a>
+            {% for key, label, field, cost in sections %}
+            <div style="display:flex;gap:0.35rem;align-items:stretch;">
+                <a href="/reg/requests/{{ req.id }}/calc/{{ key }}" class="btn btn-ghost calc-btn" style="flex:1;display:flex;justify-content:space-between;align-items:center;text-decoration:none;">
+                    <span>{{ label }}</span>
+                    <span class="calc-cost" id="cost-{{ field }}">{{ "%.2f"|format(cost or 0) }}</span>
+                </a>
+                <button class="btn btn-danger btn-sm" style="padding:0 0.5rem;font-size:0.75rem;white-space:nowrap;" onclick="clearCost('{{ field }}')" title="Очистить стоимость">&#10005;</button>
+            </div>
             {% endfor %}
         </div>
 
@@ -51,14 +54,16 @@
 </div>
 {% endif %}
 
+<div id="toast" class="toast" style="display:none"></div>
 {% endblock %}
 
 {% block scripts %}
 <script>
+const reqId = {{ req.id }};
+
 function openFolder() {
     const path = '{{ folder_path | e }}';
     if (path) {
-        // Try to open local folder - works only if server and client are same machine
         navigator.clipboard.writeText(path).then(() => {
             showToast('Путь скопирован: ' + path);
         }).catch(() => {
@@ -69,17 +74,27 @@ function openFolder() {
     }
 }
 
-function showToast(msg) {
-    let t = document.getElementById('toast');
-    if (!t) {
-        t = document.createElement('div');
-        t.id = 'toast';
-        t.className = 'toast';
-        document.body.appendChild(t);
+async function clearCost(field) {
+    const data = {id: reqId};
+    data[field] = 0;
+    const resp = await fetch('/reg/api/requests/' + reqId, {
+        method: 'PUT',
+        headers: {'Content-Type': 'application/json'},
+        body: JSON.stringify(data),
+    });
+    if (resp.ok) {
+        document.getElementById('cost-' + field).textContent = '0.00';
+        showToast('Стоимость очищена');
+    } else {
+        showToast('Ошибка');
     }
+}
+
+function showToast(msg) {
+    const t = document.getElementById('toast');
     t.textContent = msg;
     t.style.display = 'block';
-    setTimeout(() => t.style.display = 'none', 3000);
+    setTimeout(() => t.style.display = 'none', 2500);
 }
 </script>
 {% endblock %}
