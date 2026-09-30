@@ -572,6 +572,7 @@ class DeliveryCreateSchema(BaseModel):
     address: str | None = None
     cost_per_truck: float = Field(0, ge=0)
     trucks_count: int = Field(1, ge=1)
+    profitability_percent: float = Field(0, ge=0, le=100)
     final_price: float = Field(0, ge=0)
 
 
@@ -582,6 +583,7 @@ class DeliveryUpdateSchema(BaseModel):
     address: str | None = None
     cost_per_truck: float | None = Field(None, ge=0)
     trucks_count: int | None = Field(None, ge=1)
+    profitability_percent: float | None = Field(None, ge=0, le=100)
     final_price: float | None = Field(None, ge=0)
 
 
@@ -593,6 +595,7 @@ class DeliveryResponseSchema(BaseModel):
     address: str | None = None
     cost_per_truck: float = 0
     trucks_count: int = 1
+    profitability_percent: float = 0
     final_price: float = 0
     created_by: str | None = None
 

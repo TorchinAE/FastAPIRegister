@@ -70,6 +70,7 @@ async def read_request(req_id: int, session: AsyncSession = Depends(db_helper.se
 
 
 @req_router.put("/{req_id}", response_model=RequestResponseSchema)
+@req_router.patch("/{req_id}", response_model=RequestResponseSchema)
 async def update_request(
     req_id: int,
     data: RequestUpdateSchema,

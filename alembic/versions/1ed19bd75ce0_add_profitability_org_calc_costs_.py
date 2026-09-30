@@ -39,6 +39,7 @@ def upgrade() -> None:
             sa.Column("address", sa.Text(), nullable=True),
             sa.Column("cost_per_truck", sa.Numeric(precision=12, scale=2), nullable=False),
             sa.Column("trucks_count", sa.Integer(), nullable=False),
+            sa.Column("profitability_percent", sa.Numeric(precision=5, scale=2), server_default="0", nullable=False),
             sa.Column("final_price", sa.Numeric(precision=12, scale=2), nullable=False),
             sa.Column("id", sa.Integer(), nullable=False),
             sa.Column("created_by", sa.String(length=100), nullable=True),
@@ -49,6 +50,11 @@ def upgrade() -> None:
             sa.ForeignKeyConstraint(["request_id"], ["requests.id"]),
             sa.PrimaryKeyConstraint("id"),
         )
+    elif not _column_exists("deliveries", "profitability_percent"):
+        with op.batch_alter_table("deliveries", schema=None) as batch_op:
+            batch_op.add_column(
+                sa.Column("profitability_percent", sa.Numeric(precision=5, scale=2), server_default="0", nullable=False)
+            )
 
     # organizations: add profitability
     if not _column_exists("organizations", "profitability"):

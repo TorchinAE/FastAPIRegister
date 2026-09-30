@@ -275,6 +275,7 @@ class Delivery(BaseID):
     address: Mapped[str | None] = mapped_column(Text, nullable=True)
     cost_per_truck: Mapped[float] = mapped_column(Numeric(12, 2), default=0)
     trucks_count: Mapped[int] = mapped_column(Integer, default=1)
+    profitability_percent: Mapped[float] = mapped_column(Numeric(5, 2), default=0)
     final_price: Mapped[float] = mapped_column(Numeric(12, 2), default=0)
 
     request: Mapped["Request"] = relationship(foreign_keys=[request_id])

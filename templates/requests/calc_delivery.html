@@ -19,11 +19,11 @@
             </div>
             <div class="form-group">
                 <label>Себестоимость 1 машины (₽)</label>
-                <input type="number" name="cost_per_truck" value="{{ delivery.cost_per_truck }}" min="0" step="0.01" style="width:100%;min-width:0" id="costPerTruck" oninput="recalc()">
+                <input type="number" name="cost_per_truck" value="{{ delivery.cost_per_truck }}" min="0" step="0.01" style="width:100%;min-width:0" id="costPerTruck" oninput="recalcFromInputs()">
             </div>
             <div class="form-group">
                 <label>Кол-во машин</label>
-                <input type="number" name="trucks_count" value="{{ delivery.trucks_count }}" min="1" step="1" style="width:100%;min-width:0" id="trucksCount" oninput="recalc()">
+                <input type="number" name="trucks_count" value="{{ delivery.trucks_count }}" min="1" step="1" style="width:100%;min-width:0" id="trucksCount" oninput="recalcFromInputs()">
             </div>
         </div>
 
@@ -34,7 +34,7 @@
             </div>
             <div class="form-group">
                 <label>Рентабельность (%)</label>
-                <input type="text" id="profitPercent" readonly value="{{ profitability }}" style="width:100%;min-width:0;background:#f8fafc;">
+                <input type="number" id="profitPercent" name="profitability_percent" value="{{ profitability }}" min="0" max="100" step="0.01" style="width:100%;min-width:0;" oninput="recalcFromPercent()">
             </div>
             <div class="form-group">
                 <label>Рентабельность (₽)</label>
@@ -45,7 +45,7 @@
         <div class="form-row" style="grid-template-columns: 1fr;margin-top:1rem;">
             <div class="form-group" style="max-width:300px;">
                 <label>Конечная цена (₽)</label>
-                <input type="text" id="finalPrice" readonly style="width:100%;min-width:0;background:#f0fdf4;font-weight:bold;font-size:1.1rem;">
+                <input type="number" id="finalPrice" min="0" step="0.01" style="width:100%;min-width:0;background:#f0fdf4;font-weight:bold;font-size:1.1rem;" oninput="recalcFromFinal()">
             </div>
         </div>
 
@@ -60,34 +60,95 @@
 
 {% block scripts %}
 <script>
-const profitPercent = {{ profitability }};
 const reqId = {{ req.id }};
 const deliveryId = {{ delivery.id }};
 
-function recalc() {
+// Suppress recalcFromInputs during programmatic updates
+let suppressInput = false;
+
+function recalcFromInputs() {
+    if (suppressInput) return;
     const costPerTruck = parseFloat(document.getElementById('costPerTruck').value) || 0;
     const trucksCount = parseInt(document.getElementById('trucksCount').value) || 1;
     const totalCost = costPerTruck * trucksCount;
+    const profitPercent = parseFloat(document.getElementById('profitPercent').value) || 0;
     const profitRub = totalCost * profitPercent / 100;
     const finalPrice = totalCost + profitRub;
 
+    suppressInput = true;
     document.getElementById('totalCost').value = totalCost.toFixed(2);
     document.getElementById('profitRub').value = profitRub.toFixed(2);
     document.getElementById('finalPrice').value = finalPrice.toFixed(2);
+    suppressInput = false;
 }
 
-// Initial calculation
-recalc();
+function recalcFromPercent() {
+    if (suppressInput) return;
+    const costPerTruck = parseFloat(document.getElementById('costPerTruck').value) || 0;
+    const trucksCount = parseInt(document.getElementById('trucksCount').value) || 1;
+    const totalCost = costPerTruck * trucksCount;
+    const profitPercent = parseFloat(document.getElementById('profitPercent').value) || 0;
+    const profitRub = totalCost * profitPercent / 100;
+    const finalPrice = totalCost + profitRub;
+
+    suppressInput = true;
+    document.getElementById('totalCost').value = totalCost.toFixed(2);
+    document.getElementById('profitRub').value = profitRub.toFixed(2);
+    document.getElementById('finalPrice').value = finalPrice.toFixed(2);
+    suppressInput = false;
+}
+
+function recalcFromFinal() {
+    if (suppressInput) return;
+    const costPerTruck = parseFloat(document.getElementById('costPerTruck').value) || 0;
+    const trucksCount = parseInt(document.getElementById('trucksCount').value) || 1;
+    const totalCost = costPerTruck * trucksCount;
+    const finalPrice = parseFloat(document.getElementById('finalPrice').value) || 0;
+    const profitRub = finalPrice - totalCost;
+    const profitPercent = totalCost > 0 ? (profitRub / totalCost * 100) : 0;
+
+    suppressInput = true;
+    document.getElementById('totalCost').value = totalCost.toFixed(2);
+    document.getElementById('profitPercent').value = profitPercent.toFixed(2);
+    document.getElementById('profitRub').value = profitRub.toFixed(2);
+    suppressInput = false;
+}
+
+// Initial calculation from saved values
+(function() {
+    suppressInput = true;
+    const costPerTruck = parseFloat(document.getElementById('costPerTruck').value) || 0;
+    const trucksCount = parseInt(document.getElementById('trucksCount').value) || 1;
+    const totalCost = costPerTruck * trucksCount;
+    const profitPercent = parseFloat(document.getElementById('profitPercent').value) || 0;
+    const savedFinal = {{ delivery.final_price }};
+
+    document.getElementById('totalCost').value = totalCost.toFixed(2);
+    if (savedFinal > 0) {
+        document.getElementById('finalPrice').value = savedFinal.toFixed(2);
+        const profitRub = savedFinal - totalCost;
+        const calcPercent = totalCost > 0 ? (profitRub / totalCost * 100) : 0;
+        document.getElementById('profitPercent').value = calcPercent.toFixed(2);
+        document.getElementById('profitRub').value = profitRub.toFixed(2);
+    } else {
+        const profitRub = totalCost * profitPercent / 100;
+        document.getElementById('profitRub').value = profitRub.toFixed(2);
+        document.getElementById('finalPrice').value = (totalCost + profitRub).toFixed(2);
+    }
+    suppressInput = false;
+})();
 
 document.getElementById('deliveryForm').addEventListener('submit', async function(e) {
     e.preventDefault();
     const fd = new FormData(this);
     const finalPrice = parseFloat(document.getElementById('finalPrice').value) || 0;
+    const profitPercent = parseFloat(document.getElementById('profitPercent').value) || 0;
     const data = {
         id: parseInt(fd.get('id')),
         address: fd.get('address') || null,
         cost_per_truck: parseFloat(fd.get('cost_per_truck')) || 0,
         trucks_count: parseInt(fd.get('trucks_count')) || 1,
+        profitability_percent: profitPercent,
         final_price: finalPrice,
     };
     const resp = await fetch('/reg/api/deliveries/' + deliveryId, {
@@ -98,7 +159,7 @@ document.getElementById('deliveryForm').addEventListener('submit', async functio
     if (resp.ok) {
         // Also update delivery_cost on the request
         await fetch('/reg/api/requests/' + reqId, {
-            method: 'PATCH',
+            method: 'PUT',
             headers: {'Content-Type': 'application/json'},
             body: JSON.stringify({id: reqId, delivery_cost: finalPrice}),
         });

@@ -1046,9 +1046,13 @@ async def request_calc_delivery_page(
     delivery = await crud_deliveries.get_or_create_delivery(session, req_id)
     await session.commit()
 
-    profitability = 0.0
-    if req.company:
+    # Use saved profitability from delivery, fall back to company default
+    if delivery.profitability_percent and float(delivery.profitability_percent) > 0:
+        profitability = float(delivery.profitability_percent)
+    elif req.company:
         profitability = float(req.company.profitability) if req.company.profitability else 0.0
+    else:
+        profitability = 0.0
 
     return templates.TemplateResponse(
         "requests/calc_delivery.html",
