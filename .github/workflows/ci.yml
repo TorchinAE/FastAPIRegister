@@ -131,6 +131,9 @@ jobs:
 
             echo "Running database migrations..."
 
+            # Stamp DB to pre-new-migration revision (handles fresh DBs created by create_all)
+            uv run alembic stamp aab557719d57 2>/dev/null || true
+            # Now run only the new migration(s)
             uv run alembic upgrade head
 
             # --------------------------------------
