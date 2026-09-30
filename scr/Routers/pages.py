@@ -940,7 +940,14 @@ async def request_calc_page(
     if adres_server and req.company:
         year = req.request_date.year if req.request_date else 2025
         slug = req.company.server_address_slug or "default"
-        org_name = req.company.name or "Unknown"
+        org_name = (
+            (req.company.name or "Unknown")
+            .replace(" ", "_")
+            .replace('"', "")
+            .replace("'", "")
+            .replace("/", "_")
+            .replace("\\", "_")
+        )
         folder_path = os.path.join(
             adres_server, "01_\u0422\u041a\u041f", f"01_\u0422\u041a\u041f_{year}", slug, f"{req.id}_{org_name}"
         )
