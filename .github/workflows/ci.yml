@@ -129,6 +129,10 @@ jobs:
 
             uv sync
 
+            echo "Running database migrations..."
+
+            uv run alembic upgrade head
+
             # --------------------------------------
             # Systemd service
             # --------------------------------------
@@ -149,6 +153,8 @@ jobs:
               echo "REG_SECRET_KEY=${{ secrets.REG_SECRET_KEY }}"
               echo "REG_ADMIN_USERNAME=${{ secrets.REG_ADMIN_USERNAME }}"
               echo "REG_ADMIN_PASSWORD=${{ secrets.REG_ADMIN_PASSWORD }}"
+              echo "MY_DOMEN=${{ secrets.MY_DOMEN }}"
+              echo "MAIL_TO_REPORT=${{ secrets.MAIL_TO_REPORT }}"
             } > /root/FastAPIRegister/.env
 
             chmod 600 /root/FastAPIRegister/.env
