@@ -49,8 +49,9 @@
             </div>
         </div>
 
-        <div class="actions" style="margin-top:1.5rem;">
+        <div class="actions" style="margin-top:1.5rem;display:flex;gap:0.75rem;">
             <button type="submit" class="btn btn-primary">Сохранить</button>
+            <button type="button" class="btn btn-danger" onclick="clearDelivery()">Очистить</button>
         </div>
     </form>
 </div>
@@ -169,6 +170,30 @@ document.getElementById('deliveryForm').addEventListener('submit', async functio
         showToast('Ошибка: ' + (err.detail || 'не удалось сохранить'));
     }
 });
+
+async function clearDelivery() {
+    if (!confirm('Очистить все данные доставки?')) return;
+    const resp = await fetch('/reg/api/deliveries/' + deliveryId, {
+        method: 'PUT',
+        headers: {'Content-Type': 'application/json'},
+        body: JSON.stringify({id: deliveryId, address: null, cost_per_truck: 0, trucks_count: 1, profitability_percent: 0, final_price: 0}),
+    });
+    if (resp.ok) {
+        await fetch('/reg/api/requests/' + reqId, {
+            method: 'PUT',
+            headers: {'Content-Type': 'application/json'},
+            body: JSON.stringify({id: reqId, delivery_cost: 0}),
+        });
+        document.getElementById('address').value = '';
+        document.getElementById('costPerTruck').value = '0';
+        document.getElementById('trucksCount').value = '1';
+        document.getElementById('profitPercent').value = '0';
+        recalcFromInputs();
+        showToast('Очищено');
+    } else {
+        showToast('Ошибка очистки');
+    }
+}
 
 function showToast(msg) {
     const t = document.getElementById('toast');
