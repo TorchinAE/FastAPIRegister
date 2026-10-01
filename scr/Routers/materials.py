@@ -231,6 +231,11 @@ def _parse_rows(rows: list) -> list[dict]:
         if not row:
             continue
 
+        # Skip header rows
+        first = str(row[0]).strip().lower() if row[0] else ""
+        if first in ("id", "название", "материалы"):
+            continue
+
         if len(row) >= 14:
             # New format: id, type, name, price, date, nom_tok, stats, vtych, vykat, ruchn, el_priv, code_1c, code_agent, url_agent
             row_id = int(row[0]) if row[0] else None
