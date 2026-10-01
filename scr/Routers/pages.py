@@ -1456,7 +1456,18 @@ async def modules_detail_page(
     bom_total = sum(bi["price"] * bi["quantity"] for bi in bom_items)
 
     materials_json = json.dumps(
-        [{"id": m.id, "name": m.name, "price": float(m.price)} for m in materials], ensure_ascii=False
+        [
+            {
+                "id": m.id,
+                "name": m.name,
+                "price": float(m.price),
+                "type": m.type.name if m.type else "",
+                "nom_tok": m.nom_tok,
+                "voltage": m.voltage or "",
+            }
+            for m in materials
+        ],
+        ensure_ascii=False,
     )
     modules_json = json.dumps([{"id": m.id, "name": m.name} for m in other_modules], ensure_ascii=False)
 

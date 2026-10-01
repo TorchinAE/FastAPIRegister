@@ -32,6 +32,26 @@
 <h2 style="margin:1.5rem 0 0.75rem;">Состав модуля</h2>
 
 <div class="card" style="margin-bottom:1rem;">
+    <div style="display:flex;gap:0.5rem;align-items:flex-end;flex-wrap:wrap;margin-bottom:0.75rem;">
+        <div class="form-group" style="flex:1;min-width:120px;margin-bottom:0;">
+            <label>Фильтр: Тип</label>
+            <select id="filterType" style="width:100%;" onchange="updateItemSelect()">
+                <option value="">Все типы</option>
+            </select>
+        </div>
+        <div class="form-group" style="flex:1;min-width:100px;margin-bottom:0;">
+            <label>Фильтр: Ток</label>
+            <select id="filterTok" style="width:100%;" onchange="updateItemSelect()">
+                <option value="">Любой</option>
+            </select>
+        </div>
+        <div class="form-group" style="flex:1;min-width:100px;margin-bottom:0;">
+            <label>Фильтр: Напряжение</label>
+            <select id="filterVoltage" style="width:100%;" onchange="updateItemSelect()">
+                <option value="">Любое</option>
+            </select>
+        </div>
+    </div>
     <div style="display:flex;gap:0.75rem;align-items:flex-end;flex-wrap:wrap;">
         <div class="form-group" style="flex:1;min-width:150px;margin-bottom:0;">
             <label>Тип</label>
@@ -43,9 +63,6 @@
         <div class="form-group" style="flex:2;min-width:200px;margin-bottom:0;">
             <label>Компонент</label>
             <select id="itemId" style="width:100%;">
-                {% for mat in materials %}
-                <option value="{{ mat.id }}">{{ mat.name }} ({{ mat.price|money }})</option>
-                {% endfor %}
             </select>
         </div>
         <div class="form-group" style="width:80px;margin-bottom:0;">
@@ -124,25 +141,55 @@
 const materialsData = {{ materials_json | safe }};
 const modulesData = {{ modules_json | safe }};
 
+// Populate filter dropdowns from materialsData
+(function() {
+    const types = [...new Set(materialsData.map(m => m.type).filter(Boolean))].sort();
+    const toks = [...new Set(materialsData.map(m => m.nom_tok).filter(t => t > 0))].sort((a, b) => a - b);
+    const voltages = [...new Set(materialsData.map(m => m.voltage).filter(Boolean))].sort();
+
+    const filterType = document.getElementById('filterType');
+    types.forEach(t => { const o = document.createElement('option'); o.value = t; o.textContent = t; filterType.appendChild(o); });
+
+    const filterTok = document.getElementById('filterTok');
+    toks.forEach(t => { const o = document.createElement('option'); o.value = t; o.textContent = t; filterTok.appendChild(o); });
+
+    const filterVoltage = document.getElementById('filterVoltage');
+    voltages.forEach(v => { const o = document.createElement('option'); o.value = v; o.textContent = v; filterVoltage.appendChild(o); });
+
+    updateItemSelect();
+})();
+
 function updateItemSelect() {
     const type = document.getElementById('itemType').value;
     const sel = document.getElementById('itemId');
     sel.innerHTML = '';
-    if (type === 'material') {
-        materialsData.forEach(m => {
-            const opt = document.createElement('option');
-            opt.value = m.id;
-            opt.textContent = m.name + ' (' + Number(m.price).toFixed(2) + ')';
-            sel.appendChild(opt);
-        });
-    } else {
+
+    if (type === 'module') {
         modulesData.forEach(m => {
             const opt = document.createElement('option');
             opt.value = m.id;
             opt.textContent = m.name;
             sel.appendChild(opt);
         });
+        return;
     }
+
+    // Filter materials
+    const fType = document.getElementById('filterType').value;
+    const fTok = document.getElementById('filterTok').value;
+    const fVoltage = document.getElementById('filterVoltage').value;
+
+    let filtered = materialsData;
+    if (fType) filtered = filtered.filter(m => m.type === fType);
+    if (fTok) filtered = filtered.filter(m => String(m.nom_tok) === fTok);
+    if (fVoltage) filtered = filtered.filter(m => m.voltage === fVoltage);
+
+    filtered.forEach(m => {
+        const opt = document.createElement('option');
+        opt.value = m.id;
+        opt.textContent = m.name + ' (' + Number(m.price).toFixed(2) + ')';
+        sel.appendChild(opt);
+    });
 }
 
 async function addItem() {
