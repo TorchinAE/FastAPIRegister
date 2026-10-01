@@ -27,7 +27,7 @@
     </div>
     <div class="form-group" style="flex:2; min-width:200px; margin-bottom:0;">
         <label>Название</label>
-        <input type="text" name="name" placeholder="Название материала" required>
+        <input type="text" name="name" id="new_name" placeholder="Название материала" required>
     </div>
     <div class="form-group" style="flex:1; min-width:100px; margin-bottom:0;">
         <label>Цена</label>
@@ -151,6 +151,14 @@
         history.replaceState(null, '', window.location.pathname);
     }
 })();
+
+// Auto-fill date to today when name is entered
+document.getElementById('new_name').addEventListener('input', function() {
+    const dateInput = document.querySelector('input[name="date"]');
+    if (this.value.trim() && !dateInput.value) {
+        dateInput.value = new Date().toISOString().split('T')[0];
+    }
+});
 
 let pendingFile = null;
 

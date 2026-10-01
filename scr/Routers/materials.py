@@ -180,7 +180,7 @@ async def import_materials_excel(
     content = await file.read()
     wb = load_workbook(io.BytesIO(content))
     ws = wb.active
-    rows = list(ws.iter_rows(min_row=2, values_only=True))
+    rows = list(ws.iter_rows(values_only=True))
 
     # Phase 1: scan for price changes (same-price rows are conflicts)
     conflicts = []
@@ -216,81 +216,207 @@ async def import_materials_excel_confirm(
     content = await file.read()
     wb = load_workbook(io.BytesIO(content))
     ws = wb.active
-    rows = list(ws.iter_rows(min_row=2, values_only=True))
+    rows = list(ws.iter_rows(values_only=True))
     imported = await _do_import(session, rows)
     await session.commit()
     return {"status": "ok", "message": f"Импортировано: {imported}", "imported": imported}
 
 
 def _parse_rows(rows: list) -> list[dict]:
-    """Parse rows into normalized dicts. Supports new (14-col) and old (7-col) formats."""
-    from datetime import datetime as dt
-
+    """Parse rows into normalized dicts. Detects columns by header or falls back to fixed order."""
     parsed_list = []
-    for row in rows:
+    if not rows:
+        return parsed_list
+
+    # Try to detect header row
+    col_map = _detect_header(rows[0])
+    data_start = 0
+    if col_map is not None:
+        data_start = 1  # skip header row
+
+    for row in rows[data_start:]:
         if not row:
             continue
 
-        # Skip header rows
-        first = str(row[0]).strip().lower() if row[0] else ""
-        if first in ("id", "название", "материалы"):
-            continue
-
-        if len(row) >= 14:
-            # New format: id, type, name, price, date, nom_tok, stats, vtych, vykat, ruchn, el_priv, code_1c, code_agent, url_agent
-            row_id = int(row[0]) if row[0] else None
-            type_name = str(row[1]).strip() if row[1] else None
-            name = str(row[2]).strip() if row[2] else None
-            price = float(row[3]) if row[3] else 0
-            date_val = _parse_date(row[4])
-            nom_tok = int(row[5]) if row[5] else 0
-            stats = bool(row[6]) if row[6] is not None else True
-            vtych = bool(row[7]) if row[7] is not None else False
-            vykat = bool(row[8]) if row[8] is not None else False
-            ruchn = bool(row[9]) if row[9] is not None else True
-            el_priv = bool(row[10]) if row[10] is not None else False
-            code_1c = str(row[11]).strip() if row[11] else None
-            code_agent = str(row[12]).strip() if row[12] else None
-            url_agent = str(row[13]).strip() if len(row) > 13 and row[13] else None
+        if col_map is not None:
+            parsed = _parse_by_header(row, col_map)
         else:
-            # Old format: name, price, code_1c, code_agent, url_agent, type_name, id
-            name = str(row[0]).strip() if row[0] else None
-            price = float(row[1]) if len(row) > 1 and row[1] else 0
-            code_1c = str(row[2]).strip() if len(row) > 2 and row[2] else None
-            code_agent = str(row[3]).strip() if len(row) > 3 and row[3] else None
-            url_agent = str(row[4]).strip() if len(row) > 4 and row[4] else None
-            type_name = str(row[5]).strip() if len(row) > 5 and row[5] else None
-            row_id = int(row[6]) if len(row) > 6 and row[6] else None
-            date_val = None
-            nom_tok = 0
-            stats = True
-            vtych = False
-            vykat = False
-            ruchn = True
-            el_priv = False
+            parsed = _parse_fixed(row)
 
-        if not name:
-            continue
+        if parsed and parsed.get("name"):
+            parsed_list.append(parsed)
 
-        parsed_list.append(
-            {
-                "row_id": row_id,
-                "type_name": type_name,
-                "name": name,
-                "price": price,
-                "date": date_val,
-                "nom_tok": nom_tok,
-                "stats": stats,
-                "vtych": vtych,
-                "vykat": vykat,
-                "ruchn": ruchn,
-                "el_priv": el_priv,
-                "code_1c": code_1c,
-                "code_agent": code_agent,
-                "url_agent": url_agent,
-            }
-        )
     return parsed_list
+
+
+# Known column name aliases → canonical field names
+_HEADER_ALIASES = {
+    "id": "id",
+    "код": "id",
+    "название": "name",
+    "наименование": "name",
+    "имя": "name",
+    "материал": "name",
+    "цена": "price",
+    "стоимость": "price",
+    "тип": "type",
+    "тип материала": "type",
+    "дата": "date",
+    "дата цены": "date",
+    "ном ток": "nom_tok",
+    "ном. ток": "nom_tok",
+    "ном_tok": "nom_tok",
+    "стац": "stats",
+    "втыч": "vtych",
+    "выкат": "vykat",
+    "ручн": "ruchn",
+    "ручная": "ruchn",
+    "эл.прив": "el_priv",
+    "эл прив": "el_priv",
+    "электропривод": "el_priv",
+    "код 1с": "code_1c",
+    "код 1c": "code_1c",
+    "code_1c": "code_1c",
+    "1c": "code_1c",
+    "код агент": "code_agent",
+    "code_agent": "code_agent",
+    "агент": "code_agent",
+    "url агент": "url_agent",
+    "url_agent": "url_agent",
+    "url": "url_agent",
+    "ссылка": "url_agent",
+}
+
+
+def _detect_header(row) -> dict | None:
+    """If row looks like a header, return {canonical_name: col_index} mapping."""
+    if not row:
+        return None
+    mapping = {}
+    for i, cell in enumerate(row):
+        if cell is None:
+            continue
+        key = str(cell).strip().lower()
+        canonical = _HEADER_ALIASES.get(key)
+        if canonical:
+            mapping[canonical] = i
+    # Need at least "name" to be useful
+    if "name" in mapping:
+        return mapping
+    return None
+
+
+def _get(row, col_map, field, default=None):
+    """Get value from row by field name via col_map."""
+    idx = col_map.get(field)
+    if idx is None or idx >= len(row):
+        return default
+    val = row[idx]
+    if val is None:
+        return default
+    return val
+
+
+def _parse_by_header(row, col_map: dict) -> dict | None:
+    """Parse a single row using header-based column mapping."""
+    name = str(_get(row, col_map, "name", "")).strip()
+    if not name:
+        return None
+
+    price = 0
+    raw_price = _get(row, col_map, "price")
+    if raw_price is not None:
+        try:
+            price = float(raw_price)
+        except (ValueError, TypeError):
+            price = 0
+
+    row_id = None
+    raw_id = _get(row, col_map, "id")
+    if raw_id is not None:
+        try:
+            row_id = int(raw_id)
+        except (ValueError, TypeError):
+            row_id = None
+
+    nom_tok = 0
+    raw_nom = _get(row, col_map, "nom_tok")
+    if raw_nom is not None:
+        try:
+            nom_tok = int(raw_nom)
+        except (ValueError, TypeError):
+            nom_tok = 0
+
+    return {
+        "row_id": row_id,
+        "type_name": str(_get(row, col_map, "type", "")).strip() or None,
+        "name": name,
+        "price": price,
+        "date": _parse_date(_get(row, col_map, "date")),
+        "nom_tok": nom_tok,
+        "stats": bool(_get(row, col_map, "stats", True)),
+        "vtych": bool(_get(row, col_map, "vtych", False)),
+        "vykat": bool(_get(row, col_map, "vykat", False)),
+        "ruchn": bool(_get(row, col_map, "ruchn", True)),
+        "el_priv": bool(_get(row, col_map, "el_priv", False)),
+        "code_1c": str(_get(row, col_map, "code_1c", "")).strip() or None,
+        "code_agent": str(_get(row, col_map, "code_agent", "")).strip() or None,
+        "url_agent": str(_get(row, col_map, "url_agent", "")).strip() or None,
+    }
+
+
+def _parse_fixed(row) -> dict | None:
+    """Fallback: parse row assuming old format (name, price, code_1c, code_agent, url_agent, type, id)."""
+    if not row or not row[0]:
+        return None
+    # Skip obvious header text
+    first = str(row[0]).strip().lower()
+    if first in ("id", "название", "материалы", "наименование"):
+        return None
+
+    name = str(row[0]).strip()
+    if not name:
+        return None
+
+    # Detect which column holds the price
+    price = 0
+    price_col = 1
+    if len(row) > 1 and row[1] is not None:
+        try:
+            price = float(row[1])
+        except (ValueError, TypeError):
+            # row[1] is not a number — try row[2] as price
+            price_col = 2
+            if len(row) > 2 and row[2] is not None:
+                try:
+                    price = float(row[2])
+                except (ValueError, TypeError):
+                    price = 0
+
+    # code_1c is the column after the price
+    code_1c_col = price_col + 1
+    code_1c = str(row[code_1c_col]).strip() if len(row) > code_1c_col and row[code_1c_col] else None
+    code_agent_col = code_1c_col + 1
+    code_agent = str(row[code_agent_col]).strip() if len(row) > code_agent_col and row[code_agent_col] else None
+    url_agent_col = code_agent_col + 1
+    url_agent = str(row[url_agent_col]).strip() if len(row) > url_agent_col and row[url_agent_col] else None
+
+    return {
+        "row_id": None,
+        "type_name": None,
+        "name": name,
+        "price": price,
+        "date": None,
+        "nom_tok": 0,
+        "stats": True,
+        "vtych": False,
+        "vykat": False,
+        "ruchn": True,
+        "el_priv": False,
+        "code_1c": code_1c,
+        "code_agent": code_agent,
+        "url_agent": url_agent,
+    }
 
 
 def _parse_date(val):
