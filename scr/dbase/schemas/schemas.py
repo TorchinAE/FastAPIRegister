@@ -1,3 +1,4 @@
+from datetime import date as Date
 from datetime import datetime
 
 from pydantic import BaseModel, ConfigDict, Field
@@ -223,6 +224,7 @@ class MaterialCreateSchema(BaseModel):
     vykat: bool = False
     ruchn: bool = True
     el_priv: bool = False
+    date: Date | None = None
 
 
 class MaterialUpdateSchema(BaseModel):
@@ -241,6 +243,7 @@ class MaterialUpdateSchema(BaseModel):
     vykat: bool | None = None
     ruchn: bool | None = None
     el_priv: bool | None = None
+    date: Date | None = None
 
 
 class MaterialResponseSchema(BaseModel):
@@ -260,6 +263,7 @@ class MaterialResponseSchema(BaseModel):
     vykat: bool = False
     ruchn: bool = True
     el_priv: bool = False
+    date: Date | None = None
     created_by: str | None = None
 
 

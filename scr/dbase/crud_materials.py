@@ -1,3 +1,5 @@
+from datetime import date
+
 from sqlalchemy import Result, func, select
 from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy.orm import selectinload
@@ -59,6 +61,9 @@ async def update_material(session: AsyncSession, upd_mat: MaterialUpdateSchema) 
     for field, value in upd_mat.model_dump(exclude_unset=True).items():
         if field != "id" and hasattr(check_mat, field):
             setattr(check_mat, field, value)
+    # Auto-set date to today when price changes (unless date was explicitly provided)
+    if upd_mat.price is not None and float(upd_mat.price) != float(check_mat.price or 0) and upd_mat.date is None:
+        check_mat.date = date.today()
     await session.flush()
     return check_mat
 

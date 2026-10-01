@@ -31,6 +31,10 @@
         </div>
         <div class="form-row" style="grid-template-columns: 1fr 1fr 1fr;">
             <div class="form-group">
+                <label>Дата</label>
+                <input type="date" name="date" value="{{ mat.date.strftime('%Y-%m-%d') if mat.date else '' }}" style="width:100%;min-width:0">
+            </div>
+            <div class="form-group">
                 <label>Код 1С</label>
                 <input type="text" name="code_1c" value="{{ mat.code_1c or '' }}" style="width:100%;min-width:0">
             </div>
@@ -69,6 +73,7 @@
 document.getElementById('editMatForm').addEventListener('submit', async function(e) {
     e.preventDefault();
     const fd = new FormData(this);
+    const dateVal = fd.get('date');
     const data = {
         id: parseInt(fd.get('id')),
         name: fd.get('name'),
@@ -83,6 +88,7 @@ document.getElementById('editMatForm').addEventListener('submit', async function
         vykat: this.querySelector('[name="vykat"]').checked,
         ruchn: this.querySelector('[name="ruchn"]').checked,
         el_priv: this.querySelector('[name="el_priv"]').checked,
+        date: dateVal || null,
     };
     const resp = await fetch('/reg/api/materials/', {
         method: 'PATCH',

@@ -1,6 +1,7 @@
 # models.py
 import enum
 from datetime import UTC, datetime, timezone
+from datetime import date as date_type
 from typing import Optional
 
 from sqlalchemy import CheckConstraint, DateTime, Enum, ForeignKey, Integer, Numeric, String, Text, UniqueConstraint
@@ -337,6 +338,7 @@ class Material(BaseID):
     vykat: Mapped[bool] = mapped_column(default=False, nullable=False)
     ruchn: Mapped[bool] = mapped_column(default=True, nullable=False)
     el_priv: Mapped[bool] = mapped_column(default=False, nullable=False)
+    date: Mapped[date_type | None] = mapped_column(nullable=True)
 
     type: Mapped[Optional["MaterialType"]] = relationship(foreign_keys=[type_id])
 

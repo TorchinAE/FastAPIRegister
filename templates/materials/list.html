@@ -44,6 +44,10 @@
         <label style="display:flex;align-items:center;gap:0.25rem;"><input type="checkbox" name="ruchn" id="ruchn_new"> ручн</label>
         <label style="display:flex;align-items:center;gap:0.25rem;"><input type="checkbox" name="el_priv"> эл.прив</label>
     </div>
+    <div class="form-group" style="flex:1; min-width:120px; margin-bottom:0;">
+        <label>Дата</label>
+        <input type="date" name="date">
+    </div>
     <div class="form-group" style="flex:1; min-width:100px; margin-bottom:0;">
         <label>Код 1С</label>
         <input type="text" name="code_1c" placeholder="Код 1С">
@@ -62,7 +66,7 @@
     <table id="dataTable">
         <thead>
             <tr>
-                <th>ID</th><th>Тип</th><th>Название</th><th>Цена</th><th>Ном Ток</th><th>стац</th><th>втыч</th><th>выкат</th><th>ручн</th><th>эл.прив</th><th>Код 1С</th><th>Код агент</th><th>URL агент</th><th></th>
+                <th>ID</th><th>Тип</th><th>Название</th><th>Цена</th><th>Дата</th><th>Ном Ток</th><th>стац</th><th>втыч</th><th>выкат</th><th>ручн</th><th>эл.прив</th><th>Код 1С</th><th>Код агент</th><th>URL агент</th><th></th>
             </tr>
             <tr class="table-filter">
                 <th><input type="text" data-col="0" data-min="1" placeholder="Фильтр..." class="tf-input"></th>
@@ -70,14 +74,15 @@
                 <th><input type="text" data-col="2" placeholder="Фильтр..." class="tf-input"></th>
                 <th><input type="text" data-col="3" placeholder="Фильтр..." class="tf-input"></th>
                 <th><input type="text" data-col="4" placeholder="Фильтр..." class="tf-input"></th>
-                <th><select data-col="5" class="tf-select"><option value="">—</option><option value="✓">✓</option><option value="✗">✗</option></select></th>
+                <th><input type="text" data-col="5" placeholder="Фильтр..." class="tf-input"></th>
                 <th><select data-col="6" class="tf-select"><option value="">—</option><option value="✓">✓</option><option value="✗">✗</option></select></th>
                 <th><select data-col="7" class="tf-select"><option value="">—</option><option value="✓">✓</option><option value="✗">✗</option></select></th>
                 <th><select data-col="8" class="tf-select"><option value="">—</option><option value="✓">✓</option><option value="✗">✗</option></select></th>
                 <th><select data-col="9" class="tf-select"><option value="">—</option><option value="✓">✓</option><option value="✗">✗</option></select></th>
-                <th><input type="text" data-col="10" placeholder="Фильтр..." class="tf-input"></th>
+                <th><select data-col="10" class="tf-select"><option value="">—</option><option value="✓">✓</option><option value="✗">✗</option></select></th>
                 <th><input type="text" data-col="11" placeholder="Фильтр..." class="tf-input"></th>
                 <th><input type="text" data-col="12" placeholder="Фильтр..." class="tf-input"></th>
+                <th><input type="text" data-col="13" placeholder="Фильтр..." class="tf-input"></th>
                 <th></th>
             </tr>
         </thead>
@@ -88,6 +93,7 @@
                 <td>{% if item.type %}<a href="/reg/material-types/{{ item.type_id }}" onclick="event.stopPropagation()">{{ item.type.name }}</a>{% endif %}</td>
                 <td>{{ item.name }}</td>
                 <td>{{ item.price|money }}</td>
+                <td>{{ item.date.strftime('%d.%m.%Y') if item.date else '' }}</td>
                 <td>{{ item.nom_tok }}</td>
                 <td style="text-align:center">{{ '✓' if item.stats else '✗' }}</td>
                 <td style="text-align:center">{{ '✓' if item.vtych else '✗' }}</td>
@@ -102,7 +108,7 @@
                 </td>
             </tr>
             {% endfor %}
-            {% if not items %}<tr class="empty-row"><td colspan="14">Нет материалов</td></tr>{% endif %}
+            {% if not items %}<tr class="empty-row"><td colspan="15">Нет материалов</td></tr>{% endif %}
         </tbody>
     </table>
 </div>

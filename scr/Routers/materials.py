@@ -29,6 +29,7 @@ def _mat_response(mat) -> MaterialResponseSchema:
         type_id=mat.type_id,
         type_name=mat.type.name if mat.type else None,
         created_by=mat.created_by,
+        date=mat.date,
     )
 
 
@@ -91,13 +92,15 @@ async def export_materials_excel(
     )
 
     # Title row
+    headers = ["ID", "Тип", "Название", "Цена", "Дата", "Ном Ток", "стац", "втыч", "выкат", "ручн", "эл.прив", "Код 1С", "Код агент", "URL агент"]
+    num_cols = len(headers)
     ws.append(["Материалы"])
-    ws.merge_cells(start_row=1, start_column=1, end_row=1, end_column=7)
+    ws.merge_cells(start_row=1, start_column=1, end_row=1, end_column=num_cols)
     ws.cell(1, 1).font = Font(bold=True, size=14)
     ws.cell(1, 1).alignment = Alignment(horizontal="center")
 
-    ws.append(["ID", "Название", "Цена", "Код 1С", "Код агент", "URL агент", "Тип"])
-    for col_idx in range(1, 8):
+    ws.append(headers)
+    for col_idx in range(1, num_cols + 1):
         cell = ws.cell(2, col_idx)
         cell.font = header_font
         cell.fill = header_fill
@@ -107,17 +110,24 @@ async def export_materials_excel(
         ws.append(
             [
                 item.id,
+                item.type.name if item.type else "",
                 item.name,
                 float(item.price),
+                item.date.strftime("%d.%m.%Y") if item.date else "",
+                item.nom_tok,
+                "+" if item.stats else "",
+                "+" if item.vtych else "",
+                "+" if item.vykat else "",
+                "+" if item.ruchn else "",
+                "+" if item.el_priv else "",
                 item.code_1c or "",
                 item.code_agent or "",
                 item.url_agent or "",
-                item.type.name if item.type else "",
             ]
         )
         row_num = ws.max_row
-        ws.cell(row_num, 3).number_format = "# ##0.00"
-        for col_idx in range(1, 8):
+        ws.cell(row_num, 4).number_format = "# ##0.00"
+        for col_idx in range(1, num_cols + 1):
             ws.cell(row_num, col_idx).border = thin_border
 
     # Auto-fit columns
@@ -209,6 +219,8 @@ async def import_materials_excel_confirm(
 
 
 async def _do_import(session: AsyncSession, rows: list) -> int:
+    from datetime import datetime as dt
+
     # Cache all material types for auto-creation
     types_cache, _ = await crud_material_types.get_all_types(session, per_page=10000)
     types_map = {t.name: t.id for t in types_cache}
@@ -217,15 +229,51 @@ async def _do_import(session: AsyncSession, rows: list) -> int:
     for row in rows:
         if not row or not row[0]:
             continue
-        name = str(row[0]).strip()
-        if not name:
-            continue
-        price = float(row[1]) if len(row) > 1 and row[1] else 0
-        code_1c = str(row[2]).strip() if len(row) > 2 and row[2] else None
-        code_agent = str(row[3]).strip() if len(row) > 3 and row[3] else None
-        url_agent = str(row[4]).strip() if len(row) > 4 and row[4] else None
-        type_name = str(row[5]).strip() if len(row) > 5 and row[5] else None
-        row_id = int(row[6]) if len(row) > 6 and row[6] else None
+
+        # New format (14 cols): id, type, name, price, date, nom_tok, stats, vtych, vykat, ruchn, el_priv, code_1c, code_agent, url_agent
+        # Old format (7 cols): name, price, code_1c, code_agent, url_agent, type_name, id
+        if len(row) >= 14:
+            row_id = int(row[0]) if row[0] else None
+            type_name = str(row[1]).strip() if row[1] else None
+            name = str(row[2]).strip() if row[2] else None
+            if not name:
+                continue
+            price = float(row[3]) if row[3] else 0
+            date_val = None
+            if row[4]:
+                try:
+                    if isinstance(row[4], dt):
+                        date_val = row[4].date()
+                    else:
+                        date_val = dt.strptime(str(row[4]).strip(), "%d.%m.%Y").date()
+                except (ValueError, AttributeError):
+                    pass
+            nom_tok = int(row[5]) if row[5] else 0
+            stats = bool(row[6]) if row[6] is not None else True
+            vtych = bool(row[7]) if row[7] is not None else False
+            vykat = bool(row[8]) if row[8] is not None else False
+            ruchn = bool(row[9]) if row[9] is not None else True
+            el_priv = bool(row[10]) if row[10] is not None else False
+            code_1c = str(row[11]).strip() if len(row) > 11 and row[11] else None
+            code_agent = str(row[12]).strip() if len(row) > 12 and row[12] else None
+            url_agent = str(row[13]).strip() if len(row) > 13 and row[13] else None
+        else:
+            name = str(row[0]).strip()
+            if not name:
+                continue
+            price = float(row[1]) if len(row) > 1 and row[1] else 0
+            code_1c = str(row[2]).strip() if len(row) > 2 and row[2] else None
+            code_agent = str(row[3]).strip() if len(row) > 3 and row[3] else None
+            url_agent = str(row[4]).strip() if len(row) > 4 and row[4] else None
+            type_name = str(row[5]).strip() if len(row) > 5 and row[5] else None
+            row_id = int(row[6]) if len(row) > 6 and row[6] else None
+            date_val = None
+            nom_tok = 0
+            stats = True
+            vtych = False
+            vykat = False
+            ruchn = True
+            el_priv = False
 
         type_id = None
         if type_name:
@@ -235,7 +283,9 @@ async def _do_import(session: AsyncSession, rows: list) -> int:
             type_id = types_map[type_name]
 
         schema = MaterialCreateSchema(
-            name=name, price=price, code_1c=code_1c, code_agent=code_agent, url_agent=url_agent, type_id=type_id
+            name=name, price=price, code_1c=code_1c, code_agent=code_agent, url_agent=url_agent,
+            type_id=type_id, nom_tok=nom_tok, stats=stats, vtych=vtych, vykat=vykat,
+            ruchn=ruchn, el_priv=el_priv, date=date_val,
         )
 
         if row_id:
