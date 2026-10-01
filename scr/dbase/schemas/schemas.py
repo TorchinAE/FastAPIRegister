@@ -565,6 +565,42 @@ class PaymentItemResponseSchema(BaseModel):
 # --- Delivery ---
 
 
+class ServiceCalcCreateSchema(BaseModel):
+    model_config = ConfigDict(from_attributes=True)
+
+    request_id: int
+    section: str
+    description: str | None = None
+    base_cost: float = Field(0, ge=0)
+    quantity: int = Field(1, ge=1)
+    profitability_percent: float = Field(0, ge=0, le=100)
+    final_price: float = Field(0, ge=0)
+
+
+class ServiceCalcUpdateSchema(BaseModel):
+    model_config = ConfigDict(from_attributes=True)
+
+    id: int
+    description: str | None = None
+    base_cost: float | None = Field(None, ge=0)
+    quantity: int | None = Field(None, ge=1)
+    profitability_percent: float | None = Field(None, ge=0, le=100)
+    final_price: float | None = Field(None, ge=0)
+
+
+class ServiceCalcResponseSchema(BaseModel):
+    model_config = ConfigDict(from_attributes=True)
+
+    id: int
+    request_id: int
+    section: str
+    description: str | None = None
+    base_cost: float = 0
+    quantity: int = 1
+    profitability_percent: float = 0
+    final_price: float = 0
+
+
 class DeliveryCreateSchema(BaseModel):
     model_config = ConfigDict(from_attributes=True)
 

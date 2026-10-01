@@ -28,6 +28,9 @@
                 ('pku', 'ПКУ', 'pku_cost', req.pku_cost),
                 ('pus', 'ПУС', 'pus_cost', req.pus_cost),
                 ('delivery', 'Доставка', 'delivery_cost', req.delivery_cost),
+                ('chief-engineer', 'Шеф-инженер', 'chief_engineer_cost', req.chief_engineer_cost),
+                ('smr', 'СМР', 'smr_cost', req.smr_cost),
+                ('pnr', 'ПНР', 'pnr_cost', req.pnr_cost),
             ] %}
 
             {% for key, label, field, cost in sections %}
@@ -87,6 +90,8 @@ async function clearCost(field) {
         // Also clear sub-page data for delivery
         if (field === 'delivery_cost') {
             await clearDeliveryData();
+        } else if (['chief_engineer_cost', 'smr_cost', 'pnr_cost'].includes(field)) {
+            await clearServiceData(field);
         }
         showToast('Стоимость очищена');
     } else {
@@ -108,6 +113,36 @@ async function clearDeliveryData() {
                         address: null,
                         cost_per_truck: 0,
                         trucks_count: 1,
+                        profitability_percent: 0,
+                        final_price: 0,
+                    }),
+                });
+            }
+        }
+    } catch(e) {}
+}
+
+async function clearServiceData(costField) {
+    const sectionMap = {
+        'chief_engineer_cost': 'chief-engineer',
+        'smr_cost': 'smr',
+        'pnr_cost': 'pnr',
+    };
+    const section = sectionMap[costField];
+    if (!section) return;
+    try {
+        const resp = await fetch('/reg/api/service-calcs/by-request/' + reqId + '?section=' + section);
+        if (resp.ok) {
+            const calc = await resp.json();
+            if (calc && calc.id) {
+                await fetch('/reg/api/service-calcs/' + calc.id, {
+                    method: 'PUT',
+                    headers: {'Content-Type': 'application/json'},
+                    body: JSON.stringify({
+                        id: calc.id,
+                        description: null,
+                        base_cost: 0,
+                        quantity: 1,
                         profitability_percent: 0,
                         final_price: 0,
                     }),

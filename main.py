@@ -25,6 +25,7 @@ from scr.Routers.payments import pay_router
 from scr.Routers.positions import pos_router
 from scr.Routers.requests import req_router
 from scr.Routers.router import router
+from scr.Routers.service_calcs import sc_router
 from scr.Routers.settings import settings_router
 from scr.Routers.users import users_router
 
@@ -116,6 +117,7 @@ app.include_router(mt_router, prefix="/reg")
 app.include_router(mod_router, prefix="/reg")
 app.include_router(del_router, prefix="/reg")
 app.include_router(cs_router, prefix="/reg")
+app.include_router(sc_router, prefix="/reg")
 app.include_router(pages_router, prefix="/reg")
 
 

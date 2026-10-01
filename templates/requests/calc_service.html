@@ -1,0 +1,204 @@
+{% extends "base.html" %}
+{% block title %}Расчёт ТКП #{{ req.id }} — {{ section_label }}{% endblock %}
+{% block content %}
+<div class="page-header">
+    <div>
+        <h1>Расчёт ТКП — {{ section_label }}</h1>
+        <div class="subtitle">Код: {{ req.id }} &middot; {{ req.tkp_num or '' }}</div>
+    </div>
+    <a href="/reg/requests/{{ req.id }}/calc" class="btn btn-ghost">&larr; Назад к расчёту</a>
+</div>
+
+<div class="card">
+    <form id="serviceForm">
+        <input type="hidden" name="id" value="{{ calc.id }}">
+        <div class="form-row" style="grid-template-columns: 1fr 1fr 1fr;">
+            <div class="form-group" style="grid-column: 1 / -1;">
+                <label>Описание</label>
+                <input type="text" name="description" value="{{ calc.description or '' }}" style="width:100%;min-width:0" id="description">
+            </div>
+            <div class="form-group">
+                <label>Себестоимость за ед. (₽)</label>
+                <input type="number" name="base_cost" value="{{ calc.base_cost }}" min="0" step="0.01" style="width:100%;min-width:0" id="baseCost" oninput="recalcFromInputs()">
+            </div>
+            <div class="form-group">
+                <label>Количество</label>
+                <input type="number" name="quantity" value="{{ calc.quantity }}" min="1" step="1" style="width:100%;min-width:0" id="quantity" oninput="recalcFromInputs()">
+            </div>
+        </div>
+
+        <div class="form-row" style="grid-template-columns: 1fr 1fr 1fr;margin-top:1rem;">
+            <div class="form-group">
+                <label>Сумма себестоимости (₽)</label>
+                <input type="text" id="totalCost" readonly style="width:100%;min-width:0;background:#f8fafc;font-weight:bold;">
+            </div>
+            <div class="form-group">
+                <label>Рентабельность (%)</label>
+                <input type="number" id="profitPercent" name="profitability_percent" value="{{ profitability }}" min="0" max="100" step="0.01" style="width:100%;min-width:0;" oninput="recalcFromPercent()">
+            </div>
+            <div class="form-group">
+                <label>Рентабельность (₽)</label>
+                <input type="text" id="profitRub" readonly style="width:100%;min-width:0;background:#f8fafc;">
+            </div>
+        </div>
+
+        <div class="form-row" style="grid-template-columns: 1fr;margin-top:1rem;">
+            <div class="form-group" style="max-width:300px;">
+                <label>Конечная цена (₽)</label>
+                <input type="number" id="finalPrice" min="0" step="0.01" style="width:100%;min-width:0;background:#f0fdf4;font-weight:bold;font-size:1.1rem;" oninput="recalcFromFinal()">
+            </div>
+        </div>
+
+        <div class="actions" style="margin-top:1.5rem;display:flex;gap:0.75rem;">
+            <button type="submit" class="btn btn-primary">Сохранить</button>
+            <button type="button" class="btn btn-danger" onclick="clearService()">Очистить</button>
+        </div>
+    </form>
+</div>
+
+<div id="toast" class="toast" style="display:none"></div>
+{% endblock %}
+
+{% block scripts %}
+<script>
+const reqId = {{ req.id }};
+const calcId = {{ calc.id }};
+const section = '{{ section }}';
+const costField = '{{ cost_field }}';
+
+let suppressInput = false;
+
+function recalcFromInputs() {
+    if (suppressInput) return;
+    const baseCost = parseFloat(document.getElementById('baseCost').value) || 0;
+    const qty = parseInt(document.getElementById('quantity').value) || 1;
+    const totalCost = baseCost * qty;
+    const profitPercent = parseFloat(document.getElementById('profitPercent').value) || 0;
+    const profitRub = totalCost * profitPercent / 100;
+    const finalPrice = totalCost + profitRub;
+
+    suppressInput = true;
+    document.getElementById('totalCost').value = totalCost.toFixed(2);
+    document.getElementById('profitRub').value = profitRub.toFixed(2);
+    document.getElementById('finalPrice').value = finalPrice.toFixed(2);
+    suppressInput = false;
+}
+
+function recalcFromPercent() {
+    if (suppressInput) return;
+    const baseCost = parseFloat(document.getElementById('baseCost').value) || 0;
+    const qty = parseInt(document.getElementById('quantity').value) || 1;
+    const totalCost = baseCost * qty;
+    const profitPercent = parseFloat(document.getElementById('profitPercent').value) || 0;
+    const profitRub = totalCost * profitPercent / 100;
+    const finalPrice = totalCost + profitRub;
+
+    suppressInput = true;
+    document.getElementById('totalCost').value = totalCost.toFixed(2);
+    document.getElementById('profitRub').value = profitRub.toFixed(2);
+    document.getElementById('finalPrice').value = finalPrice.toFixed(2);
+    suppressInput = false;
+}
+
+function recalcFromFinal() {
+    if (suppressInput) return;
+    const baseCost = parseFloat(document.getElementById('baseCost').value) || 0;
+    const qty = parseInt(document.getElementById('quantity').value) || 1;
+    const totalCost = baseCost * qty;
+    const finalPrice = parseFloat(document.getElementById('finalPrice').value) || 0;
+    const profitRub = finalPrice - totalCost;
+    const profitPercent = totalCost > 0 ? (profitRub / totalCost * 100) : 0;
+
+    suppressInput = true;
+    document.getElementById('totalCost').value = totalCost.toFixed(2);
+    document.getElementById('profitPercent').value = profitPercent.toFixed(2);
+    document.getElementById('profitRub').value = profitRub.toFixed(2);
+    suppressInput = false;
+}
+
+(function() {
+    suppressInput = true;
+    const baseCost = parseFloat(document.getElementById('baseCost').value) || 0;
+    const qty = parseInt(document.getElementById('quantity').value) || 1;
+    const totalCost = baseCost * qty;
+    const profitPercent = parseFloat(document.getElementById('profitPercent').value) || 0;
+    const savedFinal = {{ calc.final_price }};
+
+    document.getElementById('totalCost').value = totalCost.toFixed(2);
+    if (savedFinal > 0) {
+        document.getElementById('finalPrice').value = savedFinal.toFixed(2);
+        const profitRub = savedFinal - totalCost;
+        const calcPercent = totalCost > 0 ? (profitRub / totalCost * 100) : 0;
+        document.getElementById('profitPercent').value = calcPercent.toFixed(2);
+        document.getElementById('profitRub').value = profitRub.toFixed(2);
+    } else {
+        const profitRub = totalCost * profitPercent / 100;
+        document.getElementById('profitRub').value = profitRub.toFixed(2);
+        document.getElementById('finalPrice').value = (totalCost + profitRub).toFixed(2);
+    }
+    suppressInput = false;
+})();
+
+document.getElementById('serviceForm').addEventListener('submit', async function(e) {
+    e.preventDefault();
+    const fd = new FormData(this);
+    const finalPrice = parseFloat(document.getElementById('finalPrice').value) || 0;
+    const profitPercent = parseFloat(document.getElementById('profitPercent').value) || 0;
+    const data = {
+        id: parseInt(fd.get('id')),
+        description: fd.get('description') || null,
+        base_cost: parseFloat(fd.get('base_cost')) || 0,
+        quantity: parseInt(fd.get('quantity')) || 1,
+        profitability_percent: profitPercent,
+        final_price: finalPrice,
+    };
+    const resp = await fetch('/reg/api/service-calcs/' + calcId, {
+        method: 'PUT',
+        headers: {'Content-Type': 'application/json'},
+        body: JSON.stringify(data),
+    });
+    if (resp.ok) {
+        await fetch('/reg/api/requests/' + reqId, {
+            method: 'PUT',
+            headers: {'Content-Type': 'application/json'},
+            body: JSON.stringify({id: reqId, [costField]: finalPrice}),
+        });
+        showToast('Сохранено');
+    } else {
+        const err = await resp.json();
+        showToast('Ошибка: ' + (err.detail || 'не удалось сохранить'));
+    }
+});
+
+async function clearService() {
+    if (!confirm('Очистить все данные?')) return;
+    const resp = await fetch('/reg/api/service-calcs/' + calcId, {
+        method: 'PUT',
+        headers: {'Content-Type': 'application/json'},
+        body: JSON.stringify({id: calcId, description: null, base_cost: 0, quantity: 1, profitability_percent: 0, final_price: 0}),
+    });
+    if (resp.ok) {
+        await fetch('/reg/api/requests/' + reqId, {
+            method: 'PUT',
+            headers: {'Content-Type': 'application/json'},
+            body: JSON.stringify({id: reqId, [costField]: 0}),
+        });
+        document.getElementById('description').value = '';
+        document.getElementById('baseCost').value = '0';
+        document.getElementById('quantity').value = '1';
+        document.getElementById('profitPercent').value = '0';
+        recalcFromInputs();
+        showToast('Очищено');
+    } else {
+        showToast('Ошибка очистки');
+    }
+}
+
+function showToast(msg) {
+    const t = document.getElementById('toast');
+    t.textContent = msg;
+    t.style.display = 'block';
+    setTimeout(() => t.style.display = 'none', 2500);
+}
+</script>
+{% endblock %}

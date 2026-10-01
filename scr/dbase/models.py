@@ -229,6 +229,9 @@ class Request(BaseID):
     pku_cost: Mapped[float] = mapped_column(Numeric(12, 2), default=0)
     pus_cost: Mapped[float] = mapped_column(Numeric(12, 2), default=0)
     delivery_cost: Mapped[float] = mapped_column(Numeric(12, 2), default=0)
+    chief_engineer_cost: Mapped[float] = mapped_column(Numeric(12, 2), default=0)
+    smr_cost: Mapped[float] = mapped_column(Numeric(12, 2), default=0)
+    pnr_cost: Mapped[float] = mapped_column(Numeric(12, 2), default=0)
 
     counterparty: Mapped["Counterparty"] = relationship(foreign_keys=[counterparty_id])
     company: Mapped["Organization"] = relationship(foreign_keys=[company_id])
@@ -275,6 +278,19 @@ class Delivery(BaseID):
     address: Mapped[str | None] = mapped_column(Text, nullable=True)
     cost_per_truck: Mapped[float] = mapped_column(Numeric(12, 2), default=0)
     trucks_count: Mapped[int] = mapped_column(Integer, default=1)
+    profitability_percent: Mapped[float] = mapped_column(Numeric(5, 2), default=0)
+    final_price: Mapped[float] = mapped_column(Numeric(12, 2), default=0)
+
+    request: Mapped["Request"] = relationship(foreign_keys=[request_id])
+
+
+class ServiceCalc(BaseID):
+    __tablename__ = "service_calcs"
+    request_id: Mapped[int] = mapped_column(ForeignKey("requests.id"), nullable=False)
+    section: Mapped[str] = mapped_column(String(50), nullable=False)
+    description: Mapped[str | None] = mapped_column(Text, nullable=True)
+    base_cost: Mapped[float] = mapped_column(Numeric(12, 2), default=0)
+    quantity: Mapped[int] = mapped_column(Integer, default=1)
     profitability_percent: Mapped[float] = mapped_column(Numeric(5, 2), default=0)
     final_price: Mapped[float] = mapped_column(Numeric(12, 2), default=0)
 

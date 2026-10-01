@@ -1103,6 +1103,55 @@ async def request_calc_delivery_page(
     )
 
 
+SERVICE_SECTIONS = {
+    "chief-engineer": ("Шеф-инженер", "chief_engineer_cost"),
+    "smr": ("СМР", "smr_cost"),
+    "pnr": ("ПНР", "pnr_cost"),
+}
+
+
+@pages_router.get("/requests/{req_id}/calc/{section}", response_class=HTMLResponse)
+async def request_calc_page_by_section(
+    req_id: int,
+    section: str,
+    request: Request,
+    session: AsyncSession = Depends(db_helper.session_dependency),
+):
+    if section in ("tkp", "delivery"):
+        return RedirectResponse(f"/reg/requests/{req_id}/calc/{section}", status_code=302)
+    if section not in SERVICE_SECTIONS:
+        return await request_calc_stub_page(req_id, section, request, session)
+    user = await get_current_user(request, session)
+    if not user:
+        return RedirectResponse("/reg/", status_code=302)
+    req = await crud_requests.get_request_by_id(session, req_id)
+    if not req:
+        return HTMLResponse("ТКП не найдена", status_code=404)
+    from scr.dbase import crud_service_calcs
+
+    label, cost_field = SERVICE_SECTIONS[section]
+    calc = await crud_service_calcs.get_or_create_service_calc(session, req_id, section)
+    await session.commit()
+    # Use company profitability as default
+    profitability = float(req.company.profitability) if req.company and req.company.profitability else 15.0
+    if calc.profitability_percent and float(calc.profitability_percent) > 0:
+        profitability = float(calc.profitability_percent)
+    return templates.TemplateResponse(
+        "requests/calc_service.html",
+        {
+            "request": request,
+            "user": user,
+            "req": req,
+            "calc": calc,
+            "section": section,
+            "section_label": label,
+            "cost_field": cost_field,
+            "profitability": profitability,
+            "active_page": "requests",
+        },
+    )
+
+
 STUB_SECTIONS = {
     "corpusa": "\u041a\u043e\u0440\u043f\u0443\u0441\u0430",
     "kso": "\u041a\u0421\u041e",
@@ -1114,15 +1163,12 @@ STUB_SECTIONS = {
 }
 
 
-@pages_router.get("/requests/{req_id}/calc/{section}", response_class=HTMLResponse)
 async def request_calc_stub_page(
     req_id: int,
     section: str,
     request: Request,
-    session: AsyncSession = Depends(db_helper.session_dependency),
+    session: AsyncSession,
 ):
-    if section in ("tkp", "delivery"):
-        return RedirectResponse(f"/reg/requests/{req_id}/calc/{section}", status_code=302)
     user = await get_current_user(request, session)
     if not user:
         return RedirectResponse("/reg/", status_code=302)
