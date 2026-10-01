@@ -432,6 +432,9 @@ class RequestUpdateSchema(BaseModel):
     pku_cost: float | None = Field(None, ge=0)
     pus_cost: float | None = Field(None, ge=0)
     delivery_cost: float | None = Field(None, ge=0)
+    chief_engineer_cost: float | None = Field(None, ge=0)
+    smr_cost: float | None = Field(None, ge=0)
+    pnr_cost: float | None = Field(None, ge=0)
 
 
 class RequestResponseSchema(BaseModel):
@@ -478,6 +481,9 @@ class RequestResponseSchema(BaseModel):
     pku_cost: float = 0
     pus_cost: float = 0
     delivery_cost: float = 0
+    chief_engineer_cost: float = 0
+    smr_cost: float = 0
+    pnr_cost: float = 0
     created_by: str | None = None
 
 
