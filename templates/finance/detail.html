@@ -47,6 +47,7 @@
 <script>
 const kind = '{{ kind }}';
 const itemId = {{ item.id }};
+const baseUrl = '{{ "/reg/nakladnye" if kind == "invoices" else "/reg/fot" }}';
 
 document.getElementById('editForm').addEventListener('submit', async function(e) {
     e.preventDefault();
@@ -63,7 +64,7 @@ document.getElementById('editForm').addEventListener('submit', async function(e)
     });
     if (resp.ok) {
         showToast('Сохранено');
-        setTimeout(() => window.location.href = '{{ base }}/', 800);
+        setTimeout(() => window.location.href = baseUrl + '/', 800);
     } else {
         showToast('Ошибка');
     }
@@ -73,7 +74,7 @@ async function deleteItem() {
     if (!confirm('Удалить запись?')) return;
     const resp = await fetch('/reg/api/finance/' + kind + '/' + itemId, {method: 'DELETE'});
     if (resp.ok) {
-        window.location.href = '{{ base }}';
+        window.location.href = baseUrl;
     } else {
         showToast('Ошибка удаления');
     }
