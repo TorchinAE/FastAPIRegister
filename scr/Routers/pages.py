@@ -1497,40 +1497,53 @@ async def modules_detail_page(
 @pages_router.get("/contracts", response_class=HTMLResponse)
 async def contracts_list_page(
     request: Request,
+    page: int = Query(1, ge=1),
     session: AsyncSession = Depends(db_helper.session_dependency),
 ):
     user = await get_current_user(request, session)
     if not user:
         return RedirectResponse("/reg/", status_code=302)
 
+    from sqlalchemy import func as sa_func
     from sqlalchemy import select as sa_select
     from sqlalchemy.orm import selectinload
 
     from scr.dbase import crud_contract_specs
     from scr.dbase.models import ContractSpec, Organization
 
+    per_page = await _get_per_page(session)
+
+    # Count total
+    count_stmt = sa_select(sa_func.count(ContractSpec.id))
+    total = (await session.execute(count_stmt)).scalar() or 0
+    pages = (total + per_page - 1) // per_page
+
     stmt = (
         sa_select(ContractSpec)
         .options(selectinload(ContractSpec.company))
         .options(selectinload(ContractSpec.request))
         .order_by(ContractSpec.contract_number, ContractSpec.specification_number)
+        .offset((page - 1) * per_page)
+        .limit(per_page)
     )
     result = await session.execute(stmt)
-    all_specs = list(result.scalars().all())
+    specs = list(result.scalars().all())
 
-    # Get unique companies for filter
-    companies_set = {}
-    for spec in all_specs:
-        if spec.company_id not in companies_set:
-            companies_set[spec.company_id] = spec.company
+    # Get all companies for filter dropdown
+    all_companies_stmt = sa_select(Organization).order_by(Organization.name)
+    companies_result = await session.execute(all_companies_stmt)
+    companies = list(companies_result.scalars().all())
 
     return templates.TemplateResponse(
         "contracts/list.html",
         {
             "request": request,
             "user": user,
-            "specs": all_specs,
-            "companies": list(companies_set.values()),
+            "specs": specs,
+            "companies": companies,
+            "page": page,
+            "pages": pages,
+            "total": total,
             "active_page": "contracts",
         },
     )

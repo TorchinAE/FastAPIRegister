@@ -4,7 +4,7 @@
 <div class="page-header" style="gap:1rem; flex-wrap:wrap;">
     <div style="display:flex; align-items:center; gap:0.75rem;">
         <h1>Договора</h1>
-        <span class="subtitle">Всего спецификаций: {{ specs|length }}</span>
+        <span class="subtitle">Всего спецификаций: {{ total }}</span>
     </div>
     <button type="button" class="btn btn-primary" onclick="exportContractsExcel()">Скачать Excel</button>
 </div>
@@ -61,6 +61,13 @@
         </tbody>
     </table>
 </div>
+{% if pages > 1 %}
+<div class="pagination">
+    {% for p in range(1, pages + 1) %}
+    <a href="/reg/contracts?page={{ p }}" class="{{ 'active' if p == page else '' }}">{{ p }}</a>
+    {% endfor %}
+</div>
+{% endif %}
 
 <div id="toast" class="toast" style="display:none"></div>
 {% endblock %}
