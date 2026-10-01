@@ -306,6 +306,11 @@ def _detect_header(row) -> dict | None:
     return None
 
 
+def _has_col(col_map, field):
+    """Check if a column exists in the header mapping."""
+    return field in col_map
+
+
 def _get(row, col_map, field, default=None):
     """Get value from row by field name via col_map."""
     idx = col_map.get(field)
@@ -354,11 +359,12 @@ def _parse_by_header(row, col_map: dict) -> dict | None:
         "price": price,
         "date": _parse_date(_get(row, col_map, "date")),
         "nom_tok": nom_tok,
-        "stats": bool(_get(row, col_map, "stats", False)),
-        "vtych": bool(_get(row, col_map, "vtych", False)),
-        "vykat": bool(_get(row, col_map, "vykat", False)),
-        "ruchn": bool(_get(row, col_map, "ruchn", False)),
-        "el_priv": bool(_get(row, col_map, "el_priv", False)),
+        "has_bool_cols": _has_col(col_map, "stats") or _has_col(col_map, "ruchn"),
+        "stats": bool(_get(row, col_map, "stats")) if _has_col(col_map, "stats") else None,
+        "vtych": bool(_get(row, col_map, "vtych")) if _has_col(col_map, "vtych") else None,
+        "vykat": bool(_get(row, col_map, "vykat")) if _has_col(col_map, "vykat") else None,
+        "ruchn": bool(_get(row, col_map, "ruchn")) if _has_col(col_map, "ruchn") else None,
+        "el_priv": bool(_get(row, col_map, "el_priv")) if _has_col(col_map, "el_priv") else None,
         "code_1c": str(_get(row, col_map, "code_1c", "")).strip() or None,
         "code_agent": str(_get(row, col_map, "code_agent", "")).strip() or None,
         "url_agent": str(_get(row, col_map, "url_agent", "")).strip() or None,
@@ -408,11 +414,12 @@ def _parse_fixed(row) -> dict | None:
         "price": price,
         "date": None,
         "nom_tok": 0,
-        "stats": True,
-        "vtych": False,
-        "vykat": False,
-        "ruchn": True,
-        "el_priv": False,
+        "has_bool_cols": False,
+        "stats": None,
+        "vtych": None,
+        "vykat": None,
+        "ruchn": None,
+        "el_priv": None,
         "code_1c": code_1c,
         "code_agent": code_agent,
         "url_agent": url_agent,
@@ -468,10 +475,28 @@ async def _do_import(session: AsyncSession, rows: list) -> int:
 
     imported = 0
     for parsed in _parse_rows(rows):
-        # If nom_tok not specified, stats and ruchn default to False
-        if not parsed.get("nom_tok"):
+        nom_tok = parsed.get("nom_tok", 0)
+        has_bool = parsed.get("has_bool_cols", False)
+
+        if not nom_tok:
+            # No tok specified → stats and ruchn are False
             parsed["stats"] = False
             parsed["ruchn"] = False
+        elif not has_bool:
+            # Tok specified but no boolean columns in table → stats and ruchn default True
+            parsed["stats"] = True
+            parsed["ruchn"] = True
+        else:
+            # Tok specified and boolean columns exist → use values, default False if empty
+            if parsed["stats"] is None:
+                parsed["stats"] = False
+            if parsed["ruchn"] is None:
+                parsed["ruchn"] = False
+
+        # Other booleans default False if not specified
+        for key in ("vtych", "vykat", "el_priv"):
+            if parsed.get(key) is None:
+                parsed[key] = False
 
         existing = await _find_existing(session, parsed)
 
