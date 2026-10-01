@@ -51,11 +51,11 @@ def upgrade() -> None:
     existing_cols = {row[1] for row in conn.execute(sa.text("PRAGMA table_info(requests)"))}
     with op.batch_alter_table("requests", schema=None) as batch_op:
         if "chief_engineer_cost" not in existing_cols:
-            batch_op.add_column(sa.Column("chief_engineer_cost", sa.Numeric(precision=12, scale=2), nullable=False))
+            batch_op.add_column(sa.Column("chief_engineer_cost", sa.Numeric(precision=12, scale=2), nullable=False, server_default="0"))
         if "smr_cost" not in existing_cols:
-            batch_op.add_column(sa.Column("smr_cost", sa.Numeric(precision=12, scale=2), nullable=False))
+            batch_op.add_column(sa.Column("smr_cost", sa.Numeric(precision=12, scale=2), nullable=False, server_default="0"))
         if "pnr_cost" not in existing_cols:
-            batch_op.add_column(sa.Column("pnr_cost", sa.Numeric(precision=12, scale=2), nullable=False))
+            batch_op.add_column(sa.Column("pnr_cost", sa.Numeric(precision=12, scale=2), nullable=False, server_default="0"))
 
 
 def downgrade() -> None:
