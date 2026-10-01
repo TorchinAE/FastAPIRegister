@@ -40,6 +40,10 @@
         </main>
     </div>
     <script>
+        function formatFinancial(val) {
+            const n = parseFloat(val) || 0;
+            return n.toLocaleString('ru-RU', { minimumFractionDigits: 2, maximumFractionDigits: 2 });
+        }
         function toggleSidebar() {
             document.getElementById('sidebar').classList.toggle('open');
             document.getElementById('overlay').classList.toggle('open');

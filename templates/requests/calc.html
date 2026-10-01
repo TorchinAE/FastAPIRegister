@@ -37,7 +37,7 @@
             <div style="display:flex;gap:0.35rem;align-items:stretch;">
                 <a href="/reg/requests/{{ req.id }}/calc/{{ key }}" class="btn btn-ghost calc-btn" style="flex:1;display:flex;justify-content:space-between;align-items:center;text-decoration:none;">
                     <span>{{ label }}</span>
-                    <span class="calc-cost" id="cost-{{ field }}">{{ "%.2f"|format(cost or 0) }}</span>
+                    <span class="calc-cost" id="cost-{{ field }}" data-raw="{{ cost or 0 }}">{{ "%.2f"|format(cost or 0) }}</span>
                 </a>
                 <button class="btn btn-danger btn-sm" style="padding:0 0.5rem;font-size:0.75rem;white-space:nowrap;" onclick="clearCost('{{ field }}')" title="Очистить стоимость">&#10005;</button>
             </div>
@@ -64,6 +64,12 @@
 <script>
 const reqId = {{ req.id }};
 
+// Format all cost values on page load
+document.querySelectorAll('.calc-cost').forEach(el => {
+    const raw = parseFloat(el.dataset.raw) || 0;
+    el.textContent = formatFinancial(raw);
+});
+
 function openFolder() {
     const path = '{{ folder_path | e }}';
     if (path) {
@@ -86,7 +92,9 @@ async function clearCost(field) {
         body: JSON.stringify(data),
     });
     if (resp.ok) {
-        document.getElementById('cost-' + field).textContent = '0.00';
+        const el = document.getElementById('cost-' + field);
+        el.dataset.raw = '0';
+        el.textContent = formatFinancial(0);
         // Also clear sub-page data for delivery
         if (field === 'delivery_cost') {
             await clearDeliveryData();

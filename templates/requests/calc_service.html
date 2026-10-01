@@ -23,6 +23,7 @@
             <div class="form-group">
                 <label>Себестоимость (₽)</label>
                 <input type="number" name="base_cost" value="{{ calc.base_cost }}" min="0" step="0.01" style="width:100%;min-width:0" id="baseCost" oninput="recalcFromInputs()">
+                <div class="financial-display" id="baseCostFmt" style="font-size:0.85rem;color:var(--text-muted);margin-top:0.25rem;"></div>
             </div>
             <div class="form-group">
                 <label>Рентабельность (%)</label>
@@ -30,7 +31,7 @@
             </div>
             <div class="form-group">
                 <label>Рентабельность (₽)</label>
-                <input type="text" id="profitRub" readonly style="width:100%;min-width:0;background:#f8fafc;">
+                <div id="profitRub" readonly style="width:100%;min-width:0;background:#f8fafc;padding:0.5rem;border:1px solid var(--border,#e2e8f0);border-radius:6px;font-size:1rem;"></div>
             </div>
         </div>
 
@@ -38,6 +39,7 @@
             <div class="form-group" style="max-width:300px;">
                 <label>Конечная цена (₽)</label>
                 <input type="number" id="finalPrice" min="0" step="0.01" style="width:100%;min-width:0;background:#f0fdf4;font-weight:bold;font-size:1.1rem;" oninput="recalcFromFinal()">
+                <div class="financial-display" id="finalPriceFmt" style="font-size:0.95rem;font-weight:bold;color:#16a34a;margin-top:0.25rem;"></div>
             </div>
         </div>
 
@@ -59,6 +61,13 @@ const costField = '{{ cost_field }}';
 
 let suppressInput = false;
 
+function updateFinancialDisplays() {
+    const baseCost = parseFloat(document.getElementById('baseCost').value) || 0;
+    const finalPrice = parseFloat(document.getElementById('finalPrice').value) || 0;
+    document.getElementById('baseCostFmt').textContent = baseCost > 0 ? formatFinancial(baseCost) : '';
+    document.getElementById('finalPriceFmt').textContent = finalPrice > 0 ? formatFinancial(finalPrice) : '';
+}
+
 function recalcFromInputs() {
     if (suppressInput) return;
     const baseCost = parseFloat(document.getElementById('baseCost').value) || 0;
@@ -67,9 +76,10 @@ function recalcFromInputs() {
     const finalPrice = baseCost + profitRub;
 
     suppressInput = true;
-    document.getElementById('profitRub').value = profitRub.toFixed(2);
+    document.getElementById('profitRub').textContent = formatFinancial(profitRub);
     document.getElementById('finalPrice').value = finalPrice.toFixed(2);
     suppressInput = false;
+    updateFinancialDisplays();
 }
 
 function recalcFromPercent() {
@@ -80,9 +90,10 @@ function recalcFromPercent() {
     const finalPrice = baseCost + profitRub;
 
     suppressInput = true;
-    document.getElementById('profitRub').value = profitRub.toFixed(2);
+    document.getElementById('profitRub').textContent = formatFinancial(profitRub);
     document.getElementById('finalPrice').value = finalPrice.toFixed(2);
     suppressInput = false;
+    updateFinancialDisplays();
 }
 
 function recalcFromFinal() {
@@ -94,8 +105,9 @@ function recalcFromFinal() {
 
     suppressInput = true;
     document.getElementById('profitPercent').value = profitPercent.toFixed(2);
-    document.getElementById('profitRub').value = profitRub.toFixed(2);
+    document.getElementById('profitRub').textContent = formatFinancial(profitRub);
     suppressInput = false;
+    updateFinancialDisplays();
 }
 
 (function() {
@@ -109,12 +121,13 @@ function recalcFromFinal() {
         const profitRub = savedFinal - baseCost;
         const calcPercent = baseCost > 0 ? (profitRub / baseCost * 100) : 0;
         document.getElementById('profitPercent').value = calcPercent.toFixed(2);
-        document.getElementById('profitRub').value = profitRub.toFixed(2);
+        document.getElementById('profitRub').textContent = formatFinancial(profitRub);
     } else {
         const profitRub = baseCost * profitPercent / 100;
-        document.getElementById('profitRub').value = profitRub.toFixed(2);
+        document.getElementById('profitRub').textContent = formatFinancial(profitRub);
         document.getElementById('finalPrice').value = (baseCost + profitRub).toFixed(2);
     }
+    updateFinancialDisplays();
     suppressInput = false;
 })();
 
@@ -165,6 +178,7 @@ async function clearService() {
         document.getElementById('description').value = '';
         document.getElementById('baseCost').value = '0';
         document.getElementById('profitPercent').value = '0';
+        document.getElementById('profitRub').textContent = formatFinancial(0);
         recalcFromInputs();
         showToast('Очищено');
     } else {
