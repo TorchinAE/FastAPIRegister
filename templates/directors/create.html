@@ -1,0 +1,82 @@
+{% extends "base.html" %}
+{% block title %}Новый директор{% endblock %}
+{% block content %}
+<div class="page-header">
+    <div>
+        <h1>Новый директор</h1>
+    </div>
+    <a href="{{ back_to or '/reg/directors' }}" class="btn btn-ghost">← Назад</a>
+</div>
+
+<div class="card">
+    <form id="createDirForm">
+        <input type="hidden" name="back_to" value="{{ back_to or '' }}">
+        <div class="form-row" style="grid-template-columns: 1fr 1fr 1fr;">
+            <div class="form-group">
+                <label>Имя</label>
+                <input type="text" name="name" required style="width:100%;min-width:0">
+            </div>
+            <div class="form-group">
+                <label>Email</label>
+                <input type="email" name="email" style="width:100%;min-width:0">
+            </div>
+            <div class="form-group">
+                <label>Телефон</label>
+                <input type="text" name="phone" style="width:100%;min-width:0">
+            </div>
+            <div class="form-group">
+                <label>Должность</label>
+                <select name="position_id" required style="width:100%;min-width:0">
+                    <option value="">-- выбрать --</option>
+                    {% for p in positions %}
+                    <option value="{{ p.id }}">{{ p.name }}</option>
+                    {% endfor %}
+                </select>
+            </div>
+        </div>
+        <div class="actions">
+            <button type="submit" class="btn btn-primary">Создать</button>
+        </div>
+    </form>
+</div>
+
+<div id="toast" class="toast" style="display:none"></div>
+{% endblock %}
+
+{% block scripts %}
+<script>
+document.getElementById('createDirForm').addEventListener('submit', async function(e) {
+    e.preventDefault();
+    const fd = new FormData(this);
+    const data = {
+        name: fd.get('name'),
+        email: fd.get('email') || null,
+        phone: fd.get('phone') || null,
+        position_id: parseInt(fd.get('position_id')),
+    };
+    const resp = await fetch('/reg/api/directors/', {
+        method: 'POST',
+        headers: {'Content-Type': 'application/json'},
+        body: JSON.stringify(data),
+    });
+    if (resp.ok) {
+        const backTo = fd.get('back_to');
+        if (backTo) {
+            window.location.href = backTo;
+        } else {
+            window.location.href = '/reg/directors';
+        }
+    } else {
+        const err = await resp.json();
+        showToast('Ошибка: ' + (err.detail || 'не удалось создать'));
+    }
+});
+
+function showToast(msg) {
+    const t = document.getElementById('toast');
+    t.textContent = msg;
+    t.style.display = 'block';
+    setTimeout(() => t.style.display = 'none', 2500);
+}
+</script>
+{% endblock %}

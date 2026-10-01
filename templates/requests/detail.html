@@ -66,6 +66,10 @@
                 </div>
                 {% endfor %}
             </div>
+            <div id="invoice-totals" style="display:flex;gap:2rem;margin-top:0.5rem;font-size:0.9rem;font-weight:600;">
+                <div>Сумма: <span id="inv-total-amount">0.00</span></div>
+                <div>Оплачено: <span id="inv-total-paid">0.00</span></div>
+            </div>
             <button type="button" class="btn btn-success btn-sm" onclick="addInvoice()" style="margin-top:0.4rem;">+ Добавить счёт</button>
         </div>
 
@@ -489,6 +493,21 @@ function getCost() {
     return parseNum(document.getElementById('cost-field').value);
 }
 
+function recalcInvoiceTotals() {
+    let totalAmount = 0, totalPaid = 0;
+    document.querySelectorAll('.invoice-row .inv-amount').forEach(inp => { totalAmount += parseNum(inp.value); });
+    document.querySelectorAll('.invoice-row .inv-paid').forEach(inp => { totalPaid += parseNum(inp.value); });
+    const elAmt = document.getElementById('inv-total-amount');
+    const elPaid = document.getElementById('inv-total-paid');
+    elAmt.textContent = formatNum(totalAmount);
+    elPaid.textContent = formatNum(totalPaid);
+    const cost = getCost();
+    const match = cost > 0 && Math.abs(totalAmount - cost) < 0.01;
+    elAmt.style.color = match ? '#16a34a' : '';
+    elPaid.style.color = match ? '#16a34a' : '';
+}
+recalcInvoiceTotals();
+
 function checkOversum() {
     let total = 0;
     document.querySelectorAll('.invoice-row .inv-amount').forEach(inp => {
@@ -519,6 +538,7 @@ document.querySelectorAll('.invoice-row').forEach(row => {
 });
 document.getElementById('cost-field').addEventListener('input', () => {
     document.querySelectorAll('.invoice-row').forEach(row => recalcFromPercent(row));
+    recalcInvoiceTotals();
 });
 
 document.getElementById('invoices-list').addEventListener('input', e => {
@@ -533,11 +553,12 @@ document.getElementById('invoices-list').addEventListener('input', e => {
         }
     }
     saveInvoice(row);
+    recalcInvoiceTotals();
 });
 
 document.getElementById('invoices-list').addEventListener('change', e => {
     const row = e.target.closest('.invoice-row');
-    if (row) saveInvoice(row);
+    if (row) { saveInvoice(row); recalcInvoiceTotals(); }
 });
 
 async function addInvoice() {
@@ -563,12 +584,14 @@ async function addInvoice() {
     `;
     document.getElementById('invoices-list').appendChild(div);
     setupAmountInputs(div);
+    recalcInvoiceTotals();
 }
 
 async function deleteInvoice(id, btn) {
     await fetch(`/reg/api/invoices/${id}`, {method: 'DELETE'});
     btn.closest('.invoice-row').remove();
     checkOversum();
+    recalcInvoiceTotals();
 }
 
 async function saveInvoice(row) {

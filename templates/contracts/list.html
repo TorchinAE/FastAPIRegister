@@ -1,0 +1,87 @@
+{% extends "base.html" %}
+{% block title %}Договора{% endblock %}
+{% block content %}
+<div class="page-header" style="gap:1rem; flex-wrap:wrap;">
+    <div style="display:flex; align-items:center; gap:0.75rem;">
+        <h1>Договора</h1>
+        <span class="subtitle">Всего спецификаций: {{ specs|length }}</span>
+    </div>
+</div>
+
+<div class="table-wrap">
+    <table id="contractsTable">
+        <thead>
+            <tr>
+                <th>Компания</th>
+                <th>Договор №</th>
+                <th>Дата договора</th>
+                <th>Спецификация №</th>
+                <th>Дата спецификации</th>
+                <th>ТКП</th>
+                <th>Сумма</th>
+            </tr>
+            <tr class="table-filter">
+                <th>
+                    <select data-col="0" class="tf-select" style="width:100%;">
+                        <option value="">Все</option>
+                        {% for c in companies %}
+                        <option value="{{ c.name }}">{{ c.name }}</option>
+                        {% endfor %}
+                    </select>
+                </th>
+                <th><input type="text" data-col="1" placeholder="Фильтр..." class="tf-input"></th>
+                <th><input type="text" data-col="2" placeholder="Фильтр..." class="tf-input"></th>
+                <th><input type="text" data-col="3" placeholder="Фильтр..." class="tf-input"></th>
+                <th><input type="text" data-col="4" placeholder="Фильтр..." class="tf-input"></th>
+                <th><input type="text" data-col="5" placeholder="Фильтр..." class="tf-input"></th>
+                <th><input type="text" data-col="6" placeholder="Фильтр..." class="tf-input"></th>
+            </tr>
+        </thead>
+        <tbody>
+            {% for spec in specs %}
+            <tr{% if spec.request_id %} style="cursor:pointer" onclick="location.href='/reg/requests/{{ spec.request_id }}'"{% endif %}>
+                <td>{{ spec.company.name if spec.company else '-' }}</td>
+                <td><strong>{{ spec.contract_number }}</strong></td>
+                <td>{{ spec.contract_date.strftime('%d.%m.%Y') if spec.contract_date else '-' }}</td>
+                <td>{{ spec.specification_number }}</td>
+                <td>{{ spec.contract_date.strftime('%d.%m.%Y') if spec.contract_date else '-' }}</td>
+                <td>{% if spec.request_id %}#{{ spec.request_id }}{% if spec.request %} — {{ spec.request.tkp_num or '' }}{% endif %}{% else %}-{% endif %}</td>
+                <td style="text-align:right;">{{ spec.request.cost|money if spec.request and spec.request.cost else '-' }}</td>
+            </tr>
+            {% endfor %}
+            {% if not specs %}
+            <tr class="empty-row"><td colspan="7" style="text-align:center;color:var(--text-muted);font-style:italic;">Нет договоров</td></tr>
+            {% endif %}
+        </tbody>
+    </table>
+</div>
+
+<div id="toast" class="toast" style="display:none"></div>
+{% endblock %}
+
+{% block scripts %}
+<script>
+document.querySelectorAll('.tf-input').forEach(input => {
+    input.addEventListener('input', function() {
+        const col = parseInt(this.dataset.col);
+        const val = this.value.toLowerCase();
+        document.querySelectorAll('#contractsTable tbody tr:not(.empty-row)').forEach(row => {
+            if (val.length < 1) { row.style.display = ''; return; }
+            const cell = row.cells[col];
+            row.style.display = cell && cell.textContent.toLowerCase().includes(val) ? '' : 'none';
+        });
+    });
+});
+document.querySelectorAll('.tf-select').forEach(sel => {
+    sel.addEventListener('change', function() {
+        const col = parseInt(this.dataset.col);
+        const val = this.value;
+        document.querySelectorAll('#contractsTable tbody tr:not(.empty-row)').forEach(row => {
+            if (!val) { row.style.display = ''; return; }
+            const cell = row.cells[col];
+            row.style.display = cell && cell.textContent.trim() === val ? '' : 'none';
+        });
+    });
+});
+</script>
+{% endblock %}

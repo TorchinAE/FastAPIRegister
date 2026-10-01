@@ -7,8 +7,8 @@
         <span class="subtitle">Всего: {{ total }}</span>
     </div>
     <div style="display:flex;gap:0.5rem;">
-        <a href="/reg/api/materials/export-excel" class="btn btn-ghost" download>Скачать Excel</a>
-        <label class="btn btn-ghost" style="cursor:pointer;">
+        <a href="/reg/api/materials/export-excel" class="btn btn-primary" download>Скачать Excel</a>
+        <label class="btn btn-primary" style="cursor:pointer;">
             Загрузить Excel
             <input type="file" accept=".xlsx,.xls" style="display:none" id="excelInput" onchange="importExcel(this)">
         </label>

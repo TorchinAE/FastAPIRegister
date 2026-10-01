@@ -7,7 +7,7 @@
         <div class="subtitle">Модуль #{{ mod.id }} &middot; Стоимость: {{ mod.total_price|money }}</div>
     </div>
     <div style="display:flex;gap:0.5rem;">
-        <a href="/reg/api/modules/{{ mod.id }}/export-excel" class="btn btn-ghost" download>Скачать Excel</a>
+        <a href="/reg/api/modules/{{ mod.id }}/export-excel" class="btn btn-primary" download>Скачать Excel</a>
         <a href="{{ back_to or '/modules' }}" class="btn btn-ghost">← Назад</a>
     </div>
 </div>

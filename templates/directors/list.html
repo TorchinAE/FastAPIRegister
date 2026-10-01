@@ -6,6 +6,7 @@
         <h1>Директора</h1>
         <span class="subtitle">Всего: {{ total }}</span>
     </div>
+    <a href="/reg/directors/create{% if request.query_params.get('back_to') %}?back_to={{ request.query_params.get('back_to') }}{% endif %}" class="btn btn-success">+ Новый</a>
 </div>
 <form method="post" action="/reg/directors" style="display:flex; gap:0.75rem; align-items:flex-end; margin-bottom:1rem; padding:1rem 1.25rem; flex-wrap:wrap;">
     <div class="form-group" style="flex:2; min-width:180px; margin-bottom:0;">

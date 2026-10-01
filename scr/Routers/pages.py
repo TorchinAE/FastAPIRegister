@@ -588,26 +588,19 @@ async def users_detail_page(
     target = await crud_users.get_user_by_id(session, user_id)
     if not target:
         return HTMLResponse("Пользователь не найден", status_code=404)
+    all_users, _ = await crud_users.get_users(session, per_page=100)
+    other_users = [u for u in all_users if u.id != user_id]
     return templates.TemplateResponse(
         "users/detail.html",
-        {"request": request, "user": user, "target": target, "back_to": back_to, "active_page": "users"},
+        {
+            "request": request,
+            "user": user,
+            "target": target,
+            "other_users": other_users,
+            "back_to": back_to,
+            "active_page": "users",
+        },
     )
-
-
-@pages_router.delete("/users/{user_id}/delete")
-async def users_delete(
-    user_id: int,
-    request: Request,
-    session: AsyncSession = Depends(db_helper.session_dependency),
-):
-    user = await get_current_user(request, session)
-    if not user:
-        return JSONResponse({"error": "Не авторизован"}, status_code=401)
-    result = await crud_users.delete_user(session, user_id)
-    if not result:
-        return JSONResponse({"error": "Пользователь не найден"}, status_code=404)
-    await session.commit()
-    return JSONResponse({"ok": True})
 
 
 # --- Directors ---
@@ -660,6 +653,22 @@ async def directors_create_submit(
         await crud_directors.add_dir(session, DirectorSchema(**data), created_by=user.name)
         await session.commit()
     return RedirectResponse("/reg/directors", status_code=302)
+
+
+@pages_router.get("/directors/create", response_class=HTMLResponse)
+async def directors_create_page(
+    request: Request,
+    back_to: str | None = None,
+    session: AsyncSession = Depends(db_helper.session_dependency),
+):
+    user = await get_current_user(request, session)
+    if not user:
+        return RedirectResponse("/reg/", status_code=302)
+    positions, _ = await crud_positions.get_all_positions(session, per_page=100)
+    return templates.TemplateResponse(
+        "directors/create.html",
+        {"request": request, "user": user, "positions": positions, "back_to": back_to, "active_page": "directors"},
+    )
 
 
 @pages_router.get("/directors/{dir_id}", response_class=HTMLResponse)
@@ -1362,6 +1371,48 @@ async def modules_detail_page(
 
 
 # --- Contracts ---
+@pages_router.get("/contracts", response_class=HTMLResponse)
+async def contracts_list_page(
+    request: Request,
+    session: AsyncSession = Depends(db_helper.session_dependency),
+):
+    user = await get_current_user(request, session)
+    if not user:
+        return RedirectResponse("/reg/", status_code=302)
+
+    from sqlalchemy import select as sa_select
+    from sqlalchemy.orm import selectinload
+
+    from scr.dbase import crud_contract_specs
+    from scr.dbase.models import ContractSpec, Organization
+
+    stmt = (
+        sa_select(ContractSpec)
+        .options(selectinload(ContractSpec.company))
+        .options(selectinload(ContractSpec.request))
+        .order_by(ContractSpec.contract_number, ContractSpec.specification_number)
+    )
+    result = await session.execute(stmt)
+    all_specs = list(result.scalars().all())
+
+    # Get unique companies for filter
+    companies_set = {}
+    for spec in all_specs:
+        if spec.company_id not in companies_set:
+            companies_set[spec.company_id] = spec.company
+
+    return templates.TemplateResponse(
+        "contracts/list.html",
+        {
+            "request": request,
+            "user": user,
+            "specs": all_specs,
+            "companies": list(companies_set.values()),
+            "active_page": "contracts",
+        },
+    )
+
+
 @pages_router.get("/requests/{req_id}/contracts", response_class=HTMLResponse)
 async def request_contracts_page(
     req_id: int,
