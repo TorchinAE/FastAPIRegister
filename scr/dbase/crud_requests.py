@@ -25,6 +25,8 @@ async def get_requests(
             selectinload(Request.equipment),
             selectinload(Request.manager),
             selectinload(Request.company),
+            selectinload(Request.counterparty),
+            selectinload(Request.probability),
         )
         .order_by(Request.id.desc())
     )

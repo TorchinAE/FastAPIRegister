@@ -86,6 +86,7 @@
                     <div class="fg-h"><label>Оплатить до</label><input type="date" value="{{ pi.due_date.strftime('%Y-%m-%d') if pi.due_date else '' }}" data-field="due_date"></div>
                     <div class="fg-h"><label>Оплачено</label><input type="text" value="{{ pi.paid_amount or 0 }}" data-field="paid_amount" class="pay-paid" inputmode="decimal"></div>
                     <div class="fg-h"><label>Дата оплаты</label><input type="date" value="{{ pi.paid_date.strftime('%Y-%m-%d') if pi.paid_date else '' }}" data-field="paid_date"></div>
+                    <button type="button" class="btn btn-danger btn-sm btn-icon" onclick="clearPaymentRow(this)" title="Очистить">&#10005;</button>
                 </div>
                 {% endfor %}
             </div>
@@ -488,6 +489,18 @@ async function savePayment(row) {
     });
 }
 
+function clearPaymentRow(btn) {
+    const row = btn.closest('.payment-row');
+    if (!row) return;
+    row.querySelectorAll('input[data-field]').forEach(inp => {
+        if (inp.type === 'date') inp.value = '';
+        else if (inp.classList.contains('pay-amount') || inp.classList.contains('pay-paid')) inp.value = '0.00';
+        else if (inp.classList.contains('pay-percent')) inp.value = '0';
+    });
+    highlightPaymentRow(row);
+    savePayment(row);
+}
+
 // === Invoices ===
 function getCost() {
     return parseNum(document.getElementById('cost-field').value);
@@ -504,9 +517,22 @@ function recalcInvoiceTotals() {
     const cost = getCost();
     const match = cost > 0 && Math.abs(totalAmount - cost) < 0.01;
     elAmt.style.color = match ? '#16a34a' : '';
-    elPaid.style.color = match ? '#16a34a' : '';
+    elPaid.style.color = totalPaid < totalAmount ? '#dc2626' : (match ? '#16a34a' : '');
+    highlightInvoiceRows();
 }
 recalcInvoiceTotals();
+
+function highlightInvoiceRows() {
+    const today = new Date().toISOString().split('T')[0];
+    document.querySelectorAll('.invoice-row').forEach(row => {
+        const amount = parseNum(row.querySelector('.inv-amount')?.value);
+        const paid = parseNum(row.querySelector('.inv-paid')?.value);
+        const paidDate = row.querySelector('[data-field="paid_date"]')?.value || '';
+        const overdue = paidDate && paidDate < today && paid < amount;
+        row.style.background = overdue ? '#fef2f2' : '';
+        row.style.borderLeft = overdue ? '3px solid #dc2626' : '';
+    });
+}
 
 function checkOversum() {
     let total = 0;
@@ -537,6 +563,12 @@ document.querySelectorAll('.invoice-row').forEach(row => {
     recalcFromPercent(row);
 });
 document.getElementById('cost-field').addEventListener('input', () => {
+    if (parseNum(document.getElementById('cost-field').value) > 0) {
+        const issueDate = document.querySelector('[name="issue_date"]');
+        if (!issueDate.value) {
+            issueDate.value = new Date().toISOString().split('T')[0];
+        }
+    }
     document.querySelectorAll('.invoice-row').forEach(row => recalcFromPercent(row));
     recalcInvoiceTotals();
 });

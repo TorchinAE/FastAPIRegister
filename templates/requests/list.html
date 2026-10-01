@@ -20,6 +20,7 @@
                 <th>Дата выдачи</th>
                 <th>Менеджер</th>
                 <th>Компания</th>
+                <th>Контакт</th>
                 <th>Статус</th>
                 <th>Оборудование</th>
                 <th>Описание</th>
@@ -35,6 +36,12 @@
                 <th>ПКУ</th>
                 <th>ПУС</th>
                 <th>ПАРН</th>
+                <th>Вероятность</th>
+                <th>Договор</th>
+                <th>Спецификация</th>
+                <th>Номер заказа</th>
+                <th>Дата открытия заказа</th>
+                <th>Дата отгрузки</th>
             </tr>
             <tr class="table-filter">
                 <th><input type="text" data-col="0" data-min="1" placeholder="..." class="tf-input"></th>
@@ -56,7 +63,7 @@
                 <th><input type="text" data-col="6" placeholder="..." class="tf-input"></th>
                 <th><input type="text" data-col="7" placeholder="..." class="tf-input"></th>
                 <th><input type="text" data-col="8" placeholder="..." class="tf-input"></th>
-                <th><input type="text" data-col="9" data-min="1" placeholder="..." class="tf-input"></th>
+                <th><input type="text" data-col="9" placeholder="..." class="tf-input"></th>
                 <th><input type="text" data-col="10" data-min="1" placeholder="..." class="tf-input"></th>
                 <th><input type="text" data-col="11" data-min="1" placeholder="..." class="tf-input"></th>
                 <th><input type="text" data-col="12" data-min="1" placeholder="..." class="tf-input"></th>
@@ -68,6 +75,12 @@
                 <th><input type="text" data-col="18" data-min="1" placeholder="..." class="tf-input"></th>
                 <th><input type="text" data-col="19" data-min="1" placeholder="..." class="tf-input"></th>
                 <th><input type="text" data-col="20" data-min="1" placeholder="..." class="tf-input"></th>
+                <th><input type="text" data-col="21" placeholder="..." class="tf-input"></th>
+                <th><input type="text" data-col="22" placeholder="..." class="tf-input"></th>
+                <th><input type="text" data-col="23" placeholder="..." class="tf-input"></th>
+                <th><input type="text" data-col="24" placeholder="..." class="tf-input"></th>
+                <th><input type="text" data-col="25" placeholder="..." class="tf-input"></th>
+                <th><input type="text" data-col="26" placeholder="..." class="tf-input"></th>
             </tr>
         </thead>
         <tbody>
@@ -79,6 +92,7 @@
                 <td data-sort="{{ req.issue_date.strftime('%Y%m%d') if req.issue_date else '' }}">{{ req.issue_date.strftime('%d.%m.%Y') if req.issue_date else '-' }}</td>
                 <td>{{ req.manager.name if req.manager else '-' }}</td>
                 <td>{{ req.company.name if req.company else '-' }}</td>
+                <td>{{ req.counterparty.name if req.counterparty else '-' }}</td>
                 <td>
                     {% set status = req.status.value if req.status else '' %}
                     {% if status == 'запрос' %}<span class="badge badge-new">{{ status }}</span>
@@ -101,10 +115,16 @@
                 <td>{{ req.pku }}</td>
                 <td>{{ req.pus }}</td>
                 <td>{{ req.parn }}</td>
+                <td>{{ req.probability.name if req.probability else '-' }}</td>
+                <td>{{ specs_map[req.id].contract_number if req.id in specs_map else '-' }}</td>
+                <td>{{ specs_map[req.id].specification_number if req.id in specs_map else '-' }}</td>
+                <td>{{ req.factory_order_num or '-' }}</td>
+                <td data-sort="{{ req.factory_order_date.strftime('%Y%m%d') if req.factory_order_date else '' }}">{{ req.factory_order_date.strftime('%d.%m.%Y') if req.factory_order_date else '-' }}</td>
+                <td data-sort="{{ req.ship_date.strftime('%Y%m%d') if req.ship_date else '' }}">{{ req.ship_date.strftime('%d.%m.%Y') if req.ship_date else '-' }}</td>
             </tr>
             {% endfor %}
             {% if not items %}
-            <tr class="empty-row"><td colspan="21">Нет ТКП</td></tr>
+            <tr class="empty-row"><td colspan="28">Нет ТКП</td></tr>
             {% endif %}
         </tbody>
     </table>
@@ -238,8 +258,8 @@ async function exportFilteredExcel() {
     });
 
     // Columns that are integers (0-indexed: 10-20 = БКТПБ..ПАРН)
-    const intCols = new Set([10, 11, 12, 13, 14, 15, 16, 17, 18, 19, 20]);
-    const costCol = 9; // Стоимость с НДС
+    const intCols = new Set([11, 12, 13, 14, 15, 16, 17, 18, 19, 20, 21]);
+    const costCol = 10; // Стоимость с НДС
 
     // Rows 3+: data
     rows.forEach(r => {

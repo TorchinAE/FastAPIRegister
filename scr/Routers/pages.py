@@ -137,6 +137,24 @@ async def requests_page(
     requests_list, total = await crud_requests.get_requests(session, page=page)
     per_page = 20
     pages = (total + per_page - 1) // per_page
+
+    # Load contract specs for the current page's requests
+    from sqlalchemy import select as sa_select
+    from sqlalchemy.orm import selectinload
+
+    from scr.dbase.models import ContractSpec
+
+    req_ids = [r.id for r in requests_list]
+    specs_map = {}
+    if req_ids:
+        specs_result = await session.execute(
+            sa_select(ContractSpec)
+            .where(ContractSpec.request_id.in_(req_ids))
+            .options(selectinload(ContractSpec.company))
+        )
+        for spec in specs_result.scalars().all():
+            specs_map[spec.request_id] = spec
+
     return templates.TemplateResponse(
         "requests/list.html",
         {
@@ -148,6 +166,7 @@ async def requests_page(
             "total": total,
             "statuses": RequestStatus,
             "active_page": "requests",
+            "specs_map": specs_map,
         },
     )
 
