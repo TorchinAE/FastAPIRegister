@@ -139,8 +139,8 @@ async def requests_page(
     user = await get_current_user(request, session)
     if not user:
         return RedirectResponse("/reg/", status_code=302)
-    requests_list, total = await crud_requests.get_requests(session, page=page)
     per_page = await _get_per_page(session)
+    requests_list, total = await crud_requests.get_requests(session, page=page, per_page=per_page)
     pages = (total + per_page - 1) // per_page
 
     # Load contract specs for the current page's requests
@@ -355,9 +355,9 @@ async def counterparties_page(
     user = await get_current_user(request, session)
     if not user:
         return RedirectResponse("/reg/", status_code=302)
-    items, total = await crud_counterparties.get_counterparties(session, page=page)
-    companies, _ = await crud_organizations.get_organizations(session, per_page=100)
     per_page = await _get_per_page(session)
+    items, total = await crud_counterparties.get_counterparties(session, page=page, per_page=per_page)
+    companies, _ = await crud_organizations.get_organizations(session, per_page=100)
     return templates.TemplateResponse(
         "counterparties/list.html",
         {
@@ -455,9 +455,9 @@ async def companies_page(
     user = await get_current_user(request, session)
     if not user:
         return RedirectResponse("/reg/", status_code=302)
-    items, total = await crud_organizations.get_organizations(session, page=page)
-    directors, _ = await crud_directors.get_dirs(session, per_page=100)
     per_page = await _get_per_page(session)
+    items, total = await crud_organizations.get_organizations(session, page=page, per_page=per_page)
+    directors, _ = await crud_directors.get_dirs(session, per_page=100)
     return templates.TemplateResponse(
         "companies/list.html",
         {
@@ -553,8 +553,8 @@ async def users_page(
     user = await get_current_user(request, session)
     if not user:
         return RedirectResponse("/reg/", status_code=302)
-    items, total = await crud_users.get_users(session, page=page)
     per_page = await _get_per_page(session)
+    items, total = await crud_users.get_users(session, page=page, per_page=per_page)
     return templates.TemplateResponse(
         "users/list.html",
         {
@@ -637,9 +637,9 @@ async def directors_page(
     user = await get_current_user(request, session)
     if not user:
         return RedirectResponse("/reg/", status_code=302)
-    items, total = await crud_directors.get_dirs(session, page=page)
-    positions, _ = await crud_positions.get_all_positions(session, per_page=100)
     per_page = await _get_per_page(session)
+    items, total = await crud_directors.get_dirs(session, page=page, per_page=per_page)
+    positions, _ = await crud_positions.get_all_positions(session, per_page=100)
     return templates.TemplateResponse(
         "directors/list.html",
         {
@@ -748,8 +748,8 @@ async def positions_page(
     user = await get_current_user(request, session)
     if not user:
         return RedirectResponse("/reg/", status_code=302)
-    items, total = await crud_positions.get_all_positions(session, page=page)
     per_page = await _get_per_page(session)
+    items, total = await crud_positions.get_all_positions(session, page=page, per_page=per_page)
     return templates.TemplateResponse(
         "positions/list.html",
         {
@@ -811,8 +811,8 @@ async def equipment_page(
     user = await get_current_user(request, session)
     if not user:
         return RedirectResponse("/reg/", status_code=302)
-    items, total = await crud_equipment.get_equipment_list(session, page=page)
     per_page = await _get_per_page(session)
+    items, total = await crud_equipment.get_equipment_list(session, page=page, per_page=per_page)
     return templates.TemplateResponse(
         "equipment/list.html",
         {
@@ -1305,8 +1305,8 @@ async def material_types_page(
     user = await get_current_user(request, session)
     if not user:
         return RedirectResponse("/reg/", status_code=302)
-    items, total = await crud_material_types.get_all_types(session, page=page)
     per_page = await _get_per_page(session)
+    items, total = await crud_material_types.get_all_types(session, page=page, per_page=per_page)
     return templates.TemplateResponse(
         "material_types/list.html",
         {
@@ -1392,8 +1392,8 @@ async def modules_page(
     user = await get_current_user(request, session)
     if not user:
         return RedirectResponse("/reg/", status_code=302)
-    items, total = await crud_modules.get_modules(session, page=page)
     per_page = await _get_per_page(session)
+    items, total = await crud_modules.get_modules(session, page=page, per_page=per_page)
     return templates.TemplateResponse(
         "modules/list.html",
         {
