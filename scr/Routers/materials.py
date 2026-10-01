@@ -92,7 +92,22 @@ async def export_materials_excel(
     )
 
     # Title row
-    headers = ["ID", "Тип", "Название", "Цена", "Дата", "Ном Ток", "стац", "втыч", "выкат", "ручн", "эл.прив", "Код 1С", "Код агент", "URL агент"]
+    headers = [
+        "ID",
+        "Тип",
+        "Название",
+        "Цена",
+        "Дата",
+        "Ном Ток",
+        "стац",
+        "втыч",
+        "выкат",
+        "ручн",
+        "эл.прив",
+        "Код 1С",
+        "Код агент",
+        "URL агент",
+    ]
     num_cols = len(headers)
     ws.append(["Материалы"])
     ws.merge_cells(start_row=1, start_column=1, end_row=1, end_column=num_cols)
@@ -167,37 +182,26 @@ async def import_materials_excel(
     ws = wb.active
     rows = list(ws.iter_rows(min_row=2, values_only=True))
 
-    # Phase 1: scan for conflicts (match by id + price)
+    # Phase 1: scan for price changes (same-price rows are conflicts)
     conflicts = []
     new_rows = []
-    for row in rows:
-        if not row or not row[0]:
-            continue
-        name = str(row[0]).strip()
-        if not name:
-            continue
-        price = float(row[1]) if len(row) > 1 and row[1] else 0
-        row_id = int(row[6]) if len(row) > 6 and row[6] else None
-
-        existing = None
-        if row_id:
-            existing = await crud_materials.get_material_by_id(session, row_id)
-        if existing and float(existing.price) == price:
+    for parsed in _parse_rows(rows):
+        existing = await _find_existing(session, parsed)
+        if existing and float(existing.price) == parsed["price"] and parsed["price"] > 0:
             conflicts.append(
                 {
                     "id": existing.id,
-                    "name": name,
+                    "name": parsed["name"],
                     "old_name": existing.name,
-                    "price": price,
+                    "price": parsed["price"],
                     "old_price": float(existing.price),
                 }
             )
-        new_rows.append((row, row_id, existing))
+        new_rows.append(parsed)
 
     if conflicts:
         return {"status": "confirm", "conflicts": conflicts, "total": len(new_rows)}
 
-    # Phase 2: no conflicts — import all
     imported = await _do_import(session, rows)
     await session.commit()
     return {"status": "ok", "message": f"Импортировано: {imported}", "imported": imported}
@@ -218,49 +222,34 @@ async def import_materials_excel_confirm(
     return {"status": "ok", "message": f"Импортировано: {imported}", "imported": imported}
 
 
-async def _do_import(session: AsyncSession, rows: list) -> int:
+def _parse_rows(rows: list) -> list[dict]:
+    """Parse rows into normalized dicts. Supports new (14-col) and old (7-col) formats."""
     from datetime import datetime as dt
 
-    # Cache all material types for auto-creation
-    types_cache, _ = await crud_material_types.get_all_types(session, per_page=10000)
-    types_map = {t.name: t.id for t in types_cache}
-
-    imported = 0
+    parsed_list = []
     for row in rows:
-        if not row or not row[0]:
+        if not row:
             continue
 
-        # New format (14 cols): id, type, name, price, date, nom_tok, stats, vtych, vykat, ruchn, el_priv, code_1c, code_agent, url_agent
-        # Old format (7 cols): name, price, code_1c, code_agent, url_agent, type_name, id
         if len(row) >= 14:
+            # New format: id, type, name, price, date, nom_tok, stats, vtych, vykat, ruchn, el_priv, code_1c, code_agent, url_agent
             row_id = int(row[0]) if row[0] else None
             type_name = str(row[1]).strip() if row[1] else None
             name = str(row[2]).strip() if row[2] else None
-            if not name:
-                continue
             price = float(row[3]) if row[3] else 0
-            date_val = None
-            if row[4]:
-                try:
-                    if isinstance(row[4], dt):
-                        date_val = row[4].date()
-                    else:
-                        date_val = dt.strptime(str(row[4]).strip(), "%d.%m.%Y").date()
-                except (ValueError, AttributeError):
-                    pass
+            date_val = _parse_date(row[4])
             nom_tok = int(row[5]) if row[5] else 0
             stats = bool(row[6]) if row[6] is not None else True
             vtych = bool(row[7]) if row[7] is not None else False
             vykat = bool(row[8]) if row[8] is not None else False
             ruchn = bool(row[9]) if row[9] is not None else True
             el_priv = bool(row[10]) if row[10] is not None else False
-            code_1c = str(row[11]).strip() if len(row) > 11 and row[11] else None
-            code_agent = str(row[12]).strip() if len(row) > 12 and row[12] else None
+            code_1c = str(row[11]).strip() if row[11] else None
+            code_agent = str(row[12]).strip() if row[12] else None
             url_agent = str(row[13]).strip() if len(row) > 13 and row[13] else None
         else:
-            name = str(row[0]).strip()
-            if not name:
-                continue
+            # Old format: name, price, code_1c, code_agent, url_agent, type_name, id
+            name = str(row[0]).strip() if row[0] else None
             price = float(row[1]) if len(row) > 1 and row[1] else 0
             code_1c = str(row[2]).strip() if len(row) > 2 and row[2] else None
             code_agent = str(row[3]).strip() if len(row) > 3 and row[3] else None
@@ -275,6 +264,85 @@ async def _do_import(session: AsyncSession, rows: list) -> int:
             ruchn = True
             el_priv = False
 
+        if not name:
+            continue
+
+        parsed_list.append(
+            {
+                "row_id": row_id,
+                "type_name": type_name,
+                "name": name,
+                "price": price,
+                "date": date_val,
+                "nom_tok": nom_tok,
+                "stats": stats,
+                "vtych": vtych,
+                "vykat": vykat,
+                "ruchn": ruchn,
+                "el_priv": el_priv,
+                "code_1c": code_1c,
+                "code_agent": code_agent,
+                "url_agent": url_agent,
+            }
+        )
+    return parsed_list
+
+
+def _parse_date(val):
+    from datetime import date
+    from datetime import datetime as dt
+
+    if not val:
+        return None
+    if isinstance(val, dt):
+        return val.date()
+    try:
+        return dt.strptime(str(val).strip(), "%d.%m.%Y").date()
+    except (ValueError, AttributeError):
+        pass
+    try:
+        return dt.strptime(str(val).strip(), "%Y-%m-%d").date()
+    except (ValueError, AttributeError):
+        return None
+
+
+async def _find_existing(session: AsyncSession, parsed: dict):
+    """Find existing material by: ID → code_1c → code_agent → name."""
+    if parsed.get("row_id"):
+        mat = await crud_materials.get_material_by_id(session, parsed["row_id"])
+        if mat:
+            return mat
+    if parsed.get("code_1c"):
+        mat = await crud_materials.get_material_by_code_1c(session, parsed["code_1c"])
+        if mat:
+            return mat
+    if parsed.get("code_agent"):
+        mat = await crud_materials.get_material_by_code_agent(session, parsed["code_agent"])
+        if mat:
+            return mat
+    return await crud_materials.get_material_by_name(session, parsed["name"])
+
+
+async def _do_import(session: AsyncSession, rows: list) -> int:
+    from datetime import date as date_cls
+
+    # Cache all material types for auto-creation
+    types_cache, _ = await crud_material_types.get_all_types(session, per_page=10000)
+    types_map = {t.name: t.id for t in types_cache}
+
+    # Ensure default type "Производство" exists
+    if "Производство" not in types_map:
+        new_type = await crud_material_types.add_type(session, MaterialTypeCreateSchema(name="Производство"))
+        types_map["Производство"] = new_type.id
+
+    imported = 0
+    for parsed in _parse_rows(rows):
+        existing = await _find_existing(session, parsed)
+
+        # Resolve type_id
+        type_name = parsed.get("type_name")
+        if not type_name:
+            type_name = "Производство"
         type_id = None
         if type_name:
             if type_name not in types_map:
@@ -282,22 +350,41 @@ async def _do_import(session: AsyncSession, rows: list) -> int:
                 types_map[type_name] = new_type.id
             type_id = types_map[type_name]
 
-        schema = MaterialCreateSchema(
-            name=name, price=price, code_1c=code_1c, code_agent=code_agent, url_agent=url_agent,
-            type_id=type_id, nom_tok=nom_tok, stats=stats, vtych=vtych, vykat=vykat,
-            ruchn=ruchn, el_priv=el_priv, date=date_val,
-        )
+        # Date: use provided, else today
+        date_val = parsed.get("date")
+        if not date_val:
+            date_val = date_cls.today()
 
-        if row_id:
-            existing = await crud_materials.get_material_by_id(session, row_id)
-            if existing:
-                for field, value in schema.model_dump(exclude_unset=True).items():
-                    if hasattr(existing, field):
-                        setattr(existing, field, value)
-                imported += 1
-                continue
-
-        await crud_materials.add_material(session, schema)
+        if existing:
+            # Update existing material
+            existing.price = parsed["price"]
+            existing.date = date_val
+            if parsed.get("type_name"):
+                existing.type_id = type_id
+            if parsed.get("code_1c") and not existing.code_1c:
+                existing.code_1c = parsed["code_1c"]
+            if parsed.get("code_agent") and not existing.code_agent:
+                existing.code_agent = parsed["code_agent"]
+            if parsed.get("url_agent") and not existing.url_agent:
+                existing.url_agent = parsed["url_agent"]
+        else:
+            # Create new material
+            schema = MaterialCreateSchema(
+                name=parsed["name"],
+                price=parsed["price"],
+                code_1c=parsed.get("code_1c"),
+                code_agent=parsed.get("code_agent"),
+                url_agent=parsed.get("url_agent"),
+                type_id=type_id,
+                nom_tok=parsed.get("nom_tok", 0),
+                stats=parsed.get("stats", True),
+                vtych=parsed.get("vtych", False),
+                vykat=parsed.get("vykat", False),
+                ruchn=parsed.get("ruchn", True),
+                el_priv=parsed.get("el_priv", False),
+                date=date_val,
+            )
+            await crud_materials.add_material(session, schema)
         imported += 1
     return imported
 

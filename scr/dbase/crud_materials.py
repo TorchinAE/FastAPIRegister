@@ -43,6 +43,18 @@ async def get_material_by_name(session: AsyncSession, name: str) -> Material | N
     return result.scalar_one_or_none()
 
 
+async def get_material_by_code_1c(session: AsyncSession, code: str) -> Material | None:
+    stmt = select(Material).where(Material.code_1c == code)
+    result: Result = await session.execute(stmt)
+    return result.scalar_one_or_none()
+
+
+async def get_material_by_code_agent(session: AsyncSession, code: str) -> Material | None:
+    stmt = select(Material).where(Material.code_agent == code)
+    result: Result = await session.execute(stmt)
+    return result.scalar_one_or_none()
+
+
 async def add_material(session: AsyncSession, in_mat: MaterialCreateSchema, created_by: str | None = None) -> Material:
     check_mat = await get_material_by_name(session, in_mat.name)
     if check_mat:

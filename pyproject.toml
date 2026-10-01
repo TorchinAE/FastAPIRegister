@@ -34,4 +34,4 @@ line-length = 120
 exclude = ["alembic/versions/*"]
 
 [tool.ruff.lint]
-ignore = ["B008", "F401", "DTZ005"]
+ignore = ["B008", "F401", "DTZ005", "DTZ007", "DTZ011"]

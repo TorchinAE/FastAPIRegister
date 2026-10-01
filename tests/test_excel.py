@@ -14,7 +14,8 @@ async def test_export_materials_excel(client):
     ws = wb.active
     assert ws.cell(1, 1).value == "Материалы"
     assert ws.cell(2, 1).value == "ID"
-    assert ws.cell(2, 2).value == "Название"
+    assert ws.cell(2, 2).value == "Тип"
+    assert ws.cell(2, 3).value == "Название"
 
 
 @pytest.mark.asyncio
