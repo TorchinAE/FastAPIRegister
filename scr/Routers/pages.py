@@ -46,6 +46,11 @@ async def get_current_user(request: Request, session: AsyncSession):
     return None
 
 
+async def _get_per_page(session) -> int:
+    val = await crud_settings.get_setting(session, "materials_per_page")
+    return int(val) if val else 30
+
+
 @pages_router.get("/", response_class=HTMLResponse)
 async def login_page(request: Request):
     return templates.TemplateResponse("login.html", {"request": request, "user": None})
@@ -135,7 +140,7 @@ async def requests_page(
     if not user:
         return RedirectResponse("/reg/", status_code=302)
     requests_list, total = await crud_requests.get_requests(session, page=page)
-    per_page = 20
+    per_page = await _get_per_page(session)
     pages = (total + per_page - 1) // per_page
 
     # Load contract specs for the current page's requests
@@ -352,7 +357,7 @@ async def counterparties_page(
         return RedirectResponse("/reg/", status_code=302)
     items, total = await crud_counterparties.get_counterparties(session, page=page)
     companies, _ = await crud_organizations.get_organizations(session, per_page=100)
-    per_page = 20
+    per_page = await _get_per_page(session)
     return templates.TemplateResponse(
         "counterparties/list.html",
         {
@@ -452,7 +457,7 @@ async def companies_page(
         return RedirectResponse("/reg/", status_code=302)
     items, total = await crud_organizations.get_organizations(session, page=page)
     directors, _ = await crud_directors.get_dirs(session, per_page=100)
-    per_page = 20
+    per_page = await _get_per_page(session)
     return templates.TemplateResponse(
         "companies/list.html",
         {
@@ -549,7 +554,7 @@ async def users_page(
     if not user:
         return RedirectResponse("/reg/", status_code=302)
     items, total = await crud_users.get_users(session, page=page)
-    per_page = 20
+    per_page = await _get_per_page(session)
     return templates.TemplateResponse(
         "users/list.html",
         {
@@ -634,7 +639,7 @@ async def directors_page(
         return RedirectResponse("/reg/", status_code=302)
     items, total = await crud_directors.get_dirs(session, page=page)
     positions, _ = await crud_positions.get_all_positions(session, per_page=100)
-    per_page = 20
+    per_page = await _get_per_page(session)
     return templates.TemplateResponse(
         "directors/list.html",
         {
@@ -744,7 +749,7 @@ async def positions_page(
     if not user:
         return RedirectResponse("/reg/", status_code=302)
     items, total = await crud_positions.get_all_positions(session, page=page)
-    per_page = 20
+    per_page = await _get_per_page(session)
     return templates.TemplateResponse(
         "positions/list.html",
         {
@@ -807,7 +812,7 @@ async def equipment_page(
     if not user:
         return RedirectResponse("/reg/", status_code=302)
     items, total = await crud_equipment.get_equipment_list(session, page=page)
-    per_page = 20
+    per_page = await _get_per_page(session)
     return templates.TemplateResponse(
         "equipment/list.html",
         {
@@ -925,7 +930,7 @@ async def invoices_page(
     )
     count_stmt = select(func.count(Invoice.id))
     total = (await session.execute(count_stmt)).scalar() or 0
-    per_page = 20
+    per_page = await _get_per_page(session)
     stmt = stmt.offset((page - 1) * per_page).limit(per_page)
     result = await session.execute(stmt)
     items = list(result.scalars().all())
@@ -1202,8 +1207,7 @@ async def materials_page(
         return RedirectResponse("/reg/", status_code=302)
     items = await crud_materials.get_all_materials(session)
     types, _ = await crud_material_types.get_all_types(session, per_page=10000)
-    per_page_str = await crud_settings.get_setting(session, "materials_per_page")
-    per_page = int(per_page_str) if per_page_str else 30
+    per_page = await _get_per_page(session)
 
     # Build set of material names that have modules
     from scr.dbase import crud_modules
@@ -1302,7 +1306,7 @@ async def material_types_page(
     if not user:
         return RedirectResponse("/reg/", status_code=302)
     items, total = await crud_material_types.get_all_types(session, page=page)
-    per_page = 20
+    per_page = await _get_per_page(session)
     return templates.TemplateResponse(
         "material_types/list.html",
         {
@@ -1389,7 +1393,7 @@ async def modules_page(
     if not user:
         return RedirectResponse("/reg/", status_code=302)
     items, total = await crud_modules.get_modules(session, page=page)
-    per_page = 20
+    per_page = await _get_per_page(session)
     return templates.TemplateResponse(
         "modules/list.html",
         {
@@ -1578,7 +1582,8 @@ async def nakladnye_list_page(
         return RedirectResponse("/reg/", status_code=302)
     from scr.dbase import crud_finance
 
-    items, total = await crud_finance.get_invoice_items(session, page=page, per_page=50)
+    per_page = await _get_per_page(session)
+    items, total = await crud_finance.get_invoice_items(session, page=page, per_page=per_page)
     # Resolve user names
     user_cache = {}
     items_with_user = []
@@ -1590,7 +1595,7 @@ async def nakladnye_list_page(
                 user_cache[item.changed_by_id] = u.name if u else str(item.changed_by_id)
             uname = user_cache[item.changed_by_id]
         items_with_user.append({"item": item, "user_name": uname})
-    pages = (total + 49) // 50
+    pages = (total + per_page - 1) // per_page
     return templates.TemplateResponse(
         "finance/list.html",
         {
@@ -1650,7 +1655,8 @@ async def fot_list_page(
         return RedirectResponse("/reg/", status_code=302)
     from scr.dbase import crud_finance
 
-    items, total = await crud_finance.get_payroll_items(session, page=page, per_page=50)
+    per_page = await _get_per_page(session)
+    items, total = await crud_finance.get_payroll_items(session, page=page, per_page=per_page)
     user_cache = {}
     items_with_user = []
     for item in items:
@@ -1661,7 +1667,7 @@ async def fot_list_page(
                 user_cache[item.changed_by_id] = u.name if u else str(item.changed_by_id)
             uname = user_cache[item.changed_by_id]
         items_with_user.append({"item": item, "user_name": uname})
-    pages = (total + 49) // 50
+    pages = (total + per_page - 1) // per_page
     return templates.TemplateResponse(
         "finance/list.html",
         {
