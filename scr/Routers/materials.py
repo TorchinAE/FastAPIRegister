@@ -589,3 +589,27 @@ async def delete_material(mat_id: int, session: AsyncSession = Depends(db_helper
         raise HTTPException(status_code=404, detail="Материал не найден")
     await session.commit()
     return {"message": "Материал удалён"}
+
+
+@mat_router.post("/{mat_id}/toggle-module")
+async def toggle_module_for_material(
+    mat_id: int,
+    session: AsyncSession = Depends(db_helper.session_dependency),
+):
+    from scr.dbase import crud_modules
+    from scr.dbase.schemas.schemas import ModuleCreateSchema, ModuleItemCreateSchema
+
+    mat = await crud_materials.get_material_by_id(session, mat_id)
+    if not mat:
+        raise HTTPException(status_code=404, detail="Материал не найден")
+
+    existing_module = await crud_modules.get_module_by_name(session, mat.name)
+    if existing_module:
+        await crud_modules.delete_module(session, existing_module.id)
+        await session.commit()
+        return {"action": "removed", "module_id": None}
+
+    mod = await crud_modules.add_module(session, ModuleCreateSchema(name=mat.name))
+    await crud_modules.add_module_item(session, mod.id, ModuleItemCreateSchema(material_id=mat.id, quantity=1))
+    await session.commit()
+    return {"action": "created", "module_id": mod.id}
