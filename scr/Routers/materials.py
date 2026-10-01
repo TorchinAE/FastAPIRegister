@@ -354,10 +354,10 @@ def _parse_by_header(row, col_map: dict) -> dict | None:
         "price": price,
         "date": _parse_date(_get(row, col_map, "date")),
         "nom_tok": nom_tok,
-        "stats": bool(_get(row, col_map, "stats", True)),
+        "stats": bool(_get(row, col_map, "stats", False)),
         "vtych": bool(_get(row, col_map, "vtych", False)),
         "vykat": bool(_get(row, col_map, "vykat", False)),
-        "ruchn": bool(_get(row, col_map, "ruchn", True)),
+        "ruchn": bool(_get(row, col_map, "ruchn", False)),
         "el_priv": bool(_get(row, col_map, "el_priv", False)),
         "code_1c": str(_get(row, col_map, "code_1c", "")).strip() or None,
         "code_agent": str(_get(row, col_map, "code_agent", "")).strip() or None,
@@ -468,6 +468,11 @@ async def _do_import(session: AsyncSession, rows: list) -> int:
 
     imported = 0
     for parsed in _parse_rows(rows):
+        # If nom_tok not specified, stats and ruchn default to False
+        if not parsed.get("nom_tok"):
+            parsed["stats"] = False
+            parsed["ruchn"] = False
+
         existing = await _find_existing(session, parsed)
 
         # Resolve type_id
