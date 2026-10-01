@@ -29,10 +29,14 @@
                 </select>
             </div>
         </div>
-        <div class="form-row" style="grid-template-columns: 1fr 1fr 1fr;">
+        <div class="form-row" style="grid-template-columns: 1fr 1fr 1fr 1fr;">
             <div class="form-group">
                 <label>Дата</label>
                 <input type="date" name="date" value="{{ mat.date.strftime('%Y-%m-%d') if mat.date else '' }}" style="width:100%;min-width:0">
+            </div>
+            <div class="form-group">
+                <label>Напряжение</label>
+                <input type="text" name="voltage" value="{{ mat.voltage or '' }}" style="width:100%;min-width:0">
             </div>
             <div class="form-group">
                 <label>Код 1С</label>
@@ -83,6 +87,7 @@ document.getElementById('editMatForm').addEventListener('submit', async function
         url_agent: fd.get('url_agent') || null,
         type_id: fd.get('type_id') ? parseInt(fd.get('type_id')) : null,
         nom_tok: parseInt(fd.get('nom_tok')) || 0,
+        voltage: fd.get('voltage') || null,
         stats: this.querySelector('[name="stats"]').checked,
         vtych: this.querySelector('[name="vtych"]').checked,
         vykat: this.querySelector('[name="vykat"]').checked,

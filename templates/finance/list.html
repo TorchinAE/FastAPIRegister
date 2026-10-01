@@ -1,0 +1,114 @@
+{% extends "base.html" %}
+{% block title %}{{ kind_label }}{% endblock %}
+{% block content %}
+<div class="page-header" style="gap:1rem; flex-wrap:wrap;">
+    <div style="display:flex; align-items:center; gap:0.75rem;">
+        <h1>{{ kind_label }}</h1>
+        <span class="subtitle">Всего: {{ total }}</span>
+    </div>
+    <div style="display:flex;gap:0.5rem;">
+        <a href="/reg/api/finance/{{ kind }}/export-excel" class="btn btn-primary" download>Скачать Excel</a>
+        <label class="btn btn-primary" style="cursor:pointer;">
+            Загрузить Excel
+            <input type="file" accept=".xlsx,.xls" style="display:none" id="excelInput" onchange="importExcel(this)">
+        </label>
+    </div>
+</div>
+
+<div class="card" style="margin-bottom:1rem;">
+    <form onsubmit="addNew(event)" style="display:flex;gap:0.75rem;align-items:flex-end;">
+        <div class="form-group" style="flex:2;min-width:200px;margin-bottom:0;">
+            <label>Название</label>
+            <input type="text" id="newName" placeholder="Название" required>
+        </div>
+        <div class="form-group" style="flex:1;min-width:120px;margin-bottom:0;">
+            <label>Стоимость</label>
+            <input type="number" id="newCost" placeholder="0" step="0.01" min="0" value="0">
+        </div>
+        <button type="submit" class="btn btn-success" style="height:38px;">Добавить</button>
+    </form>
+</div>
+
+<div class="table-wrap">
+    <table>
+        <thead>
+            <tr>
+                <th>ID</th><th>Название</th><th>Стоимость</th><th>Дата изменения</th><th>Кто изменил</th><th></th>
+            </tr>
+        </thead>
+        <tbody>
+            {% for item in items %}
+            <tr style="cursor:pointer" onclick="location.href='/reg/{{ kind }}/{{ item.id }}'">
+                <td><strong>{{ item.id }}</strong></td>
+                <td>{{ item.name }}</td>
+                <td>{{ item.cost|money }}</td>
+                <td>{{ item.date_modified.strftime('%d.%m.%Y %H:%M') if item.date_modified else '' }}</td>
+                <td>{{ item.changed_by_id or '' }}</td>
+                <td style="text-align:center;width:40px">
+                    <button class="btn btn-danger btn-sm btn-icon" title="Удалить" onclick="event.stopPropagation(); deleteItem({{ item.id }}, this)">&#10005;</button>
+                </td>
+            </tr>
+            {% endfor %}
+            {% if not items %}<tr class="empty-row"><td colspan="6">Нет записей</td></tr>{% endif %}
+        </tbody>
+    </table>
+</div>
+{% if pages > 1 %}
+<div class="pagination">
+    {% for p in range(1, pages + 1) %}
+    <a href="/reg/{{ kind }}?page={{ p }}" class="{{ 'active' if p == page else '' }}">{{ p }}</a>
+    {% endfor %}
+</div>
+{% endif %}
+
+<div id="toast" class="toast" style="display:none"></div>
+{% endblock %}
+
+{% block scripts %}
+<script>
+const kind = '{{ kind }}';
+
+async function addNew(e) {
+    e.preventDefault();
+    const name = document.getElementById('newName').value.trim();
+    const cost = parseFloat(document.getElementById('newCost').value) || 0;
+    if (!name) { showToast('Введите название'); return; }
+    const resp = await fetch('/reg/api/finance/' + kind, {
+        method: 'POST',
+        headers: {'Content-Type': 'application/json'},
+        body: JSON.stringify({name, cost}),
+    });
+    if (resp.ok) {
+        location.reload();
+    } else {
+        showToast('Ошибка');
+    }
+}
+
+async function deleteItem(id, btn) {
+    if (!confirm('Удалить запись?')) return;
+    const resp = await fetch('/reg/api/finance/' + kind + '/' + id, {method: 'DELETE'});
+    if (resp.ok) { btn.closest('tr').remove(); showToast('Удалено'); } else { showToast('Ошибка'); }
+}
+
+async function importExcel(input) {
+    if (!input.files.length) return;
+    const fd = new FormData();
+    fd.append('file', input.files[0]);
+    const resp = await fetch('/reg/api/finance/' + kind + '/import-excel', {method: 'POST', body: fd});
+    if (resp.ok) {
+        const data = await resp.json();
+        showToast(data.message);
+        setTimeout(() => location.reload(), 1000);
+    } else {
+        showToast('Ошибка импорта');
+    }
+    input.value = '';
+}
+
+function showToast(msg) {
+    const t = document.getElementById('toast'); t.textContent = msg;
+    t.style.display = 'block'; setTimeout(() => t.style.display = 'none', 2500);
+}
+</script>
+{% endblock %}

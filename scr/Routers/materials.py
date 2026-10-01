@@ -30,6 +30,7 @@ def _mat_response(mat) -> MaterialResponseSchema:
         type_name=mat.type.name if mat.type else None,
         created_by=mat.created_by,
         date=mat.date,
+        voltage=mat.voltage,
     )
 
 
@@ -99,6 +100,7 @@ async def export_materials_excel(
         "Цена",
         "Дата",
         "Ном Ток",
+        "Напряжение",
         "стац",
         "втыч",
         "выкат",
@@ -130,6 +132,7 @@ async def export_materials_excel(
                 float(item.price),
                 item.date.strftime("%d.%m.%Y") if item.date else "",
                 item.nom_tok,
+                item.voltage or "",
                 "+" if item.stats else "",
                 "+" if item.vtych else "",
                 "+" if item.vykat else "",
@@ -285,6 +288,9 @@ _HEADER_ALIASES = {
     "url_agent": "url_agent",
     "url": "url_agent",
     "ссылка": "url_agent",
+    "напряжение": "voltage",
+    "вольтаж": "voltage",
+    "voltage": "voltage",
 }
 
 
@@ -368,6 +374,7 @@ def _parse_by_header(row, col_map: dict) -> dict | None:
         "code_1c": str(_get(row, col_map, "code_1c", "")).strip() or None,
         "code_agent": str(_get(row, col_map, "code_agent", "")).strip() or None,
         "url_agent": str(_get(row, col_map, "url_agent", "")).strip() or None,
+        "voltage": str(_get(row, col_map, "voltage", "")).strip() or None,
     }
 
 
@@ -423,6 +430,7 @@ def _parse_fixed(row) -> dict | None:
         "code_1c": code_1c,
         "code_agent": code_agent,
         "url_agent": url_agent,
+        "voltage": None,
     }
 
 
@@ -528,6 +536,8 @@ async def _do_import(session: AsyncSession, rows: list) -> int:
                 existing.code_agent = parsed["code_agent"]
             if parsed.get("url_agent") and not existing.url_agent:
                 existing.url_agent = parsed["url_agent"]
+            if parsed.get("voltage") and not existing.voltage:
+                existing.voltage = parsed["voltage"]
         else:
             # Create new material
             schema = MaterialCreateSchema(
@@ -543,6 +553,7 @@ async def _do_import(session: AsyncSession, rows: list) -> int:
                 vykat=parsed.get("vykat", False),
                 ruchn=parsed.get("ruchn", True),
                 el_priv=parsed.get("el_priv", False),
+                voltage=parsed.get("voltage"),
                 date=date_val,
             )
             await crud_materials.add_material(session, schema)

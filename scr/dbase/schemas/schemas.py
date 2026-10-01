@@ -219,6 +219,7 @@ class MaterialCreateSchema(BaseModel):
     url_agent: str | None = None
     type_id: int | None = None
     nom_tok: int = Field(0, ge=0, le=7000)
+    voltage: str | None = None
     stats: bool = True
     vtych: bool = False
     vykat: bool = False
@@ -238,6 +239,7 @@ class MaterialUpdateSchema(BaseModel):
     url_agent: str | None = None
     type_id: int | None = None
     nom_tok: int | None = Field(None, ge=0, le=7000)
+    voltage: str | None = None
     stats: bool | None = None
     vtych: bool | None = None
     vykat: bool | None = None
@@ -258,6 +260,7 @@ class MaterialResponseSchema(BaseModel):
     type_id: int | None = None
     type_name: str | None = None
     nom_tok: int = 0
+    voltage: str | None = None
     stats: bool = True
     vtych: bool = False
     vykat: bool = False
@@ -669,6 +672,56 @@ class ContractSpecResponseSchema(BaseModel):
     contract_date: datetime
     specification_number: int
     created_by: str | None = None
+
+
+# --- Invoice Items (Накладные) ---
+
+
+class InvoiceItemCreateSchema(BaseModel):
+    name: str
+    cost: float = Field(0, ge=0)
+
+
+class InvoiceItemUpdateSchema(BaseModel):
+    id: int
+    name: str | None = None
+    cost: float | None = Field(None, ge=0)
+
+
+class InvoiceItemResponseSchema(BaseModel):
+    model_config = ConfigDict(from_attributes=True)
+
+    id: int
+    name: str
+    cost: float = 0
+    date_modified: datetime | None = None
+    changed_by_id: int | None = None
+    changed_by_name: str | None = None
+
+
+# --- Payroll Items (ФОТ) ---
+
+
+class PayrollItemCreateSchema(BaseModel):
+    name: str
+    cost: float = Field(0, ge=0)
+
+
+class PayrollItemUpdateSchema(BaseModel):
+    id: int
+    name: str | None = None
+    cost: float | None = Field(None, ge=0)
+
+
+class PayrollItemResponseSchema(BaseModel):
+    model_config = ConfigDict(from_attributes=True)
+
+    id: int
+    name: str
+    cost: float = 0
+    date_modified: datetime | None = None
+    changed_by_id: int | None = None
+    changed_by_name: str | None = None
 
 
 # --- Pagination ---

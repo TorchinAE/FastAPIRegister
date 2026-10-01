@@ -1,0 +1,88 @@
+{% extends "base.html" %}
+{% block title %}{{ kind_label }} — {{ item.name }}{% endblock %}
+{% block content %}
+<div class="page-header">
+    <div>
+        <h1>{{ kind_label }} — {{ item.name }}</h1>
+        <div class="subtitle">Запись #{{ item.id }}</div>
+    </div>
+    <a href="/reg/{{ kind }}" class="btn btn-ghost">&larr; Назад</a>
+</div>
+
+<div class="card">
+    <form id="editForm">
+        <input type="hidden" name="id" value="{{ item.id }}">
+        <div class="form-row" style="grid-template-columns: 1fr 1fr;">
+            <div class="form-group">
+                <label>Название</label>
+                <input type="text" name="name" value="{{ item.name }}" required style="width:100%;min-width:0">
+            </div>
+            <div class="form-group">
+                <label>Стоимость</label>
+                <input type="number" name="cost" value="{{ item.cost }}" step="0.01" min="0" style="width:100%;min-width:0">
+            </div>
+        </div>
+        <div class="form-row" style="grid-template-columns: 1fr 1fr;">
+            <div class="form-group">
+                <label>Дата изменения</label>
+                <input type="text" readonly value="{{ item.date_modified.strftime('%d.%m.%Y %H:%M') if item.date_modified else '' }}" style="width:100%;min-width:0;background:#f8fafc;">
+            </div>
+            <div class="form-group">
+                <label>Кто изменил</label>
+                <input type="text" readonly value="{{ item.changed_by_id or '' }}" style="width:100%;min-width:0;background:#f8fafc;">
+            </div>
+        </div>
+        <div class="actions" style="margin-top:1.5rem;">
+            <button type="submit" class="btn btn-primary">Сохранить</button>
+            <button type="button" class="btn btn-danger" onclick="deleteItem()">Удалить</button>
+        </div>
+    </form>
+</div>
+
+<div id="toast" class="toast" style="display:none"></div>
+{% endblock %}
+
+{% block scripts %}
+<script>
+const kind = '{{ kind }}';
+const itemId = {{ item.id }};
+
+document.getElementById('editForm').addEventListener('submit', async function(e) {
+    e.preventDefault();
+    const fd = new FormData(this);
+    const data = {
+        id: parseInt(fd.get('id')),
+        name: fd.get('name'),
+        cost: parseFloat(fd.get('cost')) || 0,
+    };
+    const resp = await fetch('/reg/api/finance/' + kind, {
+        method: 'PATCH',
+        headers: {'Content-Type': 'application/json'},
+        body: JSON.stringify(data),
+    });
+    if (resp.ok) {
+        showToast('Сохранено');
+        setTimeout(() => window.location.href = '/reg/' + kind + '/', 800);
+    } else {
+        showToast('Ошибка');
+    }
+});
+
+async function deleteItem() {
+    if (!confirm('Удалить запись?')) return;
+    const resp = await fetch('/reg/api/finance/' + kind + '/' + itemId, {method: 'DELETE'});
+    if (resp.ok) {
+        window.location.href = '/reg/' + kind;
+    } else {
+        showToast('Ошибка удаления');
+    }
+}
+
+function showToast(msg) {
+    const t = document.getElementById('toast');
+    t.textContent = msg;
+    t.style.display = 'block';
+    setTimeout(() => t.style.display = 'none', 2500);
+}
+</script>
+{% endblock %}

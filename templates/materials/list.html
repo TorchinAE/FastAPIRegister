@@ -37,6 +37,10 @@
         <label>Ном Ток</label>
         <input type="number" name="nom_tok" id="nom_tok_new" value="0" min="0" max="7000">
     </div>
+    <div class="form-group" style="flex:1; min-width:80px; margin-bottom:0;">
+        <label>Напряжение</label>
+        <input type="text" name="voltage" placeholder="Напряжение">
+    </div>
     <div style="display:flex;flex-wrap:wrap;gap:0.5rem 1rem;margin-bottom:0;align-items:center;">
         <label style="display:flex;align-items:center;gap:0.25rem;"><input type="checkbox" name="stats" id="stats_new"> стац</label>
         <label style="display:flex;align-items:center;gap:0.25rem;"><input type="checkbox" name="vtych"> втыч</label>
@@ -66,7 +70,7 @@
     <table id="dataTable">
         <thead>
             <tr>
-                <th>ID</th><th>Тип</th><th>Название</th><th>Цена</th><th>Дата</th><th>Ном Ток</th><th>стац</th><th>втыч</th><th>выкат</th><th>ручн</th><th>эл.прив</th><th>Код 1С</th><th>Код агент</th><th>URL агент</th><th></th>
+                <th>ID</th><th>Тип</th><th>Название</th><th>Цена</th><th>Дата</th><th>Ном Ток</th><th>Напряж.</th><th>стац</th><th>втыч</th><th>выкат</th><th>ручн</th><th>эл.прив</th><th>Код 1С</th><th>Код агент</th><th>URL агент</th><th></th>
             </tr>
             <tr class="table-filter">
                 <th><input type="text" data-col="0" data-min="1" placeholder="Фильтр..." class="tf-input"></th>
@@ -75,50 +79,23 @@
                 <th><input type="text" data-col="3" placeholder="Фильтр..." class="tf-input"></th>
                 <th><input type="text" data-col="4" placeholder="Фильтр..." class="tf-input"></th>
                 <th><input type="text" data-col="5" placeholder="Фильтр..." class="tf-input"></th>
-                <th><select data-col="6" class="tf-select"><option value="">—</option><option value="✓">✓</option><option value="✗">✗</option></select></th>
+                <th><input type="text" data-col="6" placeholder="Фильтр..." class="tf-input"></th>
                 <th><select data-col="7" class="tf-select"><option value="">—</option><option value="✓">✓</option><option value="✗">✗</option></select></th>
                 <th><select data-col="8" class="tf-select"><option value="">—</option><option value="✓">✓</option><option value="✗">✗</option></select></th>
                 <th><select data-col="9" class="tf-select"><option value="">—</option><option value="✓">✓</option><option value="✗">✗</option></select></th>
                 <th><select data-col="10" class="tf-select"><option value="">—</option><option value="✓">✓</option><option value="✗">✗</option></select></th>
-                <th><input type="text" data-col="11" placeholder="Фильтр..." class="tf-input"></th>
+                <th><select data-col="11" class="tf-select"><option value="">—</option><option value="✓">✓</option><option value="✗">✗</option></select></th>
                 <th><input type="text" data-col="12" placeholder="Фильтр..." class="tf-input"></th>
                 <th><input type="text" data-col="13" placeholder="Фильтр..." class="tf-input"></th>
+                <th><input type="text" data-col="14" placeholder="Фильтр..." class="tf-input"></th>
                 <th></th>
             </tr>
         </thead>
-        <tbody>
-            {% for item in items %}
-            <tr style="cursor:pointer" onclick="location.href='/reg/materials/{{ item.id }}'">
-                <td><strong>{{ item.id }}</strong></td>
-                <td>{% if item.type %}<a href="/reg/material-types/{{ item.type_id }}" onclick="event.stopPropagation()">{{ item.type.name }}</a>{% endif %}</td>
-                <td>{{ item.name }}</td>
-                <td>{{ item.price|money }}</td>
-                <td>{{ item.date.strftime('%d.%m.%Y') if item.date else '' }}</td>
-                <td>{{ item.nom_tok }}</td>
-                <td style="text-align:center">{{ '✓' if item.stats else '✗' }}</td>
-                <td style="text-align:center">{{ '✓' if item.vtych else '✗' }}</td>
-                <td style="text-align:center">{{ '✓' if item.vykat else '✗' }}</td>
-                <td style="text-align:center">{{ '✓' if item.ruchn else '✗' }}</td>
-                <td style="text-align:center">{{ '✓' if item.el_priv else '✗' }}</td>
-                <td>{{ item.code_1c or '' }}</td>
-                <td>{{ item.code_agent or '' }}</td>
-                <td>{{ item.url_agent or '' }}</td>
-                <td style="text-align:center;width:40px">
-                    <button class="btn btn-danger btn-sm btn-icon" title="Удалить" onclick="event.stopPropagation(); deleteMat({{ item.id }}, this)">&#10005;</button>
-                </td>
-            </tr>
-            {% endfor %}
-            {% if not items %}<tr class="empty-row"><td colspan="15">Нет материалов</td></tr>{% endif %}
+        <tbody id="tableBody">
         </tbody>
     </table>
 </div>
-{% if pages > 1 %}
-<div class="pagination">
-    {% for p in range(1, pages + 1) %}
-    <a href="/reg/materials?page={{ p }}" class="{{ 'active' if p == page else '' }}">{{ p }}</a>
-    {% endfor %}
-</div>
-{% endif %}
+<div id="clientPagination" class="pagination" style="display:flex;gap:0.25rem;flex-wrap:wrap;margin-top:0.75rem;"></div>
 
 <!-- Conflict confirmation modal -->
 <div id="conflictModal" style="display:none;position:fixed;top:0;left:0;width:100%;height:100%;background:rgba(0,0,0,0.5);z-index:1000;justify-content:center;align-items:center;">
@@ -141,6 +118,34 @@
 
 {% block scripts %}
 <script>
+const PER_PAGE = {{ per_page }};
+// All data loaded from server
+const allData = [
+    {% for item in items %}
+    {
+        id: {{ item.id }},
+        type: '{{ (item.type.name if item.type else "")|e }}',
+        typeId: {{ item.type_id or 'null' }},
+        name: '{{ item.name|e }}',
+        price: '{{ item.price|money }}',
+        date: '{{ item.date.strftime("%d.%m.%Y") if item.date else "" }}',
+        nomTok: {{ item.nom_tok }},
+        voltage: '{{ (item.voltage or "")|e }}',
+        stats: {{ 'true' if item.stats else 'false' }},
+        vtych: {{ 'true' if item.vtych else 'false' }},
+        vykat: {{ 'true' if item.vykat else 'false' }},
+        ruchn: {{ 'true' if item.ruchn else 'false' }},
+        elPriv: {{ 'true' if item.el_priv else 'false' }},
+        code1c: '{{ (item.code_1c or "")|e }}',
+        codeAgent: '{{ (item.code_agent or "")|e }}',
+        urlAgent: '{{ (item.url_agent or "")|e }}',
+    },
+    {% endfor %}
+];
+
+let filteredData = allData.slice();
+let currentPage = 1;
+
 // Auto-select newly created type from back_to redirect
 (function() {
     const params = new URLSearchParams(window.location.search);
@@ -159,6 +164,95 @@ document.getElementById('new_name').addEventListener('input', function() {
         dateInput.value = new Date().toISOString().split('T')[0];
     }
 });
+
+function renderTable() {
+    const tbody = document.getElementById('tableBody');
+    const start = (currentPage - 1) * PER_PAGE;
+    const pageData = filteredData.slice(start, start + PER_PAGE);
+
+    tbody.innerHTML = pageData.map(m =>
+        `<tr style="cursor:pointer" onclick="location.href='/reg/materials/${m.id}'">
+            <td><strong>${m.id}</strong></td>
+            <td>${m.typeId ? '<a href="/reg/material-types/' + m.typeId + '" onclick="event.stopPropagation()">' + m.type + '</a>' : ''}</td>
+            <td>${m.name}</td>
+            <td>${m.price}</td>
+            <td>${m.date}</td>
+            <td>${m.nomTok}</td>
+            <td>${m.voltage}</td>
+            <td style="text-align:center">${m.stats ? '✓' : '✗'}</td>
+            <td style="text-align:center">${m.vtych ? '✓' : '✗'}</td>
+            <td style="text-align:center">${m.vykat ? '✓' : '✗'}</td>
+            <td style="text-align:center">${m.ruchn ? '✓' : '✗'}</td>
+            <td style="text-align:center">${m.elPriv ? '✓' : '✗'}</td>
+            <td>${m.code1c}</td>
+            <td>${m.codeAgent}</td>
+            <td>${m.urlAgent}</td>
+            <td style="text-align:center;width:40px">
+                <button class="btn btn-danger btn-sm btn-icon" title="Удалить" onclick="event.stopPropagation(); deleteMat(${m.id}, this)">&#10005;</button>
+            </td>
+        </tr>`
+    ).join('') || '<tr class="empty-row"><td colspan="16">Нет материалов</td></tr>';
+
+    renderPagination();
+}
+
+function renderPagination() {
+    const totalPages = Math.ceil(filteredData.length / PER_PAGE);
+    const div = document.getElementById('clientPagination');
+    if (totalPages <= 1) { div.innerHTML = ''; return; }
+
+    let html = '';
+    for (let p = 1; p <= totalPages; p++) {
+        html += `<a href="javascript:void(0)" class="${p === currentPage ? 'active' : ''}" onclick="goPage(${p})">${p}</a>`;
+    }
+    html += `<span style="margin-left:0.5rem;font-size:0.85rem;color:var(--text-muted);">Показано ${filteredData.length} из ${allData.length}</span>`;
+    div.innerHTML = html;
+}
+
+function goPage(p) {
+    currentPage = p;
+    renderTable();
+    window.scrollTo(0, 0);
+}
+
+function applyFilters() {
+    const filters = [];
+    document.querySelectorAll('.tf-input').forEach(input => {
+        const col = parseInt(input.dataset.col);
+        const val = input.value.toLowerCase().trim();
+        if (val) filters.push({col, val, type: 'text'});
+    });
+    document.querySelectorAll('.tf-select').forEach(sel => {
+        const col = parseInt(sel.dataset.col);
+        const val = sel.value;
+        if (val) filters.push({col, val, type: 'select'});
+    });
+
+    if (filters.length === 0) {
+        filteredData = allData.slice();
+    } else {
+        filteredData = allData.filter(m => {
+            const cells = [
+                String(m.id), m.type, m.name, m.price, m.date, String(m.nomTok), m.voltage,
+                m.stats ? '✓' : '✗', m.vtych ? '✓' : '✗', m.vykat ? '✓' : '✗',
+                m.ruchn ? '✓' : '✗', m.elPriv ? '✓' : '✗',
+                m.code1c, m.codeAgent, m.urlAgent
+            ];
+            return filters.every(f => {
+                if (f.type === 'text') {
+                    return cells[f.col] && cells[f.col].toLowerCase().includes(f.val);
+                } else {
+                    return cells[f.col] === f.val;
+                }
+            });
+        });
+    }
+    currentPage = 1;
+    renderTable();
+}
+
+document.querySelectorAll('.tf-input').forEach(input => input.addEventListener('input', applyFilters));
+document.querySelectorAll('.tf-select').forEach(sel => sel.addEventListener('change', applyFilters));
 
 let pendingFile = null;
 
@@ -220,37 +314,14 @@ function showToast(msg) {
     const t = document.getElementById('toast'); t.textContent = msg;
     t.style.display = 'block'; setTimeout(() => t.style.display = 'none', 2500);
 }
-document.querySelectorAll('.tf-input').forEach(input => {
-    input.addEventListener('input', function() {
-        const col = parseInt(this.dataset.col);
-        const val = this.value.toLowerCase();
-        document.querySelectorAll('#dataTable tbody tr:not(.empty-row)').forEach(row => {
-            if (val.length < 1) { row.style.display = ''; return; }
-            const cell = row.cells[col];
-            row.style.display = cell && cell.textContent.toLowerCase().includes(val) ? '' : 'none';
-        });
-    });
-});
-document.querySelectorAll('.tf-select').forEach(sel => {
-    sel.addEventListener('change', function() {
-        const col = parseInt(this.dataset.col);
-        const val = this.value;
-        document.querySelectorAll('#dataTable tbody tr:not(.empty-row)').forEach(row => {
-            if (!val) { row.style.display = ''; return; }
-            const cell = row.cells[col];
-            const cellText = cell ? cell.textContent.trim() : '';
-            if (val === '✓') {
-                row.style.display = cellText === '✓' ? '' : 'none';
-            } else {
-                row.style.display = cellText === '✗' ? '' : 'none';
-            }
-        });
-    });
-});
+
 document.getElementById('nom_tok_new').addEventListener('input', function() {
     const val = parseInt(this.value) || 0;
     document.getElementById('stats_new').checked = val > 0;
     document.getElementById('ruchn_new').checked = val > 0;
 });
+
+// Initial render
+renderTable();
 </script>
 {% endblock %}

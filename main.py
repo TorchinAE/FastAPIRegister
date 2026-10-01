@@ -16,6 +16,7 @@ from scr.Routers.counterparties import cp_router
 from scr.Routers.deliveries import del_router
 from scr.Routers.directors import dir_router
 from scr.Routers.equipment import eq_router
+from scr.Routers.finance import fin_router
 from scr.Routers.invoices import inv_router
 from scr.Routers.material_types import mt_router
 from scr.Routers.materials import mat_router
@@ -56,6 +57,7 @@ async def lifespan(_: FastAPI):
         ("smtp_from", ""),
         ("adres_server", ""),
         ("tkp_template_folder", ""),
+        ("materials_per_page", "30"),
     ]
     async with db_helper.session_factory() as session:
         for key, value in DEFAULT_SETTINGS:
@@ -118,6 +120,7 @@ app.include_router(mod_router, prefix="/reg")
 app.include_router(del_router, prefix="/reg")
 app.include_router(cs_router, prefix="/reg")
 app.include_router(sc_router, prefix="/reg")
+app.include_router(fin_router, prefix="/reg")
 app.include_router(pages_router, prefix="/reg")
 
 

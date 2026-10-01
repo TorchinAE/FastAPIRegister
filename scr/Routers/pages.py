@@ -1,4 +1,4 @@
-from fastapi import APIRouter, Depends, Form, Request
+from fastapi import APIRouter, Depends, Form, Query, Request
 from fastapi.responses import HTMLResponse, JSONResponse, RedirectResponse
 from fastapi.templating import Jinja2Templates
 from sqlalchemy.ext.asyncio import AsyncSession
@@ -1195,15 +1195,16 @@ async def request_calc_stub_page(
 @pages_router.get("/materials", response_class=HTMLResponse)
 async def materials_page(
     request: Request,
-    page: int = 1,
     session: AsyncSession = Depends(db_helper.session_dependency),
 ):
     user = await get_current_user(request, session)
     if not user:
         return RedirectResponse("/reg/", status_code=302)
-    items, total = await crud_materials.get_materials(session, page=page)
+    items = await crud_materials.get_all_materials(session)
     types, _ = await crud_material_types.get_all_types(session, per_page=10000)
-    per_page = 20
+    per_page_str = await crud_settings.get_setting(session, "materials_per_page")
+    per_page = int(per_page_str) if per_page_str else 30
+    await session.commit()
     return templates.TemplateResponse(
         "materials/list.html",
         {
@@ -1211,9 +1212,8 @@ async def materials_page(
             "user": user,
             "items": items,
             "types": types,
-            "page": page,
-            "pages": (total + per_page - 1) // per_page,
-            "total": total,
+            "total": len(items),
+            "per_page": per_page,
             "active_page": "materials",
         },
     )
@@ -1230,6 +1230,8 @@ async def materials_create_submit(
     form = await request.form()
     name = form.get("name", "").strip()
     if name:
+        from datetime import date as date_cls
+
         from scr.dbase.schemas.schemas import MaterialCreateSchema
 
         data = {
@@ -1239,12 +1241,21 @@ async def materials_create_submit(
             "code_agent": form.get("code_agent") or None,
             "url_agent": form.get("url_agent") or None,
             "nom_tok": int(form.get("nom_tok", 0)),
+            "voltage": form.get("voltage") or None,
             "stats": form.get("stats") == "on",
             "vtych": form.get("vtych") == "on",
             "vykat": form.get("vykat") == "on",
             "ruchn": form.get("ruchn") == "on",
             "el_priv": form.get("el_priv") == "on",
         }
+        date_str = form.get("date")
+        if date_str:
+            try:
+                data["date"] = date_cls.fromisoformat(date_str)
+            except (ValueError, TypeError):
+                data["date"] = date_cls.today()
+        else:
+            data["date"] = date_cls.today()
         if form.get("type_id"):
             data["type_id"] = int(form["type_id"])
         await crud_materials.add_material(session, MaterialCreateSchema(**data), created_by=user.name)
@@ -1530,5 +1541,120 @@ async def request_contracts_page(
             "req": req,
             "specs": specs,
             "active_page": "requests",
+        },
+    )
+
+
+# ==================== Накладные & ФОТ ====================
+
+
+@pages_router.get("/nakladnye", response_class=HTMLResponse)
+async def nakladnye_list_page(
+    request: Request,
+    page: int = Query(1, ge=1),
+    session: AsyncSession = Depends(db_helper.session_dependency),
+):
+    user = await get_current_user(request, session)
+    if not user:
+        return RedirectResponse("/reg/", status_code=302)
+    from scr.dbase import crud_finance
+
+    items, total = await crud_finance.get_invoice_items(session, page=page, per_page=50)
+    pages = (total + 49) // 50
+    return templates.TemplateResponse(
+        "finance/list.html",
+        {
+            "request": request,
+            "user": user,
+            "items": items,
+            "total": total,
+            "page": page,
+            "pages": pages,
+            "kind": "invoices",
+            "kind_label": "Накладные",
+            "active_page": "nakladnye",
+        },
+    )
+
+
+@pages_router.get("/nakladnye/{item_id}", response_class=HTMLResponse)
+async def nakladnye_detail_page(
+    item_id: int,
+    request: Request,
+    session: AsyncSession = Depends(db_helper.session_dependency),
+):
+    user = await get_current_user(request, session)
+    if not user:
+        return RedirectResponse("/reg/", status_code=302)
+    from scr.dbase import crud_finance
+
+    item = await crud_finance.get_invoice_item_by_id(session, item_id)
+    if not item:
+        return HTMLResponse("Запись не найдена", status_code=404)
+    return templates.TemplateResponse(
+        "finance/detail.html",
+        {
+            "request": request,
+            "user": user,
+            "item": item,
+            "kind": "invoices",
+            "kind_label": "Накладные",
+            "active_page": "nakladnye",
+        },
+    )
+
+
+@pages_router.get("/fot", response_class=HTMLResponse)
+async def fot_list_page(
+    request: Request,
+    page: int = Query(1, ge=1),
+    session: AsyncSession = Depends(db_helper.session_dependency),
+):
+    user = await get_current_user(request, session)
+    if not user:
+        return RedirectResponse("/reg/", status_code=302)
+    from scr.dbase import crud_finance
+
+    items, total = await crud_finance.get_payroll_items(session, page=page, per_page=50)
+    pages = (total + 49) // 50
+    return templates.TemplateResponse(
+        "finance/list.html",
+        {
+            "request": request,
+            "user": user,
+            "items": items,
+            "total": total,
+            "page": page,
+            "pages": pages,
+            "kind": "payroll",
+            "kind_label": "ФОТ",
+            "active_page": "fot",
+        },
+    )
+
+
+@pages_router.get("/fot/{item_id}", response_class=HTMLResponse)
+async def fot_detail_page(
+    item_id: int,
+    request: Request,
+    session: AsyncSession = Depends(db_helper.session_dependency),
+):
+    user = await get_current_user(request, session)
+    if not user:
+        return RedirectResponse("/reg/", status_code=302)
+    from scr.dbase import crud_finance
+
+    item = await crud_finance.get_payroll_item_by_id(session, item_id)
+    if not item:
+        return HTMLResponse("Запись не найдена", status_code=404)
+    return templates.TemplateResponse(
+        "finance/detail.html",
+        {
+            "request": request,
+            "user": user,
+            "item": item,
+            "kind": "payroll",
+            "kind_label": "ФОТ",
+            "active_page": "fot",
         },
     )

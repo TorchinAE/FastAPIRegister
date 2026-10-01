@@ -333,6 +333,7 @@ class Material(BaseID):
     url_agent: Mapped[str | None] = mapped_column(String(500), nullable=True)
     type_id: Mapped[int | None] = mapped_column(ForeignKey("material_types.id", ondelete="SET NULL"), nullable=True)
     nom_tok: Mapped[int] = mapped_column(Integer, default=0, nullable=False)
+    voltage: Mapped[str | None] = mapped_column(String(50), nullable=True)
     stats: Mapped[bool] = mapped_column(default=True, nullable=False)
     vtych: Mapped[bool] = mapped_column(default=False, nullable=False)
     vykat: Mapped[bool] = mapped_column(default=False, nullable=False)
@@ -400,3 +401,27 @@ class ModuleItem(Base):
     module: Mapped["Module"] = relationship(foreign_keys=[module_id], back_populates="items")
     material: Mapped[Optional["Material"]] = relationship(foreign_keys=[material_id])
     sub_module: Mapped[Optional["Module"]] = relationship(foreign_keys=[sub_module_id])
+
+
+class InvoiceItem(Base):
+    """Накладные"""
+
+    __tablename__ = "invoice_items_ext"
+
+    id: Mapped[int] = mapped_column(primary_key=True)
+    name: Mapped[str] = mapped_column(String(200), nullable=False)
+    cost: Mapped[float] = mapped_column(Numeric(12, 2), default=0, nullable=False)
+    date_modified: Mapped[datetime | None] = mapped_column(DateTime, nullable=True)
+    changed_by_id: Mapped[int | None] = mapped_column(ForeignKey("users.id"), nullable=True)
+
+
+class PayrollItem(Base):
+    """ФОТ (Фонд оплаты труда)"""
+
+    __tablename__ = "payroll_items"
+
+    id: Mapped[int] = mapped_column(primary_key=True)
+    name: Mapped[str] = mapped_column(String(200), nullable=False)
+    cost: Mapped[float] = mapped_column(Numeric(12, 2), default=0, nullable=False)
+    date_modified: Mapped[datetime | None] = mapped_column(DateTime, nullable=True)
+    changed_by_id: Mapped[int | None] = mapped_column(ForeignKey("users.id"), nullable=True)
