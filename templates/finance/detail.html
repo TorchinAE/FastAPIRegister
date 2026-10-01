@@ -29,7 +29,7 @@
                 <input type="text" readonly value="{{ item.date_modified.strftime('%d.%m.%Y %H:%M') if item.date_modified else '' }}" style="width:100%;min-width:0;background:#f8fafc;">
             </div>
             <div class="form-group">
-                <label>Кто изменил</label>
+                <label>Изменил</label>
                 <input type="text" readonly value="{{ changed_by_name or '' }}" style="width:100%;min-width:0;background:#f8fafc;">
             </div>
         </div>

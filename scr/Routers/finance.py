@@ -115,9 +115,11 @@ async def export_invoices_excel(session: AsyncSession = Depends(db_helper.sessio
 @fin_router.post("/invoices/import-excel")
 async def import_invoices_excel(
     file: UploadFile = File(...),
+    request: Request = None,
     session: AsyncSession = Depends(db_helper.session_dependency),
 ):
-    imported = await _import_excel(session, file, "invoice")
+    user_id = await _get_session_user_id(request, session)
+    imported = await _import_excel(session, file, "invoice", user_id)
     await session.commit()
     return {"status": "ok", "message": f"Импортировано: {imported}", "imported": imported}
 
@@ -206,9 +208,11 @@ async def export_payroll_excel(session: AsyncSession = Depends(db_helper.session
 @fin_router.post("/payroll/import-excel")
 async def import_payroll_excel(
     file: UploadFile = File(...),
+    request: Request = None,
     session: AsyncSession = Depends(db_helper.session_dependency),
 ):
-    imported = await _import_excel(session, file, "payroll")
+    user_id = await _get_session_user_id(request, session)
+    imported = await _import_excel(session, file, "payroll", user_id)
     await session.commit()
     return {"status": "ok", "message": f"Импортировано: {imported}", "imported": imported}
 
@@ -309,24 +313,28 @@ def _export_excel(items, title, item_mapper):
     )
 
 
-async def _import_excel(session, file, kind: str) -> int:
+async def _import_excel(session, file, kind: str, user_id: int | None = None) -> int:
     content = await file.read()
     wb = load_workbook(io.BytesIO(content))
     ws = wb.active
     rows = list(ws.iter_rows(values_only=True))
+
+    # Cache existing items by name for fast lookup
+    if kind == "invoice":
+        all_items = await crud_finance.get_all_invoice_items(session)
+    else:
+        all_items = await crud_finance.get_all_payroll_items(session)
+    by_name = {item.name: item for item in all_items}
 
     imported = 0
     for row in rows:
         if not row:
             continue
 
-        # Detect header row
         first = str(row[0]).strip().lower() if row[0] else ""
         if first in ("id", "название", "имя", "стоимость"):
             continue
 
-        # Export format: [ID, Название, Стоимость]
-        # If col 0 is numeric, it's an ID — col 1 is name, col 2 is cost
         item_id = None
         name = None
         cost = 0
@@ -337,7 +345,6 @@ async def _import_excel(session, file, kind: str) -> int:
             pass
 
         if item_id is not None:
-            # Format: ID, Название, Стоимость
             name = str(row[1]).strip() if len(row) > 1 and row[1] else None
             if len(row) > 2 and row[2] is not None:
                 try:
@@ -345,7 +352,6 @@ async def _import_excel(session, file, kind: str) -> int:
                 except (ValueError, TypeError):
                     cost = 0
         else:
-            # Format: Название, Стоимость (no ID)
             name = str(row[0]).strip() if row[0] else None
             if len(row) > 1 and row[1] is not None:
                 try:
@@ -356,24 +362,28 @@ async def _import_excel(session, file, kind: str) -> int:
         if not name:
             continue
 
+        # Try to find existing by ID first, then by name
+        existing = None
         if item_id:
             if kind == "invoice":
                 existing = await crud_finance.get_invoice_item_by_id(session, item_id)
-                if existing:
-                    await crud_finance.update_invoice_item(session, item_id, name=name, cost=cost)
-                    imported += 1
-                    continue
             else:
                 existing = await crud_finance.get_payroll_item_by_id(session, item_id)
-                if existing:
-                    await crud_finance.update_payroll_item(session, item_id, name=name, cost=cost)
-                    imported += 1
-                    continue
+        if not existing:
+            existing = by_name.get(name)
 
-        if kind == "invoice":
-            await crud_finance.add_invoice_item(session, name=name, cost=cost)
+        if existing:
+            existing.cost = cost
+            existing.name = name
+            existing.date_modified = datetime.now(UTC)
+            existing.changed_by_id = user_id
+            by_name[name] = existing  # update cache
         else:
-            await crud_finance.add_payroll_item(session, name=name, cost=cost)
+            if kind == "invoice":
+                new_item = await crud_finance.add_invoice_item(session, name=name, cost=cost, user_id=user_id)
+            else:
+                new_item = await crud_finance.add_payroll_item(session, name=name, cost=cost, user_id=user_id)
+            by_name[name] = new_item
         imported += 1
 
     return imported
