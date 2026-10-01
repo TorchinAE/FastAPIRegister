@@ -1,4 +1,5 @@
 from fastapi import APIRouter, Depends, HTTPException, Query
+from pydantic import BaseModel
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from scr.dbase import crud_contract_specs
@@ -6,6 +7,11 @@ from scr.dbase.database import db_helper
 from scr.dbase.schemas.schemas import ContractSpecCreateSchema, ContractSpecResponseSchema
 
 cs_router = APIRouter(prefix="/api/contract-specs", tags=["ContractSpecs"])
+
+
+class ContractSpecUpdate(BaseModel):
+    contract_number: int | None = None
+    contract_date: str | None = None
 
 
 @cs_router.get("/by-company/{company_id}", response_model=list[ContractSpecResponseSchema])
@@ -29,6 +35,28 @@ async def create_spec(
     await session.commit()
     await session.refresh(spec, ["request"])
     return spec
+
+
+@cs_router.patch("/{spec_id}", response_model=ContractSpecResponseSchema)
+async def update_spec(
+    spec_id: int,
+    data: ContractSpecUpdate,
+    session: AsyncSession = Depends(db_helper.session_dependency),
+):
+    from datetime import UTC, datetime
+
+    contract_date = None
+    if data.contract_date:
+        try:
+            contract_date = datetime.strptime(data.contract_date, "%Y-%m-%d").replace(tzinfo=UTC)
+        except ValueError:
+            raise HTTPException(status_code=400, detail="Неверный формат даты")
+    result = await crud_contract_specs.update_contract_spec(session, spec_id, data.contract_number, contract_date)
+    if not result:
+        raise HTTPException(status_code=404, detail="Спецификация не найдена")
+    await session.commit()
+    await session.refresh(result, ["request"])
+    return result
 
 
 @cs_router.delete("/{spec_id}")

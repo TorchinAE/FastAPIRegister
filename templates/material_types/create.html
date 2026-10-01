@@ -1,0 +1,25 @@
+{% extends "base.html" %}
+{% block title %}Новый тип материала{% endblock %}
+{% block content %}
+<div class="page-header">
+    <div>
+        <h1>Новый тип материала</h1>
+    </div>
+    <a href="{{ back_to or '/reg/material-types' }}" class="btn btn-ghost">← Назад</a>
+</div>
+
+<div class="card">
+    <form method="post" action="/reg/material-types">
+        <input type="hidden" name="back_to" value="{{ back_to or '' }}">
+        <div class="form-row" style="grid-template-columns: 1fr;">
+            <div class="form-group">
+                <label>Название типа</label>
+                <input type="text" name="name" maxlength="20" placeholder="Введите тип материала" required style="width:100%;min-width:0">
+            </div>
+        </div>
+        <div class="actions">
+            <button type="submit" class="btn btn-primary">Создать</button>
+        </div>
+    </form>
+</div>
+{% endblock %}

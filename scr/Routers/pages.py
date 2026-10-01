@@ -1262,12 +1262,36 @@ async def material_types_create_submit(
         return RedirectResponse("/reg/", status_code=302)
     form = await request.form()
     name = form.get("name", "").strip()
+    back_to = form.get("back_to", "").strip()
+    new_type_id = None
     if name:
         from scr.dbase.schemas.schemas import MaterialTypeCreateSchema
 
-        await crud_material_types.add_type(session, MaterialTypeCreateSchema(name=name), created_by=user.name)
+        new_type = await crud_material_types.add_type(
+            session, MaterialTypeCreateSchema(name=name), created_by=user.name
+        )
         await session.commit()
-    return RedirectResponse("/reg/material-types", status_code=302)
+        new_type_id = new_type.id if new_type else None
+    redirect_url = back_to or "/reg/material-types"
+    if new_type_id and back_to:
+        separator = "&" if "?" in back_to else "?"
+        redirect_url = f"{back_to}{separator}new_type_id={new_type_id}"
+    return RedirectResponse(redirect_url, status_code=302)
+
+
+@pages_router.get("/material-types/create", response_class=HTMLResponse)
+async def material_types_create_page(
+    request: Request,
+    back_to: str | None = None,
+    session: AsyncSession = Depends(db_helper.session_dependency),
+):
+    user = await get_current_user(request, session)
+    if not user:
+        return RedirectResponse("/reg/", status_code=302)
+    return templates.TemplateResponse(
+        "material_types/create.html",
+        {"request": request, "user": user, "back_to": back_to, "active_page": "material_types"},
+    )
 
 
 @pages_router.get("/material-types/{type_id}", response_class=HTMLResponse)

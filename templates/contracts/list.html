@@ -6,6 +6,7 @@
         <h1>Договора</h1>
         <span class="subtitle">Всего спецификаций: {{ specs|length }}</span>
     </div>
+    <button type="button" class="btn btn-primary" onclick="exportContractsExcel()">Скачать Excel</button>
 </div>
 
 <div class="table-wrap">
@@ -19,6 +20,7 @@
                 <th>Дата спецификации</th>
                 <th>ТКП</th>
                 <th>Сумма</th>
+                <th style="width:40px;"></th>
             </tr>
             <tr class="table-filter">
                 <th>
@@ -35,6 +37,7 @@
                 <th><input type="text" data-col="4" placeholder="Фильтр..." class="tf-input"></th>
                 <th><input type="text" data-col="5" placeholder="Фильтр..." class="tf-input"></th>
                 <th><input type="text" data-col="6" placeholder="Фильтр..." class="tf-input"></th>
+                <th></th>
             </tr>
         </thead>
         <tbody>
@@ -47,10 +50,13 @@
                 <td>{{ spec.contract_date.strftime('%d.%m.%Y') if spec.contract_date else '-' }}</td>
                 <td>{% if spec.request_id %}#{{ spec.request_id }}{% if spec.request %} — {{ spec.request.tkp_num or '' }}{% endif %}{% else %}-{% endif %}</td>
                 <td style="text-align:right;">{{ spec.request.cost|money if spec.request and spec.request.cost else '-' }}</td>
+                <td style="text-align:center;width:40px">
+                    <button class="btn btn-danger btn-sm btn-icon" title="Удалить" onclick="event.stopPropagation(); deleteSpec({{ spec.id }}, this)">&#10005;</button>
+                </td>
             </tr>
             {% endfor %}
             {% if not specs %}
-            <tr class="empty-row"><td colspan="7" style="text-align:center;color:var(--text-muted);font-style:italic;">Нет договоров</td></tr>
+            <tr class="empty-row"><td colspan="8" style="text-align:center;color:var(--text-muted);font-style:italic;">Нет договоров</td></tr>
             {% endif %}
         </tbody>
     </table>
@@ -60,6 +66,8 @@
 {% endblock %}
 
 {% block scripts %}
+<script src="https://cdnjs.cloudflare.com/ajax/libs/exceljs/4.4.0/exceljs.min.js"></script>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/FileSaver.js/2.0.5/FileSaver.min.js"></script>
 <script>
 document.querySelectorAll('.tf-input').forEach(input => {
     input.addEventListener('input', function() {
@@ -83,5 +91,68 @@ document.querySelectorAll('.tf-select').forEach(sel => {
         });
     });
 });
+
+async function deleteSpec(specId, btn) {
+    if (!confirm('Удалить спецификацию?')) return;
+    const resp = await fetch('/reg/api/contract-specs/' + specId, {method: 'DELETE'});
+    if (resp.ok) {
+        btn.closest('tr').remove();
+        showToast('Удалено');
+    } else {
+        showToast('Ошибка удаления');
+    }
+}
+
+async function exportContractsExcel() {
+    const headers = [];
+    document.querySelectorAll('#contractsTable thead tr:first-child th').forEach(th => {
+        const text = th.textContent.trim();
+        if (text) headers.push(text);
+    });
+    const rows = [];
+    document.querySelectorAll('#contractsTable tbody tr:not(.empty-row)').forEach(tr => {
+        if (tr.style.display === 'none') return;
+        const row = [];
+        tr.querySelectorAll('td').forEach((td, i) => {
+            if (i < headers.length) row.push(td.textContent.trim().replace(/\s+/g, ' '));
+        });
+        if (row.length === headers.length) rows.push(row);
+    });
+    if (rows.length === 0) { alert('Нет видимых строк для экспорта'); return; }
+
+    const wb = new ExcelJS.Workbook();
+    const ws = wb.addWorksheet('Договора');
+    ws.addRow(['Договора']);
+    ws.mergeCells(1, 1, 1, headers.length);
+    ws.getCell('A1').font = { bold: true, size: 14 };
+    ws.getCell('A1').alignment = { horizontal: 'center' };
+
+    const headerRow = ws.addRow(headers);
+    headerRow.eachCell(cell => {
+        cell.font = { bold: true };
+        cell.fill = { type: 'pattern', pattern: 'solid', fgColor: { argb: 'FFD9D9D9' } };
+        cell.border = { top: { style: 'thin' }, bottom: { style: 'thin' }, left: { style: 'thin' }, right: { style: 'thin' } };
+    });
+    rows.forEach(r => {
+        const dr = ws.addRow(r);
+        dr.eachCell({ includeEmpty: true }, cell => {
+            cell.border = { top: { style: 'thin' }, bottom: { style: 'thin' }, left: { style: 'thin' }, right: { style: 'thin' } };
+        });
+    });
+    ws.columns.forEach((col, i) => {
+        let maxLen = headers[i] ? headers[i].length : 10;
+        rows.forEach(r => { const l = String(r[i] || '').length; if (l > maxLen) maxLen = l; });
+        col.width = Math.min(maxLen + 3, 50);
+    });
+    const now = new Date();
+    const ds = now.getFullYear() + String(now.getMonth()+1).padStart(2,'0') + String(now.getDate()).padStart(2,'0');
+    const blob = await wb.xlsx.writeBuffer();
+    saveAs(new Blob([blob], {type:'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet'}), 'contracts_' + ds + '.xlsx');
+}
+
+function showToast(msg) {
+    const t = document.getElementById('toast'); t.textContent = msg;
+    t.style.display = 'block'; setTimeout(() => t.style.display = 'none', 2500);
+}
 </script>
 {% endblock %}

@@ -60,6 +60,23 @@ async def add_new_contract(
     return await add_contract_spec(session, company_id, contract_number, request_id)
 
 
+async def update_contract_spec(
+    session: AsyncSession,
+    spec_id: int,
+    contract_number: int | None = None,
+    contract_date=None,
+) -> ContractSpec | None:
+    spec = await session.get(ContractSpec, spec_id)
+    if not spec:
+        return None
+    if contract_number is not None:
+        spec.contract_number = contract_number
+    if contract_date is not None:
+        spec.contract_date = contract_date
+    await session.flush()
+    return spec
+
+
 async def delete_contract_spec(session: AsyncSession, spec_id: int) -> bool:
     spec = await session.get(ContractSpec, spec_id)
     if spec:

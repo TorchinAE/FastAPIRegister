@@ -47,8 +47,8 @@
             <tbody id="specsBody">
                 {% for spec in specs %}
                 <tr{% if spec.request_id %} style="cursor:pointer" onclick="location.href='/reg/requests/{{ spec.request_id }}/calc'"{% endif %}>
-                    <td><strong>{{ spec.contract_number }}</strong></td>
-                    <td>{{ spec.contract_date.strftime('%d.%m.%Y') if spec.contract_date else '-' }}</td>
+                    <td><input type="number" value="{{ spec.contract_number }}" class="spec-contract-num" data-spec-id="{{ spec.id }}" style="width:5em;border:1px solid var(--border);border-radius:4px;padding:2px 4px;text-align:center;" onclick="event.stopPropagation()"></td>
+                    <td><input type="date" value="{{ spec.contract_date.strftime('%Y-%m-%d') if spec.contract_date else '' }}" class="spec-contract-date" data-spec-id="{{ spec.id }}" style="border:1px solid var(--border);border-radius:4px;padding:2px 4px;" onclick="event.stopPropagation()"></td>
                     <td>{{ spec.specification_number }}</td>
                     <td>{% if spec.request_id %}#{{ spec.request_id }}{% if spec.request %} — {{ spec.request.tkp_num or '' }}{% endif %}{% else %}-{% endif %}</td>
                     <td style="text-align:center;">
@@ -137,5 +137,29 @@ function showToast(msg) {
     t.style.display = 'block';
     setTimeout(() => t.style.display = 'none', 2500);
 }
+
+async function saveSpecField(specId, field, value) {
+    const data = {};
+    data[field] = value;
+    const resp = await fetch('/reg/api/contract-specs/' + specId, {
+        method: 'PATCH',
+        headers: {'Content-Type': 'application/json'},
+        body: JSON.stringify(data),
+    });
+    if (!resp.ok) {
+        showToast('Ошибка сохранения');
+    }
+}
+
+document.querySelectorAll('.spec-contract-num').forEach(inp => {
+    inp.addEventListener('change', function() {
+        saveSpecField(this.dataset.specId, 'contract_number', parseInt(this.value));
+    });
+});
+document.querySelectorAll('.spec-contract-date').forEach(inp => {
+    inp.addEventListener('change', function() {
+        saveSpecField(this.dataset.specId, 'contract_date', this.value);
+    });
+});
 </script>
 {% endblock %}
