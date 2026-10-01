@@ -1204,6 +1204,13 @@ async def materials_page(
     types, _ = await crud_material_types.get_all_types(session, per_page=10000)
     per_page_str = await crud_settings.get_setting(session, "materials_per_page")
     per_page = int(per_page_str) if per_page_str else 30
+
+    # Build set of material names that have modules
+    from scr.dbase import crud_modules
+
+    all_modules = await crud_modules.get_all_modules(session)
+    module_names = {m.name for m in all_modules}
+
     await session.commit()
     return templates.TemplateResponse(
         "materials/list.html",
@@ -1214,6 +1221,7 @@ async def materials_page(
             "types": types,
             "total": len(items),
             "per_page": per_page,
+            "module_names": module_names,
             "active_page": "materials",
         },
     )

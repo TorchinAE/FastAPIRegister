@@ -70,7 +70,7 @@
     <table id="dataTable">
         <thead>
             <tr>
-                <th>ID</th><th>Тип</th><th>Название</th><th>Цена</th><th>Дата</th><th>Ном Ток</th><th>Напряж.</th><th>стац</th><th>втыч</th><th>выкат</th><th>ручн</th><th>эл.прив</th><th>Код 1С</th><th>Код агент</th><th>URL агент</th><th></th>
+                <th>ID</th><th>Тип</th><th>Название</th><th>Цена</th><th>Дата</th><th>Ном Ток</th><th>Напряж.</th><th>стац</th><th>втыч</th><th>выкат</th><th>ручн</th><th>эл.прив</th><th>Код 1С</th><th>Код агент</th><th>URL агент</th><th>мод.</th><th></th>
             </tr>
             <tr class="table-filter">
                 <th><input type="text" data-col="0" data-min="1" placeholder="Фильтр..." class="tf-input"></th>
@@ -88,6 +88,7 @@
                 <th><input type="text" data-col="12" placeholder="Фильтр..." class="tf-input"></th>
                 <th><input type="text" data-col="13" placeholder="Фильтр..." class="tf-input"></th>
                 <th><input type="text" data-col="14" placeholder="Фильтр..." class="tf-input"></th>
+                <th></th>
                 <th></th>
             </tr>
         </thead>
@@ -119,6 +120,7 @@
 {% block scripts %}
 <script>
 const PER_PAGE = {{ per_page }};
+const moduleNames = new Set({{ module_names | list | tojson }});
 // All data loaded from server
 const allData = [
     {% for item in items %}
@@ -139,6 +141,7 @@ const allData = [
         code1c: '{{ (item.code_1c or "")|e }}',
         codeAgent: '{{ (item.code_agent or "")|e }}',
         urlAgent: '{{ (item.url_agent or "")|e }}',
+        isModule: moduleNames.has('{{ item.name|e }}'),
     },
     {% endfor %}
 ];
@@ -188,10 +191,13 @@ function renderTable() {
             <td>${m.codeAgent}</td>
             <td>${m.urlAgent}</td>
             <td style="text-align:center;width:40px">
+                <input type="checkbox" ${m.isModule ? 'checked' : ''} onclick="event.stopPropagation(); toggleModule(${m.id}, this)" title="Создать модуль">
+            </td>
+            <td style="text-align:center;width:40px">
                 <button class="btn btn-danger btn-sm btn-icon" title="Удалить" onclick="event.stopPropagation(); deleteMat(${m.id}, this)">&#10005;</button>
             </td>
         </tr>`
-    ).join('') || '<tr class="empty-row"><td colspan="16">Нет материалов</td></tr>';
+    ).join('') || '<tr class="empty-row"><td colspan="17">Нет материалов</td></tr>';
 
     renderPagination();
 }
@@ -236,7 +242,8 @@ function applyFilters() {
                 String(m.id), m.type, m.name, m.price, m.date, String(m.nomTok), m.voltage,
                 m.stats ? '✓' : '✗', m.vtych ? '✓' : '✗', m.vykat ? '✓' : '✗',
                 m.ruchn ? '✓' : '✗', m.elPriv ? '✓' : '✗',
-                m.code1c, m.codeAgent, m.urlAgent
+                m.code1c, m.codeAgent, m.urlAgent,
+                m.isModule ? '✓' : '✗'
             ];
             return filters.every(f => {
                 if (f.type === 'text') {
@@ -307,6 +314,25 @@ async function confirmImport() {
         setTimeout(() => location.reload(), 1000);
     } else {
         showToast('Ошибка импорта');
+    }
+}
+
+async function toggleModule(matId, cb) {
+    if (!cb.checked) {
+        if (!confirm('Удалить модуль с таким же именем?')) {
+            cb.checked = true;
+            return;
+        }
+    }
+    const resp = await fetch('/reg/api/materials/' + matId + '/toggle-module', {method: 'POST'});
+    if (resp.ok) {
+        const data = await resp.json();
+        const m = allData.find(x => x.id === matId);
+        if (m) m.isModule = data.action === 'created';
+        showToast(data.action === 'created' ? 'Модуль создан' : 'Модуль удалён');
+    } else {
+        cb.checked = !cb.checked;
+        showToast('Ошибка');
     }
 }
 
