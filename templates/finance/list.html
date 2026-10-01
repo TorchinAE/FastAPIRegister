@@ -37,14 +37,15 @@
             </tr>
         </thead>
         <tbody>
-            {% for item in items %}
+            {% for row in items %}
+{% set item = row.item %}
 {% set base = '/reg/nakladnye' if kind == 'invoices' else '/reg/fot' %}
             <tr style="cursor:pointer" onclick="location.href='{{ base }}/{{ item.id }}'">
                 <td><strong>{{ item.id }}</strong></td>
                 <td>{{ item.name }}</td>
                 <td>{{ item.cost|money }}</td>
                 <td>{{ item.date_modified.strftime('%d.%m.%Y %H:%M') if item.date_modified else '' }}</td>
-                <td>{{ item.changed_by_name or item.changed_by_id or '' }}</td>
+                <td>{{ row.user_name or '' }}</td>
                 <td style="text-align:center;width:40px">
                     <button class="btn btn-danger btn-sm btn-icon" title="Удалить" onclick="event.stopPropagation(); deleteItem({{ item.id }}, this)">&#10005;</button>
                 </td>

@@ -1579,13 +1579,24 @@ async def nakladnye_list_page(
     from scr.dbase import crud_finance
 
     items, total = await crud_finance.get_invoice_items(session, page=page, per_page=50)
+    # Resolve user names
+    user_cache = {}
+    items_with_user = []
+    for item in items:
+        uname = None
+        if item.changed_by_id:
+            if item.changed_by_id not in user_cache:
+                u = await crud_users.get_user_by_id(session, item.changed_by_id)
+                user_cache[item.changed_by_id] = u.name if u else str(item.changed_by_id)
+            uname = user_cache[item.changed_by_id]
+        items_with_user.append({"item": item, "user_name": uname})
     pages = (total + 49) // 50
     return templates.TemplateResponse(
         "finance/list.html",
         {
             "request": request,
             "user": user,
-            "items": items,
+            "items": items_with_user,
             "total": total,
             "page": page,
             "pages": pages,
@@ -1610,12 +1621,17 @@ async def nakladnye_detail_page(
     item = await crud_finance.get_invoice_item_by_id(session, item_id)
     if not item:
         return HTMLResponse("Запись не найдена", status_code=404)
+    changed_by_name = None
+    if item.changed_by_id:
+        u = await crud_users.get_user_by_id(session, item.changed_by_id)
+        changed_by_name = u.name if u else str(item.changed_by_id)
     return templates.TemplateResponse(
         "finance/detail.html",
         {
             "request": request,
             "user": user,
             "item": item,
+            "changed_by_name": changed_by_name,
             "kind": "invoices",
             "kind_label": "Накладные",
             "active_page": "nakladnye",
@@ -1635,13 +1651,23 @@ async def fot_list_page(
     from scr.dbase import crud_finance
 
     items, total = await crud_finance.get_payroll_items(session, page=page, per_page=50)
+    user_cache = {}
+    items_with_user = []
+    for item in items:
+        uname = None
+        if item.changed_by_id:
+            if item.changed_by_id not in user_cache:
+                u = await crud_users.get_user_by_id(session, item.changed_by_id)
+                user_cache[item.changed_by_id] = u.name if u else str(item.changed_by_id)
+            uname = user_cache[item.changed_by_id]
+        items_with_user.append({"item": item, "user_name": uname})
     pages = (total + 49) // 50
     return templates.TemplateResponse(
         "finance/list.html",
         {
             "request": request,
             "user": user,
-            "items": items,
+            "items": items_with_user,
             "total": total,
             "page": page,
             "pages": pages,
@@ -1666,12 +1692,17 @@ async def fot_detail_page(
     item = await crud_finance.get_payroll_item_by_id(session, item_id)
     if not item:
         return HTMLResponse("Запись не найдена", status_code=404)
+    changed_by_name = None
+    if item.changed_by_id:
+        u = await crud_users.get_user_by_id(session, item.changed_by_id)
+        changed_by_name = u.name if u else str(item.changed_by_id)
     return templates.TemplateResponse(
         "finance/detail.html",
         {
             "request": request,
             "user": user,
             "item": item,
+            "changed_by_name": changed_by_name,
             "kind": "payroll",
             "kind_label": "ФОТ",
             "active_page": "fot",
