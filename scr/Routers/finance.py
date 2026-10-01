@@ -1,12 +1,12 @@
 import io
 from datetime import UTC, datetime
 
-from fastapi import APIRouter, Depends, File, HTTPException, Query, UploadFile
+from fastapi import APIRouter, Depends, File, HTTPException, Query, Request, UploadFile
 from fastapi.responses import StreamingResponse
 from openpyxl import Workbook, load_workbook
 from sqlalchemy.ext.asyncio import AsyncSession
 
-from scr.dbase import crud_finance
+from scr.dbase import crud_finance, crud_users
 from scr.dbase.database import db_helper
 from scr.dbase.schemas.schemas import (
     InvoiceItemCreateSchema,
@@ -20,6 +20,16 @@ from scr.dbase.schemas.schemas import (
 
 fin_router = APIRouter(prefix="/api/finance", tags=["Finance"])
 
+SESSION_KEY = "user_email"
+
+
+async def _get_session_user_id(request: Request, session: AsyncSession) -> int | None:
+    email = request.cookies.get(SESSION_KEY)
+    if email:
+        user = await crud_users.get_user_by_email(session, email)
+        return user.id if user else None
+    return None
+
 
 # ==================== Накладные ====================
 
@@ -31,8 +41,12 @@ async def read_invoice_items(
     session: AsyncSession = Depends(db_helper.session_dependency),
 ):
     items, total = await crud_finance.get_invoice_items(session, page=page, per_page=per_page)
+    result = []
+    for i in items:
+        uname = await _resolve_user_name(session, i.changed_by_id)
+        result.append(_invoice_response(i, uname))
     return PaginatedResponse(
-        items=[_invoice_response(i, session) for i in items],
+        items=result,
         total=total,
         page=page,
         per_page=per_page,
@@ -43,29 +57,41 @@ async def read_invoice_items(
 @fin_router.get("/invoices/all", response_model=list[InvoiceItemResponseSchema])
 async def read_all_invoice_items(session: AsyncSession = Depends(db_helper.session_dependency)):
     items = await crud_finance.get_all_invoice_items(session)
-    return [_invoice_response(i, session) for i in items]
+    result = []
+    for i in items:
+        uname = await _resolve_user_name(session, i.changed_by_id)
+        result.append(_invoice_response(i, uname))
+    return result
 
 
 @fin_router.post("/invoices", response_model=InvoiceItemResponseSchema)
 async def add_invoice_item(
     data: InvoiceItemCreateSchema,
+    request: Request,
     session: AsyncSession = Depends(db_helper.session_dependency),
 ):
-    item = await crud_finance.add_invoice_item(session, name=data.name, cost=data.cost)
+    user_id = await _get_session_user_id(request, session)
+    item = await crud_finance.add_invoice_item(session, name=data.name, cost=data.cost, user_id=user_id)
     await session.commit()
-    return _invoice_response(item, session)
+    uname = await _resolve_user_name(session, item.changed_by_id)
+    return _invoice_response(item, uname)
 
 
 @fin_router.patch("/invoices", response_model=InvoiceItemResponseSchema)
 async def update_invoice_item(
     data: InvoiceItemUpdateSchema,
+    request: Request,
     session: AsyncSession = Depends(db_helper.session_dependency),
 ):
-    item = await crud_finance.update_invoice_item(session, item_id=data.id, name=data.name, cost=data.cost)
+    user_id = await _get_session_user_id(request, session)
+    item = await crud_finance.update_invoice_item(
+        session, item_id=data.id, name=data.name, cost=data.cost, user_id=user_id
+    )
     if not item:
         raise HTTPException(status_code=404, detail="Запись не найдена")
     await session.commit()
-    return _invoice_response(item, session)
+    uname = await _resolve_user_name(session, item.changed_by_id)
+    return _invoice_response(item, uname)
 
 
 @fin_router.delete("/invoices/{item_id}")
@@ -106,8 +132,12 @@ async def read_payroll_items(
     session: AsyncSession = Depends(db_helper.session_dependency),
 ):
     items, total = await crud_finance.get_payroll_items(session, page=page, per_page=per_page)
+    result = []
+    for i in items:
+        uname = await _resolve_user_name(session, i.changed_by_id)
+        result.append(_payroll_response(i, uname))
     return PaginatedResponse(
-        items=[_payroll_response(i, session) for i in items],
+        items=result,
         total=total,
         page=page,
         per_page=per_page,
@@ -118,29 +148,41 @@ async def read_payroll_items(
 @fin_router.get("/payroll/all", response_model=list[PayrollItemResponseSchema])
 async def read_all_payroll_items(session: AsyncSession = Depends(db_helper.session_dependency)):
     items = await crud_finance.get_all_payroll_items(session)
-    return [_payroll_response(i, session) for i in items]
+    result = []
+    for i in items:
+        uname = await _resolve_user_name(session, i.changed_by_id)
+        result.append(_payroll_response(i, uname))
+    return result
 
 
 @fin_router.post("/payroll", response_model=PayrollItemResponseSchema)
 async def add_payroll_item(
     data: PayrollItemCreateSchema,
+    request: Request,
     session: AsyncSession = Depends(db_helper.session_dependency),
 ):
-    item = await crud_finance.add_payroll_item(session, name=data.name, cost=data.cost)
+    user_id = await _get_session_user_id(request, session)
+    item = await crud_finance.add_payroll_item(session, name=data.name, cost=data.cost, user_id=user_id)
     await session.commit()
-    return _payroll_response(item, session)
+    uname = await _resolve_user_name(session, item.changed_by_id)
+    return _payroll_response(item, uname)
 
 
 @fin_router.patch("/payroll", response_model=PayrollItemResponseSchema)
 async def update_payroll_item(
     data: PayrollItemUpdateSchema,
+    request: Request,
     session: AsyncSession = Depends(db_helper.session_dependency),
 ):
-    item = await crud_finance.update_payroll_item(session, item_id=data.id, name=data.name, cost=data.cost)
+    user_id = await _get_session_user_id(request, session)
+    item = await crud_finance.update_payroll_item(
+        session, item_id=data.id, name=data.name, cost=data.cost, user_id=user_id
+    )
     if not item:
         raise HTTPException(status_code=404, detail="Запись не найдена")
     await session.commit()
-    return _payroll_response(item, session)
+    uname = await _resolve_user_name(session, item.changed_by_id)
+    return _payroll_response(item, uname)
 
 
 @fin_router.delete("/payroll/{item_id}")
@@ -174,25 +216,32 @@ async def import_payroll_excel(
 # ==================== Helpers ====================
 
 
-def _invoice_response(item, session) -> dict:
+async def _resolve_user_name(session, user_id):
+    if not user_id:
+        return None
+    user = await crud_users.get_user_by_id(session, user_id)
+    return user.name if user else None
+
+
+def _invoice_response(item, user_name=None) -> dict:
     return {
         "id": item.id,
         "name": item.name,
         "cost": float(item.cost),
         "date_modified": item.date_modified,
         "changed_by_id": item.changed_by_id,
-        "changed_by_name": None,
+        "changed_by_name": user_name,
     }
 
 
-def _payroll_response(item, session) -> dict:
+def _payroll_response(item, user_name=None) -> dict:
     return {
         "id": item.id,
         "name": item.name,
         "cost": float(item.cost),
         "date_modified": item.date_modified,
         "changed_by_id": item.changed_by_id,
-        "changed_by_name": None,
+        "changed_by_name": user_name,
     }
 
 
@@ -249,10 +298,14 @@ def _export_excel(items, title, item_mapper):
     buf = io.BytesIO()
     wb.save(buf)
     buf.seek(0)
+    from urllib.parse import quote
+
+    filename = f"{title}.xlsx"
+    encoded = quote(filename)
     return StreamingResponse(
         buf,
         media_type="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
-        headers={"Content-Disposition": f"attachment; filename*=UTF-8''{title}.xlsx"},
+        headers={"Content-Disposition": f"attachment; filename*=UTF-8''{encoded}"},
     )
 
 
@@ -266,41 +319,56 @@ async def _import_excel(session, file, kind: str) -> int:
     for row in rows:
         if not row:
             continue
-        # Skip header
+
+        # Detect header row
         first = str(row[0]).strip().lower() if row[0] else ""
-        if first in ("id", "название", "имя"):
+        if first in ("id", "название", "имя", "стоимость"):
             continue
 
-        name = str(row[0]).strip() if row[0] else None
-        if not name:
-            continue
-
-        cost = 0
-        if len(row) > 1 and row[1] is not None:
-            try:
-                cost = float(row[1])
-            except (ValueError, TypeError):
-                continue
-
-        # If row has ID (col 0 is number), try to update existing
+        # Export format: [ID, Название, Стоимость]
+        # If col 0 is numeric, it's an ID — col 1 is name, col 2 is cost
         item_id = None
+        name = None
+        cost = 0
+
         try:
             item_id = int(row[0])
         except (ValueError, TypeError):
             pass
 
-        if item_id and kind == "invoice":
-            existing = await crud_finance.get_invoice_item_by_id(session, item_id)
-            if existing:
-                await crud_finance.update_invoice_item(session, item_id, name=name, cost=cost)
-                imported += 1
-                continue
-        elif item_id and kind == "payroll":
-            existing = await crud_finance.get_payroll_item_by_id(session, item_id)
-            if existing:
-                await crud_finance.update_payroll_item(session, item_id, name=name, cost=cost)
-                imported += 1
-                continue
+        if item_id is not None:
+            # Format: ID, Название, Стоимость
+            name = str(row[1]).strip() if len(row) > 1 and row[1] else None
+            if len(row) > 2 and row[2] is not None:
+                try:
+                    cost = float(row[2])
+                except (ValueError, TypeError):
+                    cost = 0
+        else:
+            # Format: Название, Стоимость (no ID)
+            name = str(row[0]).strip() if row[0] else None
+            if len(row) > 1 and row[1] is not None:
+                try:
+                    cost = float(row[1])
+                except (ValueError, TypeError):
+                    cost = 0
+
+        if not name:
+            continue
+
+        if item_id:
+            if kind == "invoice":
+                existing = await crud_finance.get_invoice_item_by_id(session, item_id)
+                if existing:
+                    await crud_finance.update_invoice_item(session, item_id, name=name, cost=cost)
+                    imported += 1
+                    continue
+            else:
+                existing = await crud_finance.get_payroll_item_by_id(session, item_id)
+                if existing:
+                    await crud_finance.update_payroll_item(session, item_id, name=name, cost=cost)
+                    imported += 1
+                    continue
 
         if kind == "invoice":
             await crud_finance.add_invoice_item(session, name=name, cost=cost)

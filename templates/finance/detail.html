@@ -6,7 +6,8 @@
         <h1>{{ kind_label }} — {{ item.name }}</h1>
         <div class="subtitle">Запись #{{ item.id }}</div>
     </div>
-    <a href="/reg/{{ kind }}" class="btn btn-ghost">&larr; Назад</a>
+{% set base = '/reg/nakladnye' if kind == 'invoices' else '/reg/fot' %}
+    <a href="{{ base }}" class="btn btn-ghost">&larr; Назад</a>
 </div>
 
 <div class="card">
@@ -62,7 +63,7 @@ document.getElementById('editForm').addEventListener('submit', async function(e)
     });
     if (resp.ok) {
         showToast('Сохранено');
-        setTimeout(() => window.location.href = '/reg/' + kind + '/', 800);
+        setTimeout(() => window.location.href = '{{ base }}/', 800);
     } else {
         showToast('Ошибка');
     }
@@ -72,7 +73,7 @@ async function deleteItem() {
     if (!confirm('Удалить запись?')) return;
     const resp = await fetch('/reg/api/finance/' + kind + '/' + itemId, {method: 'DELETE'});
     if (resp.ok) {
-        window.location.href = '/reg/' + kind;
+        window.location.href = '{{ base }}';
     } else {
         showToast('Ошибка удаления');
     }

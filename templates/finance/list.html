@@ -38,12 +38,13 @@
         </thead>
         <tbody>
             {% for item in items %}
-            <tr style="cursor:pointer" onclick="location.href='/reg/{{ kind }}/{{ item.id }}'">
+{% set base = '/reg/nakladnye' if kind == 'invoices' else '/reg/fot' %}
+            <tr style="cursor:pointer" onclick="location.href='{{ base }}/{{ item.id }}'">
                 <td><strong>{{ item.id }}</strong></td>
                 <td>{{ item.name }}</td>
                 <td>{{ item.cost|money }}</td>
                 <td>{{ item.date_modified.strftime('%d.%m.%Y %H:%M') if item.date_modified else '' }}</td>
-                <td>{{ item.changed_by_id or '' }}</td>
+                <td>{{ item.changed_by_name or item.changed_by_id or '' }}</td>
                 <td style="text-align:center;width:40px">
                     <button class="btn btn-danger btn-sm btn-icon" title="Удалить" onclick="event.stopPropagation(); deleteItem({{ item.id }}, this)">&#10005;</button>
                 </td>
@@ -54,9 +55,10 @@
     </table>
 </div>
 {% if pages > 1 %}
+{% set base = '/reg/nakladnye' if kind == 'invoices' else '/reg/fot' %}
 <div class="pagination">
     {% for p in range(1, pages + 1) %}
-    <a href="/reg/{{ kind }}?page={{ p }}" class="{{ 'active' if p == page else '' }}">{{ p }}</a>
+    <a href="{{ base }}?page={{ p }}" class="{{ 'active' if p == page else '' }}">{{ p }}</a>
     {% endfor %}
 </div>
 {% endif %}
