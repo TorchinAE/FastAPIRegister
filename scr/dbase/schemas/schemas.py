@@ -724,6 +724,121 @@ class PayrollItemResponseSchema(BaseModel):
     changed_by_name: str | None = None
 
 
+# --- ModuleType (Тип модуля) ---
+
+
+class ModuleTypeCreateSchema(BaseModel):
+    model_config = ConfigDict(from_attributes=True)
+
+    name: str
+    slug: str
+    default_fot: float = Field(0, ge=0)
+    default_overhead: float = Field(0, ge=0)
+
+
+class ModuleTypeUpdateSchema(BaseModel):
+    model_config = ConfigDict(from_attributes=True)
+
+    id: int
+    name: str | None = None
+    slug: str | None = None
+    default_fot: float | None = Field(None, ge=0)
+    default_overhead: float | None = Field(None, ge=0)
+
+
+class ModuleTypeResponseSchema(BaseModel):
+    model_config = ConfigDict(from_attributes=True)
+
+    id: int
+    name: str
+    slug: str
+    default_fot: float = 0
+    default_overhead: float = 0
+    created_by: str | None = None
+
+
+# --- ModuleTypeDefault ---
+
+
+class ModuleTypeDefaultCreateSchema(BaseModel):
+    model_config = ConfigDict(from_attributes=True)
+
+    module_type_id: int
+    module_id: int
+    quantity: int = Field(1, ge=1)
+
+
+class ModuleTypeDefaultResponseSchema(BaseModel):
+    model_config = ConfigDict(from_attributes=True)
+
+    id: int
+    module_type_id: int
+    module_id: int
+    quantity: int = 1
+    module_name: str | None = None
+    module_price: float = 0
+
+
+# --- RequestCalc ---
+
+
+class RequestCalcCreateSchema(BaseModel):
+    model_config = ConfigDict(from_attributes=True)
+
+    request_id: int
+    module_type_id: int
+
+
+class RequestCalcUpdateSchema(BaseModel):
+    model_config = ConfigDict(from_attributes=True)
+
+    id: int
+    fot: float | None = Field(None, ge=0)
+    overhead: float | None = Field(None, ge=0)
+    profitability_percent: float | None = Field(None, ge=0, le=100)
+    total_cost: float | None = Field(None, ge=0)
+    final_price: float | None = Field(None, ge=0)
+
+
+class RequestCalcItemCreateSchema(BaseModel):
+    model_config = ConfigDict(from_attributes=True)
+
+    calc_id: int
+    module_id: int
+    quantity: int = Field(1, ge=1)
+
+
+class RequestCalcItemUpdateSchema(BaseModel):
+    model_config = ConfigDict(from_attributes=True)
+
+    id: int
+    quantity: int = Field(1, ge=1)
+
+
+class RequestCalcItemResponseSchema(BaseModel):
+    model_config = ConfigDict(from_attributes=True)
+
+    id: int
+    calc_id: int
+    module_id: int
+    quantity: int = 1
+    module_name: str | None = None
+    module_price: float = 0
+
+
+class RequestCalcResponseSchema(BaseModel):
+    model_config = ConfigDict(from_attributes=True)
+
+    id: int
+    request_id: int
+    module_type_id: int
+    fot: float = 0
+    overhead: float = 0
+    profitability_percent: float = 0
+    total_cost: float = 0
+    final_price: float = 0
+
+
 # --- Pagination ---
 
 

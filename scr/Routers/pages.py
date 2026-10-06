@@ -10,6 +10,7 @@ from scr.dbase import (
     crud_invoices,
     crud_material_types,
     crud_materials,
+    crud_module_types,
     crud_modules,
     crud_organizations,
     crud_payments,
@@ -1108,10 +1109,18 @@ async def request_calc_delivery_page(
     )
 
 
-SERVICE_SECTIONS = {
-    "chief-engineer": ("Шеф-инженер", "chief_engineer_cost"),
-    "smr": ("СМР", "smr_cost"),
-    "pnr": ("ПНР", "pnr_cost"),
+SECTION_COST_FIELDS = {
+    "corpusa": "corpusa_cost",
+    "kso": "kso_cost",
+    "kru": "kru_cost",
+    "sho": "sho_cost",
+    "ktp": "ktp_cost",
+    "pku": "pku_cost",
+    "pus": "pus_cost",
+    "delivery": "delivery_cost",
+    "chief-engineer": "chief_engineer_cost",
+    "smr": "smr_cost",
+    "pnr": "pnr_cost",
 }
 
 
@@ -1122,78 +1131,132 @@ async def request_calc_page_by_section(
     request: Request,
     session: AsyncSession = Depends(db_helper.session_dependency),
 ):
-    if section in ("tkp", "delivery"):
-        return RedirectResponse(f"/reg/requests/{req_id}/calc/{section}", status_code=302)
-    if section not in SERVICE_SECTIONS:
-        return await request_calc_stub_page(req_id, section, request, session)
+    if section == "tkp":
+        return RedirectResponse(f"/reg/requests/{req_id}/calc/tkp", status_code=302)
+    if section == "delivery":
+        return RedirectResponse(f"/reg/requests/{req_id}/calc/delivery", status_code=302)
     user = await get_current_user(request, session)
     if not user:
         return RedirectResponse("/reg/", status_code=302)
     req = await crud_requests.get_request_by_id(session, req_id)
     if not req:
         return HTMLResponse("ТКП не найдена", status_code=404)
-    from scr.dbase import crud_service_calcs
-
-    label, cost_field = SERVICE_SECTIONS[section]
-    calc = await crud_service_calcs.get_or_create_service_calc(session, req_id, section)
+    mt = await crud_module_types.get_module_type_by_slug(session, section)
+    if not mt:
+        return HTMLResponse("Раздел не найден", status_code=404)
+    calc = await crud_module_types.get_or_create_calc(session, req_id, mt.id)
     await session.commit()
-    # Use company profitability as default
+    modules_list, _ = await crud_modules.get_modules(session, per_page=10000)
     profitability = float(req.company.profitability) if req.company and req.company.profitability else 15.0
     if calc.profitability_percent and float(calc.profitability_percent) > 0:
         profitability = float(calc.profitability_percent)
+    cost_field = SECTION_COST_FIELDS.get(section, "cost")
     return templates.TemplateResponse(
-        "requests/calc_service.html",
+        "requests/calc_module.html",
         {
             "request": request,
             "user": user,
             "req": req,
+            "mt": mt,
             "calc": calc,
-            "section": section,
-            "section_label": label,
-            "cost_field": cost_field,
+            "modules": modules_list,
             "profitability": profitability,
+            "cost_field": cost_field,
             "active_page": "requests",
         },
     )
 
 
-STUB_SECTIONS = {
-    "corpusa": "\u041a\u043e\u0440\u043f\u0443\u0441\u0430",
-    "kso": "\u041a\u0421\u041e",
-    "kru": "\u041a\u0420\u0423",
-    "sho": "\u0429\u041e",
-    "ktp": "\u041a\u0422\u041f",
-    "pku": "\u041f\u041a\u0423",
-    "pus": "\u041f\u0423\u0421",
-}
-
-
-async def request_calc_stub_page(
-    req_id: int,
-    section: str,
+# --- Module Types Calc ---
+@pages_router.get("/module-types-calc", response_class=HTMLResponse)
+async def module_types_calc_page(
     request: Request,
-    session: AsyncSession,
+    session: AsyncSession = Depends(db_helper.session_dependency),
 ):
     user = await get_current_user(request, session)
     if not user:
         return RedirectResponse("/reg/", status_code=302)
-    req = await crud_requests.get_request_by_id(session, req_id)
-    if not req:
-        return HTMLResponse(
-            "\u0422\u041a\u041f \u043d\u0435 \u043d\u0430\u0439\u0434\u0435\u043d\u0430", status_code=404
-        )
-    section_name = STUB_SECTIONS.get(section, section)
+    items = await crud_module_types.get_module_types(session)
     return templates.TemplateResponse(
-        "requests/calc_stub.html",
+        "module_types_calc/list.html",
         {
             "request": request,
             "user": user,
-            "req": req,
-            "section": section,
-            "section_name": section_name,
-            "active_page": "requests",
+            "items": items,
+            "total": len(items),
+            "active_page": "module_types_calc",
         },
     )
+
+
+@pages_router.post("/module-types-calc", response_class=HTMLResponse)
+async def module_types_calc_create(
+    request: Request,
+    session: AsyncSession = Depends(db_helper.session_dependency),
+):
+    user = await get_current_user(request, session)
+    if not user:
+        return RedirectResponse("/reg/", status_code=302)
+    form = await request.form()
+    name = form.get("name", "").strip()
+    slug = form.get("slug", "").strip()
+    if name and slug:
+        from scr.dbase.schemas.schemas import ModuleTypeCreateSchema
+
+        await crud_module_types.add_module_type(
+            session, ModuleTypeCreateSchema(name=name, slug=slug), created_by=user.name
+        )
+        await session.commit()
+    return RedirectResponse("/reg/module-types-calc", status_code=302)
+
+
+@pages_router.get("/module-types-calc/{type_id}/defaults", response_class=HTMLResponse)
+async def module_types_defaults_page(
+    type_id: int,
+    request: Request,
+    session: AsyncSession = Depends(db_helper.session_dependency),
+):
+    user = await get_current_user(request, session)
+    if not user:
+        return RedirectResponse("/reg/", status_code=302)
+    mt = await crud_module_types.get_module_type_by_id(session, type_id)
+    if not mt:
+        return HTMLResponse("Тип модуля не найден", status_code=404)
+    defaults = await crud_module_types.get_defaults(session, type_id)
+    modules_list, _ = await crud_modules.get_modules(session, per_page=10000)
+    return templates.TemplateResponse(
+        "module_types_calc/defaults.html",
+        {
+            "request": request,
+            "user": user,
+            "mt": mt,
+            "defaults": defaults,
+            "modules": modules_list,
+            "active_page": "module_types_calc",
+        },
+    )
+
+
+@pages_router.post("/module-types-calc/{type_id}/defaults", response_class=HTMLResponse)
+async def module_types_defaults_save(
+    type_id: int,
+    request: Request,
+    session: AsyncSession = Depends(db_helper.session_dependency),
+):
+    user = await get_current_user(request, session)
+    if not user:
+        return RedirectResponse("/reg/", status_code=302)
+    form = await request.form()
+    mt = await crud_module_types.get_module_type_by_id(session, type_id)
+    if not mt:
+        return HTMLResponse("Тип модуля не найден", status_code=404)
+    if "fot" in form:
+        mt.default_fot = float(form["fot"])
+    if "overhead" in form:
+        mt.default_overhead = float(form["overhead"])
+    await session.flush()
+    await session.commit()
+    return RedirectResponse(f"/reg/module-types-calc/{type_id}/defaults", status_code=302)
 
 
 # --- Materials ---

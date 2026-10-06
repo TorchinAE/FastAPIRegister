@@ -425,3 +425,64 @@ class PayrollItem(Base):
     cost: Mapped[float] = mapped_column(Numeric(12, 2), default=0, nullable=False)
     date_modified: Mapped[datetime | None] = mapped_column(DateTime, nullable=True)
     changed_by_id: Mapped[int | None] = mapped_column(ForeignKey("users.id"), nullable=True)
+
+
+class ModuleType(BaseID):
+    __tablename__ = "module_types_calc"
+    name: Mapped[str] = mapped_column(String(100), unique=True, nullable=False)
+    slug: Mapped[str] = mapped_column(String(50), unique=True, nullable=False)
+    default_fot: Mapped[float] = mapped_column(Numeric(12, 2), default=0)
+    default_overhead: Mapped[float] = mapped_column(Numeric(12, 2), default=0)
+
+    defaults: Mapped[list["ModuleTypeDefault"]] = relationship(
+        back_populates="module_type", cascade="all, delete-orphan"
+    )
+
+
+class ModuleTypeDefault(Base):
+    __tablename__ = "module_type_defaults"
+    __table_args__ = (
+        UniqueConstraint("module_type_id", "module_id", name="uq_modtype_default_module"),
+    )
+
+    id: Mapped[int] = mapped_column(primary_key=True)
+    module_type_id: Mapped[int] = mapped_column(
+        ForeignKey("module_types_calc.id", ondelete="CASCADE"), nullable=False
+    )
+    module_id: Mapped[int] = mapped_column(ForeignKey("modules.id", ondelete="CASCADE"), nullable=False)
+    quantity: Mapped[int] = mapped_column(Integer, default=1, nullable=False)
+
+    module_type: Mapped["ModuleType"] = relationship(back_populates="defaults")
+    module: Mapped["Module"] = relationship(foreign_keys=[module_id])
+
+
+class RequestCalc(BaseID):
+    __tablename__ = "request_calcs"
+    request_id: Mapped[int] = mapped_column(ForeignKey("requests.id", ondelete="CASCADE"), nullable=False)
+    module_type_id: Mapped[int] = mapped_column(ForeignKey("module_types_calc.id"), nullable=False)
+    fot: Mapped[float] = mapped_column(Numeric(12, 2), default=0)
+    overhead: Mapped[float] = mapped_column(Numeric(12, 2), default=0)
+    profitability_percent: Mapped[float] = mapped_column(Numeric(5, 2), default=0)
+    total_cost: Mapped[float] = mapped_column(Numeric(12, 2), default=0)
+    final_price: Mapped[float] = mapped_column(Numeric(12, 2), default=0)
+
+    request: Mapped["Request"] = relationship(foreign_keys=[request_id])
+    module_type: Mapped["ModuleType"] = relationship(foreign_keys=[module_type_id])
+    items: Mapped[list["RequestCalcItem"]] = relationship(
+        back_populates="calc", cascade="all, delete-orphan"
+    )
+
+
+class RequestCalcItem(Base):
+    __tablename__ = "request_calc_items"
+    __table_args__ = (
+        UniqueConstraint("calc_id", "module_id", name="uq_calc_item_module"),
+    )
+
+    id: Mapped[int] = mapped_column(primary_key=True)
+    calc_id: Mapped[int] = mapped_column(ForeignKey("request_calcs.id", ondelete="CASCADE"), nullable=False)
+    module_id: Mapped[int] = mapped_column(ForeignKey("modules.id"), nullable=False)
+    quantity: Mapped[int] = mapped_column(Integer, default=1, nullable=False)
+
+    calc: Mapped["RequestCalc"] = relationship(back_populates="items")
+    module: Mapped["Module"] = relationship(foreign_keys=[module_id])

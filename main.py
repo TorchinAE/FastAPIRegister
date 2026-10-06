@@ -20,6 +20,7 @@ from scr.Routers.finance import fin_router
 from scr.Routers.invoices import inv_router
 from scr.Routers.material_types import mt_router
 from scr.Routers.materials import mat_router
+from scr.Routers.module_types import mt_calc_router
 from scr.Routers.modules import mod_router
 from scr.Routers.pages import pages_router
 from scr.Routers.payments import pay_router
@@ -65,6 +66,31 @@ async def lifespan(_: FastAPI):
             if not existing:
                 session.add(Setting(key=key, value=value))
         await session.commit()
+    # Seed default module types
+    from sqlalchemy import func, select as sa_select
+
+    from scr.dbase.models import ModuleType
+
+    DEFAULT_MODULE_TYPES = [
+        ("Корпуса", "corpusa"),
+        ("КСО", "kso"),
+        ("КРУ", "kru"),
+        ("ЩО", "sho"),
+        ("КТП", "ktp"),
+        ("ПКУ", "pku"),
+        ("ПУС", "pus"),
+        ("Доставка", "delivery"),
+        ("Шеф-инженер", "chief-engineer"),
+        ("СМР", "smr"),
+        ("ПНР", "pnr"),
+    ]
+    async with db_helper.session_factory() as session:
+        result = await session.execute(sa_select(func.count(ModuleType.id)))
+        count = result.scalar() or 0
+        if count == 0:
+            for name, slug in DEFAULT_MODULE_TYPES:
+                session.add(ModuleType(name=name, slug=slug))
+            await session.commit()
     yield
 
 
@@ -116,6 +142,7 @@ app.include_router(settings_router, prefix="/reg")
 app.include_router(users_router, prefix="/reg")
 app.include_router(mat_router, prefix="/reg")
 app.include_router(mt_router, prefix="/reg")
+app.include_router(mt_calc_router, prefix="/reg")
 app.include_router(mod_router, prefix="/reg")
 app.include_router(del_router, prefix="/reg")
 app.include_router(cs_router, prefix="/reg")
