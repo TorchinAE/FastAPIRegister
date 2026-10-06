@@ -68,6 +68,7 @@ async def lifespan(_: FastAPI):
         ("adres_server", ""),
         ("tkp_template_folder", ""),
         ("materials_per_page", "30"),
+        ("nds_percent", "20"),
     ]
     async with db_helper.session_factory() as session:
         for key, value in DEFAULT_SETTINGS:

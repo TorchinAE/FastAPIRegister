@@ -1025,33 +1025,7 @@ async def request_calc_tkp_page(
         return RedirectResponse("/reg/", status_code=302)
     req = await crud_requests.get_request_by_id(session, req_id)
     if not req:
-        return HTMLResponse(
-            "\u0422\u041a\u041f \u043d\u0435 \u043d\u0430\u0439\u0434\u0435\u043d\u0430", status_code=404
-        )
-    materials, _ = await crud_materials.get_materials(session, per_page=1000)
-    modules_list, _ = await crud_modules.get_modules(session, per_page=1000)
-
-    import json
-
-    def _mod_items_json(mod):
-        items = []
-        for item in mod.items:
-            if item.material:
-                items.append(
-                    {
-                        "material": {"name": item.material.name, "price": float(item.material.price)},
-                        "quantity": item.quantity,
-                    }
-                )
-        return items
-
-    modules_json = json.dumps(
-        [{"id": m.id, "name": m.name, "total_price": m.total_price, "items": _mod_items_json(m)} for m in modules_list],
-        ensure_ascii=False,
-    )
-    materials_json = json.dumps(
-        [{"id": m.id, "name": m.name, "price": float(m.price)} for m in materials], ensure_ascii=False
-    )
+        return HTMLResponse("ТКП не найдена", status_code=404)
 
     # Load all RequestCalcs for summary
     from sqlalchemy import select as sa_select
@@ -1080,19 +1054,32 @@ async def request_calc_tkp_page(
         service_calcs[section] = sc
     await session.commit()
 
+    # Load НДС setting
+    nds_val = await crud_settings.get_setting(session, "nds_percent")
+    nds_percent = float(nds_val) if nds_val else 20.0
+
+    # Section quantities from request
+    section_quantities = {
+        "corpusa": 0,
+        "kso": 0,
+        "kru": 0,
+        "sho": 0,
+        "ktp": req.ktp if req else 0,
+        "pku": req.pku if req else 0,
+        "pus": req.pus if req else 0,
+    }
+
     return templates.TemplateResponse(
         "requests/calc_tkp.html",
         {
             "request": request,
             "user": user,
             "req": req,
-            "modules": modules_list,
-            "materials": materials,
-            "modules_json": modules_json,
-            "materials_json": materials_json,
             "all_calcs": all_calcs,
             "delivery": delivery,
             "service_calcs": service_calcs,
+            "nds_percent": nds_percent,
+            "section_quantities": section_quantities,
             "active_page": "requests",
         },
     )
