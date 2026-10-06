@@ -10,203 +10,94 @@
 </div>
 
 <div class="card">
-    <div style="display:flex;gap:2rem;align-items:flex-start;">
-        <!-- Left: section buttons -->
-        <div style="min-width:260px;display:flex;flex-direction:column;gap:0.5rem;">
-            <button class="btn btn-success" style="justify-content:flex-start;text-align:left;" onclick="openFolder()">Открыть папку</button>
-            <div style="height:0.5rem;"></div>
-            {% set sections = [
-                ('tkp', 'ТКП', 'tkp_calc_cost', req.tkp_calc_cost),
-                ('corpusa', 'Корпуса', 'corpusa_cost', req.corpusa_cost),
-                ('kso', 'КСО', 'kso_cost', req.kso_cost),
-                ('kru', 'КРУ', 'kru_cost', req.kru_cost),
-                ('sho', 'ЩО', 'sho_cost', req.sho_cost),
-                ('ktp', 'КТП', 'ktp_cost', req.ktp_cost),
-                ('pku', 'ПКУ', 'pku_cost', req.pku_cost),
-                ('pus', 'ПУС', 'pus_cost', req.pus_cost),
-                ('delivery', 'Доставка', 'delivery_cost', req.delivery_cost),
-                ('chief-engineer', 'Шеф-инженер', 'chief_engineer_cost', req.chief_engineer_cost),
-                ('smr', 'СМР', 'smr_cost', req.smr_cost),
-                ('pnr', 'ПНР', 'pnr_cost', req.pnr_cost),
-            ] %}
-            {% for key, label, field, cost in sections %}
-            <div style="display:flex;gap:0.35rem;align-items:stretch;">
-                <a href="/reg/requests/{{ req.id }}/calc/{{ key }}" class="btn btn-ghost calc-btn" style="flex:1;display:flex;justify-content:space-between;align-items:center;text-decoration:none;">
-                    <span>{{ label }}</span>
-                    <span class="calc-cost" id="cost-{{ field }}" data-raw="{{ cost or 0 }}">{{ "%.2f"|format(cost or 0) }}</span>
-                </a>
-                <button class="btn btn-danger btn-sm" style="padding:0 0.5rem;font-size:0.75rem;white-space:nowrap;" onclick="clearCost('{{ field }}')" title="Очистить стоимость">&#10005;</button>
-            </div>
-            {% endfor %}
-        </div>
-
-        <!-- Right: summary table -->
-        <div style="flex:1;overflow-x:auto;">
-            <h2 style="margin:0 0 0.75rem;">Сводная таблица расчётов</h2>
-            <table>
-                <thead>
-                    <tr>
-                        <th>Раздел</th>
-                        <th style="text-align:right;">Кол-во</th>
-                        <th style="text-align:right;">Комплектация</th>
-                        <th style="text-align:right;">ФОТ</th>
-                        <th style="text-align:right;">Накладные</th>
-                        <th style="text-align:right;">Себестоимость</th>
-                        <th style="text-align:right;">Рентаб.</th>
-                        <th style="text-align:right;">Итого</th>
-                        <th style="text-align:right;">Итого с НДС ({{ nds_percent }}%)</th>
-                    </tr>
-                </thead>
-                <tbody>
-                    {% for calc in all_calcs %}
-                    {% set modules_sum = [] %}
-                    {% for item in calc.items %}{% if item.module %}{% if modules_sum.append(item.module.total_price * item.quantity) %}{% endif %}{% endif %}{% endfor %}
-                    {% set comp = modules_sum|sum if modules_sum else 0 %}
-                    {% set qty = section_quantities.get(calc.module_type.slug, 0) %}
-                    <tr>
-                        <td><a href="/reg/requests/{{ req.id }}/calc/{{ calc.module_type.slug }}">{{ calc.module_type.name }}</a></td>
-                        <td style="text-align:right;">{{ qty }}</td>
-                        <td style="text-align:right;">{{ comp|money }}</td>
-                        <td style="text-align:right;">{{ calc.fot|money }}</td>
-                        <td style="text-align:right;">{{ calc.overhead|money }}</td>
-                        <td style="text-align:right;">{{ calc.total_cost|money }}</td>
-                        <td style="text-align:right;">{{ "%.2f"|format(calc.profitability_percent) }}%</td>
-                        <td style="text-align:right;font-weight:bold;">{{ calc.final_price|money }}</td>
-                        <td style="text-align:right;font-weight:bold;color:#16a34a;">{{ (calc.final_price * (1 + nds_percent / 100))|money }}</td>
-                    </tr>
-                    {% endfor %}
-                    {% if delivery and delivery.final_price %}
-                    <tr>
-                        <td><a href="/reg/requests/{{ req.id }}/calc/delivery">Доставка</a></td>
-                        <td style="text-align:right;">{{ delivery.trucks_count }}</td>
-                        <td style="text-align:right;">—</td>
-                        <td style="text-align:right;">—</td>
-                        <td style="text-align:right;">—</td>
-                        <td style="text-align:right;">{{ (delivery.cost_per_truck * delivery.trucks_count)|money }}</td>
-                        <td style="text-align:right;">{{ "%.2f"|format(delivery.profitability_percent) }}%</td>
-                        <td style="text-align:right;font-weight:bold;">{{ delivery.final_price|money }}</td>
-                        <td style="text-align:right;font-weight:bold;color:#16a34a;">{{ (delivery.final_price * (1 + nds_percent / 100))|money }}</td>
-                    </tr>
-                    {% endif %}
-                    {% for section, label in [('chief-engineer', 'Шеф-инженер'), ('smr', 'СМР'), ('pnr', 'ПНР')] %}
-                    {% set sc = service_calcs.get(section) %}
-                    {% if sc and sc.final_price %}
-                    <tr>
-                        <td><a href="/reg/requests/{{ req.id }}/calc/{{ section }}">{{ label }}</a></td>
-                        <td style="text-align:right;">{{ sc.quantity }}</td>
-                        <td style="text-align:right;">—</td>
-                        <td style="text-align:right;">—</td>
-                        <td style="text-align:right;">—</td>
-                        <td style="text-align:right;">{{ sc.base_cost|money }}</td>
-                        <td style="text-align:right;">{{ "%.2f"|format(sc.profitability_percent) }}%</td>
-                        <td style="text-align:right;font-weight:bold;">{{ sc.final_price|money }}</td>
-                        <td style="text-align:right;font-weight:bold;color:#16a34a;">{{ (sc.final_price * (1 + nds_percent / 100))|money }}</td>
-                    </tr>
-                    {% endif %}
-                    {% endfor %}
-                </tbody>
-                <tfoot>
-                    <tr style="font-weight:bold;background:#f0fdf4;">
-                        <td>ИТОГО</td>
-                        <td></td>
-                        <td style="text-align:right;" id="sumComp">0.00</td>
-                        <td style="text-align:right;" id="sumFot">0.00</td>
-                        <td style="text-align:right;" id="sumOverhead">0.00</td>
-                        <td style="text-align:right;" id="sumCost">0.00</td>
-                        <td></td>
-                        <td style="text-align:right;" id="sumFinal">0.00</td>
-                        <td style="text-align:right;color:#16a34a;" id="sumFinalNds">0.00</td>
-                    </tr>
-                </tfoot>
-            </table>
-        </div>
+    <h2 style="margin:0 0 0.75rem;">Сводная таблица расчётов</h2>
+    <div class="table-wrap">
+        <table>
+            <thead>
+                <tr>
+                    <th>Раздел</th>
+                    <th style="text-align:right;">Кол-во</th>
+                    <th style="text-align:right;">Комплектация</th>
+                    <th style="text-align:right;">ФОТ</th>
+                    <th style="text-align:right;">Накладные</th>
+                    <th style="text-align:right;">Себестоимость</th>
+                    <th style="text-align:right;">Рентаб.</th>
+                    <th style="text-align:right;">Итого</th>
+                    <th style="text-align:right;">Итого с НДС ({{ nds_percent }}%)</th>
+                </tr>
+            </thead>
+            <tbody>
+                {% for calc in all_calcs %}
+                {% set modules_sum = [] %}
+                {% for item in calc.items %}{% if item.module %}{% if modules_sum.append(item.module.total_price * item.quantity) %}{% endif %}{% endif %}{% endfor %}
+                {% set comp = modules_sum|sum if modules_sum else 0 %}
+                {% set qty = section_quantities.get(calc.module_type.slug, 0) %}
+                <tr>
+                    <td><a href="/reg/requests/{{ req.id }}/calc/{{ calc.module_type.slug }}">{{ calc.module_type.name }}</a></td>
+                    <td style="text-align:right;">{{ qty }}</td>
+                    <td style="text-align:right;">{{ comp|money }}</td>
+                    <td style="text-align:right;">{{ calc.fot|money }}</td>
+                    <td style="text-align:right;">{{ calc.overhead|money }}</td>
+                    <td style="text-align:right;">{{ calc.total_cost|money }}</td>
+                    <td style="text-align:right;">{{ "%.2f"|format(calc.profitability_percent) }}%</td>
+                    <td style="text-align:right;font-weight:bold;">{{ calc.final_price|money }}</td>
+                    <td style="text-align:right;font-weight:bold;color:#16a34a;">{{ (calc.final_price * (1 + nds_percent / 100))|money }}</td>
+                </tr>
+                {% endfor %}
+                {% if delivery and delivery.final_price and delivery.final_price > 0 %}
+                <tr>
+                    <td><a href="/reg/requests/{{ req.id }}/calc/delivery">Доставка</a></td>
+                    <td style="text-align:right;">{{ delivery.trucks_count or 0 }}</td>
+                    <td style="text-align:right;">—</td>
+                    <td style="text-align:right;">—</td>
+                    <td style="text-align:right;">—</td>
+                    <td style="text-align:right;">{{ ((delivery.cost_per_truck or 0) * (delivery.trucks_count or 0))|money }}</td>
+                    <td style="text-align:right;">{{ "%.2f"|format(delivery.profitability_percent or 0) }}%</td>
+                    <td style="text-align:right;font-weight:bold;">{{ delivery.final_price|money }}</td>
+                    <td style="text-align:right;font-weight:bold;color:#16a34a;">{{ (delivery.final_price * (1 + nds_percent / 100))|money }}</td>
+                </tr>
+                {% endif %}
+                {% for section, label in [('chief-engineer', 'Шеф-инженер'), ('smr', 'СМР'), ('pnr', 'ПНР')] %}
+                {% set sc = service_calcs.get(section) %}
+                {% if sc and sc.final_price and sc.final_price > 0 %}
+                <tr>
+                    <td><a href="/reg/requests/{{ req.id }}/calc/{{ section }}">{{ label }}</a></td>
+                    <td style="text-align:right;">{{ sc.quantity or 1 }}</td>
+                    <td style="text-align:right;">—</td>
+                    <td style="text-align:right;">—</td>
+                    <td style="text-align:right;">—</td>
+                    <td style="text-align:right;">{{ sc.base_cost|money }}</td>
+                    <td style="text-align:right;">{{ "%.2f"|format(sc.profitability_percent or 0) }}%</td>
+                    <td style="text-align:right;font-weight:bold;">{{ sc.final_price|money }}</td>
+                    <td style="text-align:right;font-weight:bold;color:#16a34a;">{{ (sc.final_price * (1 + nds_percent / 100))|money }}</td>
+                </tr>
+                {% endif %}
+                {% endfor %}
+            </tbody>
+            <tfoot>
+                <tr style="font-weight:bold;background:#f0fdf4;">
+                    <td>ИТОГО</td>
+                    <td></td>
+                    <td style="text-align:right;" id="sumComp">0.00</td>
+                    <td style="text-align:right;" id="sumFot">0.00</td>
+                    <td style="text-align:right;" id="sumOverhead">0.00</td>
+                    <td style="text-align:right;" id="sumCost">0.00</td>
+                    <td></td>
+                    <td style="text-align:right;" id="sumFinal">0.00</td>
+                    <td style="text-align:right;color:#16a34a;" id="sumFinalNds">0.00</td>
+                </tr>
+            </tfoot>
+        </table>
     </div>
 </div>
-
-{% if folder_path %}
-<div style="margin-top:1rem;font-size:0.8rem;color:var(--text-muted);">
-    Папка: {{ folder_path }}
-</div>
-{% endif %}
 
 <div id="toast" class="toast" style="display:none"></div>
 {% endblock %}
 
 {% block scripts %}
 <script>
-const reqId = {{ req.id }};
 const ndsPercent = {{ nds_percent }};
 
-// Format all cost values on page load
-document.querySelectorAll('.calc-cost').forEach(el => {
-    const raw = parseFloat(el.dataset.raw) || 0;
-    el.textContent = formatFinancial(raw);
-});
-
-function openFolder() {
-    const path = '{{ folder_path | e }}';
-    if (path) {
-        navigator.clipboard.writeText(path).then(() => showToast('Путь скопирован: ' + path)).catch(() => showToast('Путь: ' + path));
-    } else {
-        showToast('Папка не создана');
-    }
-}
-
-async function clearCost(field) {
-    const data = {id: reqId};
-    data[field] = 0;
-    const resp = await fetch('/reg/api/requests/' + reqId, {
-        method: 'PUT',
-        headers: {'Content-Type': 'application/json'},
-        body: JSON.stringify(data),
-    });
-    if (resp.ok) {
-        const el = document.getElementById('cost-' + field);
-        el.dataset.raw = '0';
-        el.textContent = formatFinancial(0);
-        if (field === 'delivery_cost') { await clearDeliveryData(); }
-        else if (['chief_engineer_cost', 'smr_cost', 'pnr_cost'].includes(field)) { await clearServiceData(field); }
-        showToast('Стоимость очищена');
-    } else {
-        showToast('Ошибка');
-    }
-}
-
-async function clearDeliveryData() {
-    try {
-        const resp = await fetch('/reg/api/deliveries/by-request/' + reqId);
-        if (resp.ok) {
-            const delivery = await resp.json();
-            if (delivery && delivery.id) {
-                await fetch('/reg/api/deliveries/' + delivery.id, { method: 'PUT', headers: {'Content-Type': 'application/json'}, body: JSON.stringify({ id: delivery.id, address: null, cost_per_truck: 0, trucks_count: 1, profitability_percent: 0, final_price: 0 }) });
-            }
-        }
-    } catch(e) {}
-}
-
-async function clearServiceData(costField) {
-    const sectionMap = { 'chief_engineer_cost': 'chief-engineer', 'smr_cost': 'smr', 'pnr_cost': 'pnr' };
-    const section = sectionMap[costField];
-    if (!section) return;
-    try {
-        const resp = await fetch('/reg/api/service-calcs/by-request/' + reqId + '?section=' + section);
-        if (resp.ok) {
-            const calc = await resp.json();
-            if (calc && calc.id) {
-                await fetch('/reg/api/service-calcs/' + calc.id, { method: 'PUT', headers: {'Content-Type': 'application/json'}, body: JSON.stringify({ id: calc.id, description: null, base_cost: 0, quantity: 1, profitability_percent: 0, final_price: 0 }) });
-            }
-        }
-    } catch(e) {}
-}
-
-function showToast(msg) {
-    const t = document.getElementById('toast');
-    t.textContent = msg;
-    t.style.display = 'block';
-    setTimeout(() => t.style.display = 'none', 2500);
-}
-
-// Calculate summary totals
 (function() {
     let sumComp = 0, sumFot = 0, sumOverhead = 0, sumCost = 0, sumFinal = 0;
     document.querySelectorAll('table tbody tr').forEach(tr => {
