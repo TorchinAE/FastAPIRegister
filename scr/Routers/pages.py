@@ -34,6 +34,7 @@ def _money(value):
 
 
 templates.env.filters["money"] = _money
+templates.env.globals["float"] = float
 
 pages_router = APIRouter(tags=["Pages"])
 
