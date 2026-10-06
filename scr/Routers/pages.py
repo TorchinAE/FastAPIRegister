@@ -1254,14 +1254,14 @@ async def module_types_defaults_save(
     user = await get_current_user(request, session)
     if not user:
         return RedirectResponse("/reg/", status_code=302)
+    form = await request.form()
     mt = await crud_module_types.get_module_type_by_id(session, type_id)
     if not mt:
         return HTMLResponse("Тип модуля не найден", status_code=404)
-    # Auto-find or create ФОТ_{type_name} and Накладные_{type_name}
-    fot_item = await crud_module_types.get_or_create_fot_item(session, mt.name)
-    overhead_item = await crud_module_types.get_or_create_overhead_item(session, mt.name)
-    mt.fot_item_id = fot_item.id
-    mt.overhead_item_id = overhead_item.id
+    fot_val = form.get("fot_item_id", "")
+    mt.fot_item_id = int(fot_val) if fot_val else None
+    overhead_val = form.get("overhead_item_id", "")
+    mt.overhead_item_id = int(overhead_val) if overhead_val else None
     await session.flush()
     await session.commit()
     return RedirectResponse(f"/reg/module-types-calc/{type_id}/defaults", status_code=302)

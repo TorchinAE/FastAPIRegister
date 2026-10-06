@@ -54,32 +54,33 @@
 
 <div class="card" style="margin-top:1rem;">
     <h3 style="margin-bottom:0.75rem;">ФОТ и Накладные</h3>
-    <div style="display:flex;gap:2rem;flex-wrap:wrap;margin-bottom:1rem;">
-        <div>
-            <strong>ФОТ:</strong>
-            {% if mt.fot_item %}
-                {{ mt.fot_item.name }} — {{ mt.fot_item.cost|money }}
-            {% else %}
-                <span style="color:var(--text-muted);">Не привязано</span>
-            {% endif %}
+    <form method="post" action="/reg/module-types-calc/{{ mt.id }}/defaults" style="display:flex;gap:1rem;align-items:flex-end;flex-wrap:wrap;">
+        <div class="form-group" style="flex:1;min-width:250px;margin-bottom:0;">
+            <label>ФОТ</label>
+            <select name="fot_item_id" style="width:100%;">
+                <option value="">-- Не выбрано --</option>
+                {% for pi in payroll_items %}
+                <option value="{{ pi.id }}" {{ 'selected' if mt.fot_item_id == pi.id else '' }}>
+                    {{ pi.name }} — {{ pi.cost|money }}
+                </option>
+                {% endfor %}
+            </select>
         </div>
-        <div>
-            <strong>Накладные:</strong>
-            {% if mt.overhead_item %}
-                {{ mt.overhead_item.name }} — {{ mt.overhead_item.cost|money }}
-            {% else %}
-                <span style="color:var(--text-muted);">Не привязано</span>
-            {% endif %}
+        <div class="form-group" style="flex:1;min-width:250px;margin-bottom:0;">
+            <label>Накладные</label>
+            <select name="overhead_item_id" style="width:100%;">
+                <option value="">-- Не выбрано --</option>
+                {% for ii in invoice_items %}
+                <option value="{{ ii.id }}" {{ 'selected' if mt.overhead_item_id == ii.id else '' }}>
+                    {{ ii.name }} — {{ ii.cost|money }}
+                </option>
+                {% endfor %}
+            </select>
         </div>
-    </div>
-    <form method="post" action="/reg/module-types-calc/{{ mt.id }}/defaults">
-        <button type="submit" class="btn btn-primary">
-            {% if mt.fot_item and mt.overhead_item %}Обновить привязку{% else %}Привязать ФОТ и Накладные{% endif %}
-        </button>
+        <button type="submit" class="btn btn-primary" style="height:38px;">Сохранить</button>
     </form>
     <div style="margin-top:0.75rem;font-size:0.85rem;color:var(--text-muted);">
-        Создаётся запись «ФОТ_{{ mt.name }}» в разделе ФОТ и «Накладные_{{ mt.name }}» в разделе Накладные.
-        Стоимость редактируется в соответствующих разделах или прямо на странице расчёта.
+        Выберите запись из справочника ФОТ и Накладные. Значение подставится по умолчанию на страницу расчёта, где его можно будет изменить.
     </div>
 </div>
 
