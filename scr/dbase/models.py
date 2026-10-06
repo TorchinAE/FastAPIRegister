@@ -441,14 +441,10 @@ class ModuleType(BaseID):
 
 class ModuleTypeDefault(Base):
     __tablename__ = "module_type_defaults"
-    __table_args__ = (
-        UniqueConstraint("module_type_id", "module_id", name="uq_modtype_default_module"),
-    )
+    __table_args__ = (UniqueConstraint("module_type_id", "module_id", name="uq_modtype_default_module"),)
 
     id: Mapped[int] = mapped_column(primary_key=True)
-    module_type_id: Mapped[int] = mapped_column(
-        ForeignKey("module_types_calc.id", ondelete="CASCADE"), nullable=False
-    )
+    module_type_id: Mapped[int] = mapped_column(ForeignKey("module_types_calc.id", ondelete="CASCADE"), nullable=False)
     module_id: Mapped[int] = mapped_column(ForeignKey("modules.id", ondelete="CASCADE"), nullable=False)
     quantity: Mapped[int] = mapped_column(Integer, default=1, nullable=False)
 
@@ -468,16 +464,12 @@ class RequestCalc(BaseID):
 
     request: Mapped["Request"] = relationship(foreign_keys=[request_id])
     module_type: Mapped["ModuleType"] = relationship(foreign_keys=[module_type_id])
-    items: Mapped[list["RequestCalcItem"]] = relationship(
-        back_populates="calc", cascade="all, delete-orphan"
-    )
+    items: Mapped[list["RequestCalcItem"]] = relationship(back_populates="calc", cascade="all, delete-orphan")
 
 
 class RequestCalcItem(Base):
     __tablename__ = "request_calc_items"
-    __table_args__ = (
-        UniqueConstraint("calc_id", "module_id", name="uq_calc_item_module"),
-    )
+    __table_args__ = (UniqueConstraint("calc_id", "module_id", name="uq_calc_item_module"),)
 
     id: Mapped[int] = mapped_column(primary_key=True)
     calc_id: Mapped[int] = mapped_column(ForeignKey("request_calcs.id", ondelete="CASCADE"), nullable=False)

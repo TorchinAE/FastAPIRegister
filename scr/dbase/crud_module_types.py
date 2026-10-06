@@ -11,7 +11,6 @@ from scr.dbase.schemas.schemas import (
     RequestCalcUpdateSchema,
 )
 
-
 # ── ModuleType ──
 
 
