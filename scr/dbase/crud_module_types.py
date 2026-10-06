@@ -35,7 +35,11 @@ async def get_module_type_by_id(session: AsyncSession, type_id: int) -> ModuleTy
 
 
 async def get_module_type_by_slug(session: AsyncSession, slug: str) -> ModuleType | None:
-    stmt = select(ModuleType).where(ModuleType.slug == slug)
+    stmt = (
+        select(ModuleType)
+        .where(ModuleType.slug == slug)
+        .options(selectinload(ModuleType.fot_item), selectinload(ModuleType.overhead_item))
+    )
     result = await session.execute(stmt)
     return result.scalar_one_or_none()
 

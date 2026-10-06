@@ -36,6 +36,15 @@ from scr.Routers.users import users_router
 async def lifespan(_: FastAPI):
     async with db_helper.engine.begin() as conn:
         await conn.run_sync(Base.metadata.create_all)
+    # Migrate: add new columns to module_types_calc if missing
+    from sqlalchemy import text
+
+    async with db_helper.engine.begin() as conn:
+        for col in ("fot_item_id", "overhead_item_id"):
+            try:
+                await conn.execute(text(f"ALTER TABLE module_types_calc ADD COLUMN {col} INTEGER"))
+            except Exception:  # noqa: BLE001, S110
+                pass  # column already exists
     # Seed default probabilities
     from sqlalchemy import select
 
