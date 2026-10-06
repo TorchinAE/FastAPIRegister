@@ -40,8 +40,8 @@
                 <td>{{ item.id }}</td>
                 <td><a href="/reg/module-types-calc/{{ item.id }}/defaults">{{ item.name }}</a></td>
                 <td><code>{{ item.slug }}</code></td>
-                <td>{{ item.default_fot|money }}</td>
-                <td>{{ item.default_overhead|money }}</td>
+                <td>{{ (item.fot_item.cost if item.fot_item else 0)|money }}</td>
+                <td>{{ (item.overhead_item.cost if item.overhead_item else 0)|money }}</td>
                 <td>
                     <button class="btn btn-danger btn-sm" onclick="deleteType({{ item.id }}, this)">Удалить</button>
                 </td>
