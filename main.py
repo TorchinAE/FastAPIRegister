@@ -67,7 +67,8 @@ async def lifespan(_: FastAPI):
                 session.add(Setting(key=key, value=value))
         await session.commit()
     # Seed default module types
-    from sqlalchemy import func, select as sa_select
+    from sqlalchemy import func
+    from sqlalchemy import select as sa_select
 
     from scr.dbase.models import ModuleType
 
