@@ -732,8 +732,8 @@ class ModuleTypeCreateSchema(BaseModel):
 
     name: str
     slug: str
-    default_fot: float = Field(0, ge=0)
-    default_overhead: float = Field(0, ge=0)
+    fot_item_id: int | None = None
+    overhead_item_id: int | None = None
 
 
 class ModuleTypeUpdateSchema(BaseModel):
@@ -742,8 +742,8 @@ class ModuleTypeUpdateSchema(BaseModel):
     id: int
     name: str | None = None
     slug: str | None = None
-    default_fot: float | None = Field(None, ge=0)
-    default_overhead: float | None = Field(None, ge=0)
+    fot_item_id: int | None = None
+    overhead_item_id: int | None = None
 
 
 class ModuleTypeResponseSchema(BaseModel):
@@ -752,8 +752,12 @@ class ModuleTypeResponseSchema(BaseModel):
     id: int
     name: str
     slug: str
-    default_fot: float = 0
-    default_overhead: float = 0
+    fot_item_id: int | None = None
+    overhead_item_id: int | None = None
+    fot_item_name: str | None = None
+    fot_item_cost: float = 0
+    overhead_item_name: str | None = None
+    overhead_item_cost: float = 0
     created_by: str | None = None
 
 

@@ -431,12 +431,14 @@ class ModuleType(BaseID):
     __tablename__ = "module_types_calc"
     name: Mapped[str] = mapped_column(String(100), unique=True, nullable=False)
     slug: Mapped[str] = mapped_column(String(50), unique=True, nullable=False)
-    default_fot: Mapped[float] = mapped_column(Numeric(12, 2), default=0)
-    default_overhead: Mapped[float] = mapped_column(Numeric(12, 2), default=0)
+    fot_item_id: Mapped[int | None] = mapped_column(ForeignKey("payroll_items.id"), nullable=True)
+    overhead_item_id: Mapped[int | None] = mapped_column(ForeignKey("invoice_items_ext.id"), nullable=True)
 
     defaults: Mapped[list["ModuleTypeDefault"]] = relationship(
         back_populates="module_type", cascade="all, delete-orphan"
     )
+    fot_item: Mapped[Optional["PayrollItem"]] = relationship(foreign_keys=[fot_item_id])
+    overhead_item: Mapped[Optional["InvoiceItem"]] = relationship(foreign_keys=[overhead_item_id])
 
 
 class ModuleTypeDefault(Base):

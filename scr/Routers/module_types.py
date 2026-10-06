@@ -24,7 +24,22 @@ mt_calc_router = APIRouter(tags=["ModuleTypes"])
 
 @mt_calc_router.get("/api/module-types/", response_model=list[ModuleTypeResponseSchema])
 async def list_module_types(session: AsyncSession = Depends(db_helper.session_dependency)):
-    return await crud_module_types.get_module_types(session)
+    types = await crud_module_types.get_module_types(session)
+    return [
+        ModuleTypeResponseSchema(
+            id=t.id,
+            name=t.name,
+            slug=t.slug,
+            fot_item_id=t.fot_item_id,
+            overhead_item_id=t.overhead_item_id,
+            fot_item_name=t.fot_item.name if t.fot_item else None,
+            fot_item_cost=float(t.fot_item.cost) if t.fot_item else 0,
+            overhead_item_name=t.overhead_item.name if t.overhead_item else None,
+            overhead_item_cost=float(t.overhead_item.cost) if t.overhead_item else 0,
+            created_by=t.created_by,
+        )
+        for t in types
+    ]
 
 
 @mt_calc_router.post("/api/module-types/", response_model=ModuleTypeResponseSchema)
@@ -47,6 +62,36 @@ async def delete_module_type(
         raise HTTPException(status_code=404, detail="Тип модуля не найден")
     await session.commit()
     return {"ok": True}
+
+
+@mt_calc_router.put("/api/module-types/{type_id}", response_model=ModuleTypeResponseSchema)
+async def update_module_type(
+    type_id: int,
+    data: dict,
+    session: AsyncSession = Depends(db_helper.session_dependency),
+):
+    mt = await crud_module_types.get_module_type_by_id(session, type_id)
+    if not mt:
+        raise HTTPException(status_code=404, detail="Тип модуля не найден")
+    if "fot_item_id" in data:
+        mt.fot_item_id = int(data["fot_item_id"]) if data["fot_item_id"] else None
+    if "overhead_item_id" in data:
+        mt.overhead_item_id = int(data["overhead_item_id"]) if data["overhead_item_id"] else None
+    await session.flush()
+    await session.commit()
+    mt = await crud_module_types.get_module_type_by_id(session, type_id)
+    return ModuleTypeResponseSchema(
+        id=mt.id,
+        name=mt.name,
+        slug=mt.slug,
+        fot_item_id=mt.fot_item_id,
+        overhead_item_id=mt.overhead_item_id,
+        fot_item_name=mt.fot_item.name if mt.fot_item else None,
+        fot_item_cost=float(mt.fot_item.cost) if mt.fot_item else 0,
+        overhead_item_name=mt.overhead_item.name if mt.overhead_item else None,
+        overhead_item_cost=float(mt.overhead_item.cost) if mt.overhead_item else 0,
+        created_by=mt.created_by,
+    )
 
 
 # ── Module Type Defaults ──
@@ -117,6 +162,42 @@ async def delete_default(
 
 
 # ── RequestCalcs ──
+
+
+@mt_calc_router.put("/api/module-types/{type_id}/fot-cost")
+async def update_fot_cost(
+    type_id: int,
+    data: dict,
+    session: AsyncSession = Depends(db_helper.session_dependency),
+):
+    mt = await crud_module_types.get_module_type_by_id(session, type_id)
+    if not mt or not mt.fot_item:
+        raise HTTPException(status_code=404, detail="ФОТ не найден")
+    mt.fot_item.cost = float(data.get("cost", 0))
+    from datetime import UTC, datetime
+
+    mt.fot_item.date_modified = datetime.now(UTC)
+    await session.flush()
+    await session.commit()
+    return {"ok": True, "cost": float(mt.fot_item.cost)}
+
+
+@mt_calc_router.put("/api/module-types/{type_id}/overhead-cost")
+async def update_overhead_cost(
+    type_id: int,
+    data: dict,
+    session: AsyncSession = Depends(db_helper.session_dependency),
+):
+    mt = await crud_module_types.get_module_type_by_id(session, type_id)
+    if not mt or not mt.overhead_item:
+        raise HTTPException(status_code=404, detail="Накладные не найдены")
+    mt.overhead_item.cost = float(data.get("cost", 0))
+    from datetime import UTC, datetime
+
+    mt.overhead_item.date_modified = datetime.now(UTC)
+    await session.flush()
+    await session.commit()
+    return {"ok": True, "cost": float(mt.overhead_item.cost)}
 
 
 @mt_calc_router.get("/api/request-calcs/{calc_id}", response_model=RequestCalcResponseSchema)

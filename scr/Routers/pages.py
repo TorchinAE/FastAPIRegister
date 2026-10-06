@@ -1162,6 +1162,8 @@ async def request_calc_page_by_section(
             "modules": modules_list,
             "profitability": profitability,
             "cost_field": cost_field,
+            "fot_item": mt.fot_item,
+            "overhead_item": mt.overhead_item,
             "active_page": "requests",
         },
     )
@@ -1224,6 +1226,10 @@ async def module_types_defaults_page(
         return HTMLResponse("Тип модуля не найден", status_code=404)
     defaults = await crud_module_types.get_defaults(session, type_id)
     modules_list, _ = await crud_modules.get_modules(session, per_page=10000)
+    from scr.dbase import crud_finance
+
+    payroll_items = await crud_finance.get_all_payroll_items(session)
+    invoice_items = await crud_finance.get_all_invoice_items(session)
     return templates.TemplateResponse(
         "module_types_calc/defaults.html",
         {
@@ -1232,6 +1238,8 @@ async def module_types_defaults_page(
             "mt": mt,
             "defaults": defaults,
             "modules": modules_list,
+            "payroll_items": payroll_items,
+            "invoice_items": invoice_items,
             "active_page": "module_types_calc",
         },
     )
@@ -1246,14 +1254,14 @@ async def module_types_defaults_save(
     user = await get_current_user(request, session)
     if not user:
         return RedirectResponse("/reg/", status_code=302)
-    form = await request.form()
     mt = await crud_module_types.get_module_type_by_id(session, type_id)
     if not mt:
         return HTMLResponse("Тип модуля не найден", status_code=404)
-    if "fot" in form:
-        mt.default_fot = float(form["fot"])
-    if "overhead" in form:
-        mt.default_overhead = float(form["overhead"])
+    # Auto-find or create ФОТ_{type_name} and Накладные_{type_name}
+    fot_item = await crud_module_types.get_or_create_fot_item(session, mt.name)
+    overhead_item = await crud_module_types.get_or_create_overhead_item(session, mt.name)
+    mt.fot_item_id = fot_item.id
+    mt.overhead_item_id = overhead_item.id
     await session.flush()
     await session.commit()
     return RedirectResponse(f"/reg/module-types-calc/{type_id}/defaults", status_code=302)

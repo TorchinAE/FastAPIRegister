@@ -53,17 +53,34 @@
 </div>
 
 <div class="card" style="margin-top:1rem;">
-    <form id="defaultsSettings" style="display:flex;gap:1rem;align-items:flex-end;flex-wrap:wrap;">
-        <div class="form-group" style="width:200px;margin-bottom:0;">
-            <label>ФОТ по умолчанию (₽)</label>
-            <input type="number" id="defaultFot" value="{{ mt.default_fot }}" min="0" step="0.01" style="width:100%;">
+    <h3 style="margin-bottom:0.75rem;">ФОТ и Накладные</h3>
+    <div style="display:flex;gap:2rem;flex-wrap:wrap;margin-bottom:1rem;">
+        <div>
+            <strong>ФОТ:</strong>
+            {% if mt.fot_item %}
+                {{ mt.fot_item.name }} — {{ mt.fot_item.cost|money }}
+            {% else %}
+                <span style="color:var(--text-muted);">Не привязано</span>
+            {% endif %}
         </div>
-        <div class="form-group" style="width:200px;margin-bottom:0;">
-            <label>Накладные по умолчанию (₽)</label>
-            <input type="number" id="defaultOverhead" value="{{ mt.default_overhead }}" min="0" step="0.01" style="width:100%;">
+        <div>
+            <strong>Накладные:</strong>
+            {% if mt.overhead_item %}
+                {{ mt.overhead_item.name }} — {{ mt.overhead_item.cost|money }}
+            {% else %}
+                <span style="color:var(--text-muted);">Не привязано</span>
+            {% endif %}
         </div>
-        <button type="button" class="btn btn-primary" style="height:38px;" onclick="saveDefaults()">Сохранить настройки</button>
+    </div>
+    <form method="post" action="/reg/module-types-calc/{{ mt.id }}/defaults">
+        <button type="submit" class="btn btn-primary">
+            {% if mt.fot_item and mt.overhead_item %}Обновить привязку{% else %}Привязать ФОТ и Накладные{% endif %}
+        </button>
     </form>
+    <div style="margin-top:0.75rem;font-size:0.85rem;color:var(--text-muted);">
+        Создаётся запись «ФОТ_{{ mt.name }}» в разделе ФОТ и «Накладные_{{ mt.name }}» в разделе Накладные.
+        Стоимость редактируется в соответствующих разделах или прямо на странице расчёта.
+    </div>
 </div>
 
 <div id="toast" class="toast" style="display:none"></div>
@@ -104,21 +121,6 @@ async function updateQty(id, qty) {
         headers: {'Content-Type': 'application/json'},
         body: JSON.stringify({quantity: parseInt(qty)}),
     });
-}
-
-async function saveDefaults() {
-    const fot = parseFloat(document.getElementById('defaultFot').value) || 0;
-    const overhead = parseFloat(document.getElementById('defaultOverhead').value) || 0;
-    // We need an update endpoint for module type - use the existing pattern
-    // For now, reload after save via a simple POST
-    const resp = await fetch('/reg/module-types-calc/' + typeId + '/defaults', {
-        method: 'POST',
-        headers: {'Content-Type': 'application/x-www-form-urlencoded'},
-        body: 'fot=' + fot + '&overhead=' + overhead,
-    });
-    if (resp.ok || resp.redirected) {
-        showToast('Сохранено');
-    }
 }
 
 function showToast(msg) {

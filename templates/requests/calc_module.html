@@ -58,12 +58,12 @@
 <div class="card" style="margin-top:1rem;">
     <div style="display:grid;grid-template-columns:1fr 1fr 1fr;gap:1rem;">
         <div class="form-group">
-            <label>ФОТ (₽)</label>
+            <label>{{ fot_item.name if fot_item else 'ФОТ' }} (₽)</label>
             <input type="number" id="fot" value="{{ calc.fot }}" min="0" step="0.01" style="width:100%;" oninput="recalc()">
             <div id="fotFmt" style="font-size:0.85rem;color:var(--text-muted);margin-top:0.25rem;"></div>
         </div>
         <div class="form-group">
-            <label>Накладные (₽)</label>
+            <label>{{ overhead_item.name if overhead_item else 'Накладные' }} (₽)</label>
             <input type="number" id="overhead" value="{{ calc.overhead }}" min="0" step="0.01" style="width:100%;" oninput="recalc()">
             <div id="overheadFmt" style="font-size:0.85rem;color:var(--text-muted);margin-top:0.25rem;"></div>
         </div>
@@ -76,10 +76,12 @@
         <div class="form-group">
             <label>Рентабельность (%)</label>
             <input type="number" id="profitPercent" value="{{ profitability }}" min="0" max="100" step="0.01" style="width:100%;" oninput="recalcFromPercent()">
+            <div id="profitPercentFmt" style="font-size:0.85rem;color:var(--text-muted);margin-top:0.25rem;"></div>
         </div>
         <div class="form-group">
             <label>Рентабельность (₽)</label>
-            <div id="profitRub" style="padding:0.5rem;background:#f8fafc;border:1px solid var(--border,#e2e8f0);border-radius:6px;">0.00</div>
+            <input type="number" id="profitRubInput" min="0" step="0.01" style="width:100%;" oninput="recalcFromProfitRub()">
+            <div id="profitRub" style="padding:0.5rem;background:#f8fafc;border:1px solid var(--border,#e2e8f0);border-radius:6px;margin-top:0.25rem;">0.00</div>
         </div>
         <div class="form-group">
             <label>Общая стоимость (₽)</label>
@@ -100,7 +102,10 @@
 <script>
 const reqId = {{ req.id }};
 const calcId = {{ calc.id }};
+const typeId = {{ mt.id }};
 const costField = '{{ cost_field }}';
+const fotItemId = {{ mt.fot_item_id or 'null' }};
+const overheadItemId = {{ mt.overhead_item_id or 'null' }};
 let suppressInput = false;
 
 function recalcModulesTotal() {
@@ -116,9 +121,7 @@ function recalcModulesTotal() {
     return total;
 }
 
-function recalc() {
-    if (suppressInput) return;
-    const modulesSum = recalcModulesTotal();
+function recalcAll(modulesSum) {
     const fot = parseFloat(document.getElementById('fot').value) || 0;
     const overhead = parseFloat(document.getElementById('overhead').value) || 0;
     const totalCost = modulesSum + fot + overhead;
@@ -126,30 +129,48 @@ function recalc() {
     const profitRub = totalCost * profitPercent / 100;
     const finalPrice = totalCost + profitRub;
 
-    suppressInput = true;
     document.getElementById('fotFmt').textContent = formatFinancial(fot);
     document.getElementById('overheadFmt').textContent = formatFinancial(overhead);
     document.getElementById('totalCost').textContent = formatFinancial(totalCost);
+    document.getElementById('profitPercentFmt').textContent = profitPercent.toFixed(2) + '%';
+    document.getElementById('profitRubInput').value = profitRub.toFixed(2);
     document.getElementById('profitRub').textContent = formatFinancial(profitRub);
     document.getElementById('finalPrice').value = finalPrice.toFixed(2);
     document.getElementById('finalPriceFmt').textContent = formatFinancial(finalPrice);
+}
+
+function recalc() {
+    if (suppressInput) return;
+    suppressInput = true;
+    const modulesSum = recalcModulesTotal();
+    recalcAll(modulesSum);
     suppressInput = false;
 }
 
 function recalcFromPercent() {
     if (suppressInput) return;
+    suppressInput = true;
+    const modulesSum = recalcModulesTotal();
+    recalcAll(modulesSum);
+    suppressInput = false;
+}
+
+function recalcFromProfitRub() {
+    if (suppressInput) return;
+    suppressInput = true;
     const modulesSum = recalcModulesTotal();
     const fot = parseFloat(document.getElementById('fot').value) || 0;
     const overhead = parseFloat(document.getElementById('overhead').value) || 0;
     const totalCost = modulesSum + fot + overhead;
-    const profitPercent = parseFloat(document.getElementById('profitPercent').value) || 0;
-    const profitRub = totalCost * profitPercent / 100;
+    const profitRub = parseFloat(document.getElementById('profitRubInput').value) || 0;
+    const profitPercent = totalCost > 0 ? (profitRub / totalCost * 100) : 0;
     const finalPrice = totalCost + profitRub;
 
-    suppressInput = true;
     document.getElementById('fotFmt').textContent = formatFinancial(fot);
     document.getElementById('overheadFmt').textContent = formatFinancial(overhead);
     document.getElementById('totalCost').textContent = formatFinancial(totalCost);
+    document.getElementById('profitPercent').value = profitPercent.toFixed(2);
+    document.getElementById('profitPercentFmt').textContent = profitPercent.toFixed(2) + '%';
     document.getElementById('profitRub').textContent = formatFinancial(profitRub);
     document.getElementById('finalPrice').value = finalPrice.toFixed(2);
     document.getElementById('finalPriceFmt').textContent = formatFinancial(finalPrice);
@@ -158,6 +179,7 @@ function recalcFromPercent() {
 
 function recalcFromFinal() {
     if (suppressInput) return;
+    suppressInput = true;
     const modulesSum = recalcModulesTotal();
     const fot = parseFloat(document.getElementById('fot').value) || 0;
     const overhead = parseFloat(document.getElementById('overhead').value) || 0;
@@ -166,11 +188,12 @@ function recalcFromFinal() {
     const profitRub = finalPrice - totalCost;
     const profitPercent = totalCost > 0 ? (profitRub / totalCost * 100) : 0;
 
-    suppressInput = true;
     document.getElementById('fotFmt').textContent = formatFinancial(fot);
     document.getElementById('overheadFmt').textContent = formatFinancial(overhead);
     document.getElementById('totalCost').textContent = formatFinancial(totalCost);
     document.getElementById('profitPercent').value = profitPercent.toFixed(2);
+    document.getElementById('profitPercentFmt').textContent = profitPercent.toFixed(2) + '%';
+    document.getElementById('profitRubInput').value = profitRub.toFixed(2);
     document.getElementById('profitRub').textContent = formatFinancial(profitRub);
     document.getElementById('finalPriceFmt').textContent = formatFinancial(finalPrice);
     suppressInput = false;
@@ -245,6 +268,24 @@ async function saveAll() {
             final_price: finalPrice,
         }),
     });
+
+    // Sync FOT to source PayrollItem
+    if (fotItemId) {
+        await fetch('/reg/api/module-types/' + typeId + '/fot-cost', {
+            method: 'PUT',
+            headers: {'Content-Type': 'application/json'},
+            body: JSON.stringify({cost: fot}),
+        });
+    }
+
+    // Sync overhead to source InvoiceItem
+    if (overheadItemId) {
+        await fetch('/reg/api/module-types/' + typeId + '/overhead-cost', {
+            method: 'PUT',
+            headers: {'Content-Type': 'application/json'},
+            body: JSON.stringify({cost: overhead}),
+        });
+    }
 
     // Update request section cost
     await fetch('/reg/api/requests/' + reqId, {

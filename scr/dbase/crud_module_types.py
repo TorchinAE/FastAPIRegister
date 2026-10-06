@@ -2,7 +2,7 @@ from sqlalchemy import func, select
 from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy.orm import selectinload
 
-from scr.dbase.models import ModuleType, ModuleTypeDefault, RequestCalc, RequestCalcItem
+from scr.dbase.models import InvoiceItem, ModuleType, ModuleTypeDefault, PayrollItem, RequestCalc, RequestCalcItem
 from scr.dbase.schemas.schemas import (
     ModuleTypeCreateSchema,
     ModuleTypeDefaultCreateSchema,
@@ -15,13 +15,23 @@ from scr.dbase.schemas.schemas import (
 
 
 async def get_module_types(session: AsyncSession) -> list[ModuleType]:
-    stmt = select(ModuleType).order_by(ModuleType.id)
+    stmt = (
+        select(ModuleType)
+        .options(selectinload(ModuleType.fot_item), selectinload(ModuleType.overhead_item))
+        .order_by(ModuleType.id)
+    )
     result = await session.execute(stmt)
     return list(result.scalars().all())
 
 
 async def get_module_type_by_id(session: AsyncSession, type_id: int) -> ModuleType | None:
-    return await session.get(ModuleType, type_id)
+    stmt = (
+        select(ModuleType)
+        .where(ModuleType.id == type_id)
+        .options(selectinload(ModuleType.fot_item), selectinload(ModuleType.overhead_item))
+    )
+    result = await session.execute(stmt)
+    return result.scalar_one_or_none()
 
 
 async def get_module_type_by_slug(session: AsyncSession, slug: str) -> ModuleType | None:
@@ -49,6 +59,32 @@ async def delete_module_type(session: AsyncSession, type_id: int) -> ModuleType 
         await session.delete(obj)
         await session.flush()
     return obj
+
+
+async def get_or_create_fot_item(session: AsyncSession, type_name: str) -> PayrollItem:
+    name = f"ФОТ_{type_name}"
+    stmt = select(PayrollItem).where(PayrollItem.name == name)
+    result = await session.execute(stmt)
+    item = result.scalar_one_or_none()
+    if item:
+        return item
+    item = PayrollItem(name=name, cost=0)
+    session.add(item)
+    await session.flush()
+    return item
+
+
+async def get_or_create_overhead_item(session: AsyncSession, type_name: str) -> InvoiceItem:
+    name = f"Накладные_{type_name}"
+    stmt = select(InvoiceItem).where(InvoiceItem.name == name)
+    result = await session.execute(stmt)
+    item = result.scalar_one_or_none()
+    if item:
+        return item
+    item = InvoiceItem(name=name, cost=0)
+    session.add(item)
+    await session.flush()
+    return item
 
 
 # ── ModuleTypeDefault ──
@@ -94,14 +130,17 @@ async def get_or_create_calc(session: AsyncSession, request_id: int, module_type
     if calc:
         return calc
 
-    # Get module type for default values
-    mod_type = await session.get(ModuleType, module_type_id)
+    # Get module type with linked items
+    mod_type = await get_module_type_by_id(session, module_type_id)
+
+    fot_val = float(mod_type.fot_item.cost) if mod_type and mod_type.fot_item else 0
+    overhead_val = float(mod_type.overhead_item.cost) if mod_type and mod_type.overhead_item else 0
 
     calc = RequestCalc(
         request_id=request_id,
         module_type_id=module_type_id,
-        fot=float(mod_type.default_fot) if mod_type else 0,
-        overhead=float(mod_type.default_overhead) if mod_type else 0,
+        fot=fot_val,
+        overhead=overhead_val,
     )
     session.add(calc)
     await session.flush()
