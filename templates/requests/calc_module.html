@@ -58,12 +58,12 @@
 <div class="card" style="margin-top:1rem;">
     <div style="display:grid;grid-template-columns:1fr 1fr 1fr;gap:1rem;">
         <div class="form-group">
-            <label>{{ fot_item.name if fot_item else 'ФОТ' }} (₽)</label>
+            <label>ФОТ (₽)</label>
             <input type="number" id="fot" value="{{ calc.fot }}" min="0" step="0.01" style="width:100%;" oninput="recalc()">
             <div id="fotFmt" style="font-size:0.85rem;color:var(--text-muted);margin-top:0.25rem;"></div>
         </div>
         <div class="form-group">
-            <label>{{ overhead_item.name if overhead_item else 'Накладные' }} (₽)</label>
+            <label>Накладные (₽)</label>
             <input type="number" id="overhead" value="{{ calc.overhead }}" min="0" step="0.01" style="width:100%;" oninput="recalc()">
             <div id="overheadFmt" style="font-size:0.85rem;color:var(--text-muted);margin-top:0.25rem;"></div>
         </div>
