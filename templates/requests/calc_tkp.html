@@ -69,6 +69,75 @@
     <button class="btn btn-primary" onclick="saveCost()">Сохранить стоимость</button>
 </div>
 
+<h2 style="margin:2rem 0 0.75rem;">Сводная таблица расчётов</h2>
+<div class="table-wrap">
+    <table>
+        <thead>
+            <tr>
+                <th>Раздел</th>
+                <th style="text-align:right;">Комплектация</th>
+                <th style="text-align:right;">ФОТ</th>
+                <th style="text-align:right;">Накладные</th>
+                <th style="text-align:right;">Себестоимость</th>
+                <th style="text-align:right;">Рентабельность</th>
+                <th style="text-align:right;">Итого</th>
+            </tr>
+        </thead>
+        <tbody>
+            {% for calc in all_calcs %}
+            {% set modules_sum = [] %}
+            {% for item in calc.items %}{% if item.module %}{% if modules_sum.append(item.module.total_price * item.quantity) %}{% endif %}{% endif %}{% endfor %}
+            {% set comp = modules_sum|sum if modules_sum else 0 %}
+            <tr>
+                <td><a href="/reg/requests/{{ req.id }}/calc/{{ calc.module_type.slug }}">{{ calc.module_type.name }}</a></td>
+                <td style="text-align:right;">{{ comp|money }}</td>
+                <td style="text-align:right;">{{ calc.fot|money }}</td>
+                <td style="text-align:right;">{{ calc.overhead|money }}</td>
+                <td style="text-align:right;">{{ calc.total_cost|money }}</td>
+                <td style="text-align:right;">{{ "%.2f"|format(calc.profitability_percent) }}%</td>
+                <td style="text-align:right;font-weight:bold;">{{ calc.final_price|money }}</td>
+            </tr>
+            {% endfor %}
+            {% if delivery and delivery.final_price %}
+            <tr>
+                <td><a href="/reg/requests/{{ req.id }}/calc/delivery">Доставка</a></td>
+                <td style="text-align:right;">—</td>
+                <td style="text-align:right;">—</td>
+                <td style="text-align:right;">—</td>
+                <td style="text-align:right;">{{ (delivery.cost_per_truck * delivery.trucks_count)|money }}</td>
+                <td style="text-align:right;">{{ "%.2f"|format(delivery.profitability_percent) }}%</td>
+                <td style="text-align:right;font-weight:bold;">{{ delivery.final_price|money }}</td>
+            </tr>
+            {% endif %}
+            {% for section, label in [('chief-engineer', 'Шеф-инженер'), ('smr', 'СМР'), ('pnr', 'ПНР')] %}
+            {% set sc = service_calcs.get(section) %}
+            {% if sc and sc.final_price %}
+            <tr>
+                <td><a href="/reg/requests/{{ req.id }}/calc/{{ section }}">{{ label }}</a></td>
+                <td style="text-align:right;">—</td>
+                <td style="text-align:right;">—</td>
+                <td style="text-align:right;">—</td>
+                <td style="text-align:right;">{{ sc.base_cost|money }}</td>
+                <td style="text-align:right;">{{ "%.2f"|format(sc.profitability_percent) }}%</td>
+                <td style="text-align:right;font-weight:bold;">{{ sc.final_price|money }}</td>
+            </tr>
+            {% endif %}
+            {% endfor %}
+        </tbody>
+        <tfoot>
+            <tr style="font-weight:bold;background:#f0fdf4;">
+                <td>ИТОГО</td>
+                <td style="text-align:right;" id="sumComp">0.00</td>
+                <td style="text-align:right;" id="sumFot">0.00</td>
+                <td style="text-align:right;" id="sumOverhead">0.00</td>
+                <td style="text-align:right;" id="sumCost">0.00</td>
+                <td></td>
+                <td style="text-align:right;" id="sumFinal">0.00</td>
+            </tr>
+        </tfoot>
+    </table>
+</div>
+
 <div id="toast" class="toast" style="display:none"></div>
 {% endblock %}
 
@@ -160,5 +229,30 @@ function showToast(msg) {
     t.style.display = 'block';
     setTimeout(() => t.style.display = 'none', 2500);
 }
+
+// Calculate summary totals
+(function() {
+    let sumComp = 0, sumFot = 0, sumOverhead = 0, sumCost = 0, sumFinal = 0;
+    document.querySelectorAll('table tbody tr').forEach(tr => {
+        const cells = tr.querySelectorAll('td');
+        if (cells.length >= 7) {
+            const comp = parseFloat(cells[1].textContent.replace(/\s/g, '').replace(',', '.')) || 0;
+            const fot = parseFloat(cells[2].textContent.replace(/\s/g, '').replace(',', '.')) || 0;
+            const oh = parseFloat(cells[3].textContent.replace(/\s/g, '').replace(',', '.')) || 0;
+            const cost = parseFloat(cells[4].textContent.replace(/\s/g, '').replace(',', '.')) || 0;
+            const fin = parseFloat(cells[6].textContent.replace(/\s/g, '').replace(',', '.')) || 0;
+            if (comp > 0) sumComp += comp;
+            if (fot > 0) sumFot += fot;
+            if (oh > 0) sumOverhead += oh;
+            if (cost > 0) sumCost += cost;
+            if (fin > 0) sumFinal += fin;
+        }
+    });
+    document.getElementById('sumComp').textContent = formatFinancial(sumComp);
+    document.getElementById('sumFot').textContent = formatFinancial(sumFot);
+    document.getElementById('sumOverhead').textContent = formatFinancial(sumOverhead);
+    document.getElementById('sumCost').textContent = formatFinancial(sumCost);
+    document.getElementById('sumFinal').textContent = formatFinancial(sumFinal);
+})();
 </script>
 {% endblock %}

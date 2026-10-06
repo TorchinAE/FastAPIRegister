@@ -164,42 +164,6 @@ async def delete_default(
 # ── RequestCalcs ──
 
 
-@mt_calc_router.put("/api/module-types/{type_id}/fot-cost")
-async def update_fot_cost(
-    type_id: int,
-    data: dict,
-    session: AsyncSession = Depends(db_helper.session_dependency),
-):
-    mt = await crud_module_types.get_module_type_by_id(session, type_id)
-    if not mt or not mt.fot_item:
-        raise HTTPException(status_code=404, detail="ФОТ не найден")
-    mt.fot_item.cost = float(data.get("cost", 0))
-    from datetime import UTC, datetime
-
-    mt.fot_item.date_modified = datetime.now(UTC)
-    await session.flush()
-    await session.commit()
-    return {"ok": True, "cost": float(mt.fot_item.cost)}
-
-
-@mt_calc_router.put("/api/module-types/{type_id}/overhead-cost")
-async def update_overhead_cost(
-    type_id: int,
-    data: dict,
-    session: AsyncSession = Depends(db_helper.session_dependency),
-):
-    mt = await crud_module_types.get_module_type_by_id(session, type_id)
-    if not mt or not mt.overhead_item:
-        raise HTTPException(status_code=404, detail="Накладные не найдены")
-    mt.overhead_item.cost = float(data.get("cost", 0))
-    from datetime import UTC, datetime
-
-    mt.overhead_item.date_modified = datetime.now(UTC)
-    await session.flush()
-    await session.commit()
-    return {"ok": True, "cost": float(mt.overhead_item.cost)}
-
-
 @mt_calc_router.get("/api/request-calcs/{calc_id}", response_model=RequestCalcResponseSchema)
 async def get_calc(
     calc_id: int,

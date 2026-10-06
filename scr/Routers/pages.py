@@ -1053,6 +1053,33 @@ async def request_calc_tkp_page(
         [{"id": m.id, "name": m.name, "price": float(m.price)} for m in materials], ensure_ascii=False
     )
 
+    # Load all RequestCalcs for summary
+    from sqlalchemy import select as sa_select
+    from sqlalchemy.orm import selectinload
+
+    from scr.dbase.models import RequestCalc, RequestCalcItem
+
+    stmt = (
+        sa_select(RequestCalc)
+        .where(RequestCalc.request_id == req_id)
+        .options(
+            selectinload(RequestCalc.items).selectinload(RequestCalcItem.module),
+            selectinload(RequestCalc.module_type),
+        )
+    )
+    result = await session.execute(stmt)
+    all_calcs = list(result.scalars().all())
+
+    # Load delivery and service calcs
+    from scr.dbase import crud_deliveries, crud_service_calcs
+
+    delivery = await crud_deliveries.get_or_create_delivery(session, req_id)
+    service_calcs = {}
+    for section in ("chief-engineer", "smr", "pnr"):
+        sc = await crud_service_calcs.get_or_create_service_calc(session, req_id, section)
+        service_calcs[section] = sc
+    await session.commit()
+
     return templates.TemplateResponse(
         "requests/calc_tkp.html",
         {
@@ -1063,6 +1090,9 @@ async def request_calc_tkp_page(
             "materials": materials,
             "modules_json": modules_json,
             "materials_json": materials_json,
+            "all_calcs": all_calcs,
+            "delivery": delivery,
+            "service_calcs": service_calcs,
             "active_page": "requests",
         },
     )

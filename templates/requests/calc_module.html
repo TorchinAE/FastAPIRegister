@@ -102,10 +102,7 @@
 <script>
 const reqId = {{ req.id }};
 const calcId = {{ calc.id }};
-const typeId = {{ mt.id }};
 const costField = '{{ cost_field }}';
-const fotItemId = {{ mt.fot_item_id or 'null' }};
-const overheadItemId = {{ mt.overhead_item_id or 'null' }};
 let suppressInput = false;
 
 function recalcModulesTotal() {
@@ -268,24 +265,6 @@ async function saveAll() {
             final_price: finalPrice,
         }),
     });
-
-    // Sync FOT to source PayrollItem
-    if (fotItemId) {
-        await fetch('/reg/api/module-types/' + typeId + '/fot-cost', {
-            method: 'PUT',
-            headers: {'Content-Type': 'application/json'},
-            body: JSON.stringify({cost: fot}),
-        });
-    }
-
-    // Sync overhead to source InvoiceItem
-    if (overheadItemId) {
-        await fetch('/reg/api/module-types/' + typeId + '/overhead-cost', {
-            method: 'PUT',
-            headers: {'Content-Type': 'application/json'},
-            body: JSON.stringify({cost: overhead}),
-        });
-    }
 
     // Update request section cost
     await fetch('/reg/api/requests/' + reqId, {
