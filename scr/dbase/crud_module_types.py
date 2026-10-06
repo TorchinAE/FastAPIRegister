@@ -131,11 +131,17 @@ async def get_or_create_calc(session: AsyncSession, request_id: int, module_type
     )
     result = await session.execute(stmt)
     calc = result.scalar_one_or_none()
-    if calc:
-        return calc
 
     # Get module type with linked items
     mod_type = await get_module_type_by_id(session, module_type_id)
+
+    if calc:
+        # Refresh fot/overhead from linked items if calc values are still 0
+        if mod_type and mod_type.fot_item and float(calc.fot) == 0 and float(mod_type.fot_item.cost) > 0:
+            calc.fot = float(mod_type.fot_item.cost)
+        if mod_type and mod_type.overhead_item and float(calc.overhead) == 0 and float(mod_type.overhead_item.cost) > 0:
+            calc.overhead = float(mod_type.overhead_item.cost)
+        return calc
 
     fot_val = float(mod_type.fot_item.cost) if mod_type and mod_type.fot_item else 0
     overhead_val = float(mod_type.overhead_item.cost) if mod_type and mod_type.overhead_item else 0
