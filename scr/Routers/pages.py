@@ -1026,7 +1026,13 @@ async def request_calc_tkp_page(
     req = await crud_requests.get_request_by_id(session, req_id)
     if not req:
         return HTMLResponse("ТКП не найдена", status_code=404)
+    try:
+        return await _render_tkp_page(request, user, req, session)
+    except Exception as e:  # noqa: BLE001
+        return HTMLResponse(f"Ошибка: {e}", status_code=500)
 
+
+async def _render_tkp_page(request, user, req, session):
     # Load all RequestCalcs for summary
     from sqlalchemy import select as sa_select
     from sqlalchemy.orm import selectinload
@@ -1035,7 +1041,7 @@ async def request_calc_tkp_page(
 
     stmt = (
         sa_select(RequestCalc)
-        .where(RequestCalc.request_id == req_id)
+        .where(RequestCalc.request_id == req.id)
         .options(
             selectinload(RequestCalc.items).selectinload(RequestCalcItem.module),
             selectinload(RequestCalc.module_type),
@@ -1047,10 +1053,10 @@ async def request_calc_tkp_page(
     # Load delivery and service calcs
     from scr.dbase import crud_deliveries, crud_service_calcs
 
-    delivery = await crud_deliveries.get_or_create_delivery(session, req_id)
+    delivery = await crud_deliveries.get_or_create_delivery(session, req.id)
     service_calcs = {}
     for section in ("chief-engineer", "smr", "pnr"):
-        sc = await crud_service_calcs.get_or_create_service_calc(session, req_id, section)
+        sc = await crud_service_calcs.get_or_create_service_calc(session, req.id, section)
         service_calcs[section] = sc
     await session.commit()
 
