@@ -41,7 +41,7 @@
                     <td style="text-align:right;">{{ calc.total_cost|money }}</td>
                     <td style="text-align:right;">{{ "%.2f"|format(calc.profitability_percent) }}%</td>
                     <td style="text-align:right;font-weight:bold;">{{ calc.final_price|money }}</td>
-                    <td style="text-align:right;font-weight:bold;color:#16a34a;">{{ (calc.final_price * (1 + nds_percent / 100))|money }}</td>
+                    <td style="text-align:right;font-weight:bold;color:#16a34a;">{{ (float(calc.final_price) * (1 + nds_percent / 100))|money }}</td>
                 </tr>
                 {% endfor %}
                 {% if delivery and delivery.final_price and delivery.final_price > 0 %}
@@ -54,7 +54,7 @@
                     <td style="text-align:right;">{{ ((delivery.cost_per_truck or 0) * (delivery.trucks_count or 0))|money }}</td>
                     <td style="text-align:right;">{{ "%.2f"|format(delivery.profitability_percent or 0) }}%</td>
                     <td style="text-align:right;font-weight:bold;">{{ delivery.final_price|money }}</td>
-                    <td style="text-align:right;font-weight:bold;color:#16a34a;">{{ (delivery.final_price * (1 + nds_percent / 100))|money }}</td>
+                    <td style="text-align:right;font-weight:bold;color:#16a34a;">{{ (float(delivery.final_price) * (1 + nds_percent / 100))|money }}</td>
                 </tr>
                 {% endif %}
                 {% for section, label in [('chief-engineer', 'Шеф-инженер'), ('smr', 'СМР'), ('pnr', 'ПНР')] %}
@@ -69,7 +69,7 @@
                     <td style="text-align:right;">{{ sc.base_cost|money }}</td>
                     <td style="text-align:right;">{{ "%.2f"|format(sc.profitability_percent or 0) }}%</td>
                     <td style="text-align:right;font-weight:bold;">{{ sc.final_price|money }}</td>
-                    <td style="text-align:right;font-weight:bold;color:#16a34a;">{{ (sc.final_price * (1 + nds_percent / 100))|money }}</td>
+                    <td style="text-align:right;font-weight:bold;color:#16a34a;">{{ (float(sc.final_price) * (1 + nds_percent / 100))|money }}</td>
                 </tr>
                 {% endif %}
                 {% endfor %}
