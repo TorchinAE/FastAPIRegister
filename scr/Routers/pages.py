@@ -1023,6 +1023,8 @@ async def request_calc_page(
             "user": user,
             "req": req,
             "folder_path": folder_path or "",
+            "totals": summary["totals"],
+            "nds_percent": summary["nds_percent"],
             "active_page": "requests",
         },
     )

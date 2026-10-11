@@ -1,6 +1,6 @@
 import io
 
-from openpyxl import Workbook
+from openpyxl import Workbook, load_workbook
 
 from scr.dbase.models import (
     Directors,
@@ -85,6 +85,23 @@ async def test_calc_blocks_prices_and_section_cost(client, db_session):
     resp = await client.delete(f"/reg/api/request-calcs/{second}")
     assert resp.json()["section_cost"] == 660.0
 
+    # Комплектация: модули ×кол-во блоков, материалы с раскрытием подмодулей, итоги с прибылью
+    resp = await client.get(f"/reg/api/requests/{ids['req']}/kit/export-excel")
+    assert resp.status_code == 200
+    wb = load_workbook(io.BytesIO(resp.content))
+    assert wb.sheetnames == ["Итоги", "Комплектация", "Материалы"]
+    modules = {r[2]: r for r in wb["Комплектация"].iter_rows(min_row=3, values_only=True)}
+    assert modules["CalcTop"][3] == 1 and modules["CalcSub"][3] == 1
+    materials = {r[3]: r for r in wb["Материалы"].iter_rows(min_row=3, values_only=True)}
+    assert materials["CalcMat"][6] == 8  # 3×2 из CalcTop + 2 из CalcSub
+    totals = {r[0]: r for r in wb["Итоги"].iter_rows(min_row=3, values_only=True)}
+    assert totals["Итого"][8] == 660.0 and totals["Итого"][7] == 660.0 - totals["Итого"][5]
+
+    client.cookies.set("user_email", "calc@test.ru")
+    resp = await client.get(f"/reg/requests/{ids['req']}/calc")
+    client.cookies.clear()
+    assert "Выгрузить комплектацию" in resp.text and "Средняя рентабельность" in resp.text
+
 
 async def test_module_import_excel_and_nom_tok(client, db_session):
     ids = await _setup_module_only(db_session)
@@ -124,3 +141,27 @@ async def _setup_module_only(s):
     s.add_all([mat, mod])
     await s.commit()
     return {"mat": mat.id, "mod": mod.id}
+
+
+async def test_defaults_import_creates_material_and_module(client, db_session):
+    mt = ModuleType(name="Def KSO", slug="def-kso")
+    db_session.add_all([mt, Module(name="DefExisting")])
+    await db_session.commit()
+    ids = {"mt": mt.id}
+    files = _xlsx(
+        [
+            ["ID", "Модуль", "Кол-во", "Цена за ед."],
+            [None, "DefExisting", 2, None],
+            [None, "Новый шкаф", 3, 250],
+        ]
+    )
+    resp = await client.post(f"/reg/api/module-types/{ids['mt']}/defaults/import-excel", files=files)
+    assert resp.status_code == 200
+    data = resp.json()
+    assert (data["added"], data["created_modules"], data["created_materials"], data["skipped"]) == (2, 1, 1, [])
+
+    defaults = {d["module_name"]: d for d in (await client.get(f"/reg/api/module-types/{ids['mt']}/defaults")).json()}
+    assert defaults["Новый шкаф"]["quantity"] == 3
+    assert defaults["Новый шкаф"]["module_price"] == 250.0
+    mats = (await client.get("/reg/api/materials/?search=Новый шкаф")).json()["items"]
+    assert [(m["name"], m["type_name"]) for m in mats] == [("Новый шкаф", "Производство")]

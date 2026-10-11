@@ -142,7 +142,7 @@ async def get_module_items(session: AsyncSession, module_id: int) -> list[Module
 # ── Цены и ном. ток модулей с учётом вложенности ──
 
 
-async def _load_tree(session: AsyncSession) -> tuple[dict[int, list[tuple]], dict[int, tuple[float, int]]]:
+async def load_tree(session: AsyncSession) -> tuple[dict[int, list[tuple]], dict[int, tuple[float, int]]]:
     """Состав всех модулей одной выборкой: {module_id: [(material_id, sub_module_id, qty)]} и данные материалов."""
     from scr.dbase.models import Material
 
@@ -159,7 +159,7 @@ async def _load_tree(session: AsyncSession) -> tuple[dict[int, list[tuple]], dic
 
 async def get_module_prices(session: AsyncSession) -> dict[int, float]:
     """Стоимость каждого модуля (рекурсивно по подмодулям, с защитой от циклов)."""
-    tree, materials = await _load_tree(session)
+    tree, materials = await load_tree(session)
     prices: dict[int, float] = {}
 
     def price_of(module_id: int, stack: frozenset) -> float:
@@ -184,7 +184,7 @@ async def get_module_prices(session: AsyncSession) -> dict[int, float]:
 
 async def recalc_nom_tok(session: AsyncSession) -> None:
     """Пересчитывает ном. ток модулей без ручного значения: максимум из материалов состава (с подмодулями)."""
-    tree, materials = await _load_tree(session)
+    tree, materials = await load_tree(session)
     modules = list((await session.execute(select(Module))).scalars().all())
     by_id = {m.id: m for m in modules}
     auto: dict[int, int] = {}

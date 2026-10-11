@@ -48,9 +48,34 @@
             {% endfor %}
         </div>
 
-        <!-- Right: content area -->
-        <div style="flex:1;min-height:400px;display:flex;align-items:center;justify-content:center;color:var(--text-muted);font-style:italic;">
-            Выберите раздел для расчёта
+        <!-- Right: сводка по всем разделам ТКП -->
+        <div class="tkp-totals">
+            <div class="tkp-totals-head">
+                <h3>Сводно по ТКП</h3>
+                <a href="/reg/api/requests/{{ req.id }}/kit/export-excel" class="btn btn-primary btn-sm" download>Выгрузить комплектацию</a>
+            </div>
+            {% set kpis = [
+                ('Комплектация', totals.comp, false),
+                ('ФОТ', totals.fot, false),
+                ('Накладные', totals.overhead, false),
+                ('Себестоимость', totals.cost, false),
+                ('Прибыль', totals.profit, false),
+                ('Итого без НДС', totals.final, true),
+                ('Итого с НДС ' ~ ('%g'|format(nds_percent)) ~ '%', totals.final_nds, false),
+            ] %}
+            <div class="tkp-totals-grid">
+                {% for label, value, strong in kpis %}
+                <div class="tkp-total{% if strong %} strong{% endif %}">
+                    <span class="tkp-total-label">{{ label }}</span>
+                    <span class="tkp-total-value calc-cost" data-raw="{{ value }}">{{ "%.2f"|format(value) }}</span>
+                </div>
+                {% endfor %}
+                <div class="tkp-total">
+                    <span class="tkp-total-label">Средняя рентабельность</span>
+                    <span class="tkp-total-value">{{ "%.2f"|format(totals.profit_percent) }} %</span>
+                </div>
+            </div>
+            <div class="tkp-totals-hint">По всем разделам с учётом количества блоков. Рентабельность = прибыль / себестоимость.</div>
         </div>
     </div>
 </div>

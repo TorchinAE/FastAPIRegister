@@ -368,6 +368,50 @@ async def _find_material(session: AsyncSession, mat_id: int | None, code_1c: str
     return None
 
 
+async def material_finder(session: AsyncSession):
+    """Возвращает find_or_create(mat_id, code_1c, name, price, type_name) -> (material | None, created).
+
+    Материал ищется по ID, затем по Коду 1С, затем по названию; не найден и есть название — создаётся
+    (тип по умолчанию «Производство», отсутствующий тип материала создаётся).
+    """
+    from datetime import date as date_cls
+
+    from scr.dbase import crud_material_types, crud_materials
+    from scr.dbase.schemas.schemas import MaterialCreateSchema, MaterialTypeCreateSchema
+    from scr.utils.excel import to_float
+
+    types, _ = await crud_material_types.get_all_types(session, per_page=10000)
+    types_map = {t.name.strip().lower(): t.id for t in types}
+
+    async def type_id_for(type_name) -> int:
+        name = str(type_name).strip() if type_name else "Производство"
+        key = name.lower()
+        if key not in types_map:
+            new_type = await crud_material_types.add_type(session, MaterialTypeCreateSchema(name=name))
+            types_map[key] = new_type.id
+        return types_map[key]
+
+    async def find_or_create(mat_id, code_1c, name, price, type_name):
+        mat = await _find_material(session, mat_id, code_1c, name)
+        if mat or not name:
+            return mat, False
+        mat = await crud_materials.add_material(
+            session,
+            MaterialCreateSchema(
+                name=name,
+                price=max(to_float(price), 0),
+                code_1c=code_1c,
+                type_id=await type_id_for(type_name),
+                stats=False,
+                ruchn=False,
+                date=date_cls.today(),
+            ),
+        )
+        return mat, True
+
+    return find_or_create
+
+
 @mod_router.post("/{mod_id}/import-excel")
 async def import_module_items_excel(
     mod_id: int,
@@ -379,12 +423,8 @@ async def import_module_items_excel(
     Материал ищется по ID, затем по Коду 1С, затем по названию; не найден — создаётся новый
     (тип по умолчанию «Производство»). Если компонент уже есть в модуле — количество заменяется.
     """
-    from datetime import date as date_cls
-
-    from scr.dbase import crud_material_types, crud_materials
     from scr.dbase.models import ModuleItem
-    from scr.dbase.schemas.schemas import MaterialCreateSchema, MaterialTypeCreateSchema
-    from scr.utils.excel import cell, data_rows, find_header, normalize, to_float, to_int
+    from scr.utils.excel import cell, data_rows, find_header, normalize, to_int
 
     mod = await crud_modules.get_module_by_id(session, mod_id)
     if not mod:
@@ -398,16 +438,7 @@ async def import_module_items_excel(
     if header_idx < 0:
         raise HTTPException(status_code=400, detail="Не найдена строка заголовка с колонкой «Название»")
 
-    types, _ = await crud_material_types.get_all_types(session, per_page=10000)
-    types_map = {t.name.strip().lower(): t.id for t in types}
-
-    async def type_id_for(type_name) -> int:
-        name = str(type_name).strip() if type_name else "Производство"
-        key = name.lower()
-        if key not in types_map:
-            new_type = await crud_material_types.add_type(session, MaterialTypeCreateSchema(name=name))
-            types_map[key] = new_type.id
-        return types_map[key]
+    find_or_create = await material_finder(session)
 
     existing = {(it.material_id, it.sub_module_id): it for it in mod.items}
     added = updated = created_materials = 0
@@ -435,24 +466,13 @@ async def import_module_items_excel(
         else:
             code_1c = cell(row, col_map, "code_1c")
             code_1c = str(code_1c).strip() if code_1c is not None else None
-            mat = await _find_material(session, row_id, code_1c, name)
+            mat, created = await find_or_create(
+                row_id, code_1c, name, cell(row, col_map, "price"), cell(row, col_map, "mat_type")
+            )
             if not mat:
-                if not name:
-                    skipped.append(f"ID {row_id}: материал не найден")
-                    continue
-                mat = await crud_materials.add_material(
-                    session,
-                    MaterialCreateSchema(
-                        name=name,
-                        price=max(to_float(cell(row, col_map, "price")), 0),
-                        code_1c=code_1c,
-                        type_id=await type_id_for(cell(row, col_map, "mat_type")),
-                        stats=False,
-                        ruchn=False,
-                        date=date_cls.today(),
-                    ),
-                )
-                created_materials += 1
+                skipped.append(f"ID {row_id}: материал не найден")
+                continue
+            created_materials += created
             key = (mat.id, None)
 
         if key in existing:

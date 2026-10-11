@@ -146,6 +146,12 @@ _DEFAULTS_ALIASES = {
     "наименование": "name",
     "кол-во": "qty",
     "количество": "qty",
+    "код 1с": "code_1c",
+    "код 1c": "code_1c",
+    "тип материала": "mat_type",
+    "цена за ед.": "price",
+    "цена за ед": "price",
+    "цена": "price",
 }
 
 
@@ -191,7 +197,13 @@ async def import_defaults_excel(
     file: UploadFile = File(...),
     session: AsyncSession = Depends(db_helper.session_dependency),
 ):
-    """Модуль ищется по ID, затем по названию. Уже добавленный модуль — количество заменяется."""
+    """Модуль ищется по ID, затем по названию. Уже добавленный модуль — количество заменяется.
+
+    Модуль не найден — ищется (или создаётся) материал с этим названием (Код 1С, Цена за ед., Тип материала),
+    из него создаётся модуль, который и добавляется в модули по умолчанию.
+    """
+    from scr.dbase.models import Module, ModuleItem
+    from scr.Routers.modules import material_finder
     from scr.utils.excel import cell, data_rows, find_header, to_int
 
     mt = await crud_module_types.get_module_type_by_id(session, type_id)
@@ -207,7 +219,8 @@ async def import_defaults_excel(
         raise HTTPException(status_code=400, detail="Не найдена строка заголовка с колонкой «Модуль»")
 
     existing = {d.module_id: d for d in await crud_module_types.get_defaults(session, type_id)}
-    added = updated = 0
+    find_or_create = await material_finder(session)
+    added = updated = created_modules = created_materials = 0
     skipped: list[str] = []
     for row in data_rows(rows, header_idx):
         name = cell(row, col_map, "name")
@@ -218,6 +231,18 @@ async def import_defaults_excel(
         mod = await crud_modules.get_module_by_id(session, row_id) if row_id else None
         if not mod and name:
             mod = await crud_modules.get_module_by_name(session, name)
+        if not mod and name:
+            code_1c = cell(row, col_map, "code_1c")
+            code_1c = str(code_1c).strip() if code_1c is not None else None
+            mat, created = await find_or_create(
+                None, code_1c, name, cell(row, col_map, "price"), cell(row, col_map, "mat_type")
+            )
+            created_materials += created
+            mod = Module(name=name)
+            session.add(mod)
+            await session.flush()
+            session.add(ModuleItem(module_id=mod.id, material_id=mat.id, quantity=1))
+            created_modules += 1
         if not mod:
             skipped.append(name or f"ID {row_id}")
             continue
@@ -233,11 +258,23 @@ async def import_defaults_excel(
             session.add(obj)
             existing[mod.id] = obj
             added += 1
+    if created_modules:
+        await session.flush()
+        await crud_modules.recalc_nom_tok(session)
     await session.commit()
     message = f"Добавлено: {added}, обновлено: {updated}"
+    if created_modules:
+        message += f", новых модулей: {created_modules}, новых материалов: {created_materials}"
     if skipped:
         message += f", не найдено: {', '.join(skipped)}"
-    return {"message": message, "added": added, "updated": updated, "skipped": skipped}
+    return {
+        "message": message,
+        "added": added,
+        "updated": updated,
+        "created_modules": created_modules,
+        "created_materials": created_materials,
+        "skipped": skipped,
+    }
 
 
 @mt_calc_router.patch("/api/module-types/defaults/{default_id}")
@@ -383,3 +420,82 @@ async def delete_calc_item(
         raise HTTPException(status_code=404, detail="Строка не найдена")
     await session.commit()
     return {"ok": True}
+
+
+@mt_calc_router.get("/api/requests/{req_id}/kit/export-excel")
+async def export_kit_excel(req_id: int, session: AsyncSession = Depends(db_helper.session_dependency)):
+    """Комплектация ТКП: итоги по разделам (ФОТ, накладные, рентабельность, прибыль), модули и материалы."""
+    from datetime import datetime as dt
+
+    from openpyxl.styles import Font
+
+    from scr.dbase import crud_requests
+    from scr.dbase.crud_tkp import build_kit, build_tkp_summary
+    from scr.utils.excel import MONEY_FMT, auto_fit_columns, border_row, write_header, xlsx_response
+
+    req = await crud_requests.get_request_by_id(session, req_id)
+    if not req:
+        raise HTTPException(status_code=404, detail="ТКП не найдена")
+    summary = await build_tkp_summary(session, req)
+    kit = await build_kit(session, req)
+    title = f"ТКП #{req.id} {req.tkp_num or ''}".strip()
+    bold = Font(bold=True)
+
+    def sheet_title(ws, text: str, cols: int) -> None:
+        ws.append([text])
+        ws.merge_cells(start_row=1, start_column=1, end_row=1, end_column=cols)
+        ws.cell(1, 1).font = Font(bold=True, size=14)
+
+    def add_row(ws, values: list, money_cols: tuple, cols: int, is_total: bool = False) -> None:
+        ws.append(values)
+        row_num = ws.max_row
+        for col in money_cols:
+            ws.cell(row_num, col).number_format = MONEY_FMT
+        border_row(ws, row_num, cols)
+        if is_total:
+            for col in range(1, cols + 1):
+                ws.cell(row_num, col).font = bold
+
+    wb = Workbook()
+
+    # Итоги по разделам
+    ws = wb.active
+    ws.title = "Итоги"
+    headers = [
+        "Раздел", "Кол-во", "Комплектация", "ФОТ", "Накладные", "Себестоимость",
+        "Рентабельность, %", "Прибыль", "Итого без НДС",
+    ]  # fmt: skip
+    money = (3, 4, 5, 6, 8, 9)
+    sheet_title(ws, f"{title} — итоги", len(headers))
+    write_header(ws, headers)
+    for r in summary["rows"]:
+        values = [r["name"], r["quantity"], r["comp"], r["fot"], r["overhead"], r["cost"]]
+        add_row(ws, [*values, round(r["profit_percent"], 2), r["profit"], r["final"]], money, len(headers))
+    t = summary["totals"]
+    values = ["Итого", None, t["comp"], t["fot"], t["overhead"], t["cost"], round(t["profit_percent"], 2)]
+    add_row(ws, [*values, t["profit"], t["final"]], money, len(headers), is_total=True)
+    add_row(ws, [f"Итого с НДС {summary['nds_percent']:g}%", *[None] * 7, t["final_nds"]], (9,), len(headers), True)
+    auto_fit_columns(ws)
+
+    # Модули
+    ws = wb.create_sheet("Комплектация")
+    headers = ["Раздел", "ID", "Модуль", "Кол-во", "Цена за ед.", "Сумма"]
+    sheet_title(ws, f"{title} — комплектация", len(headers))
+    write_header(ws, headers)
+    for r in kit["modules"]:
+        add_row(ws, [r["section"], r["module_id"], r["name"], r["quantity"], r["price"], r["sum"]], (5, 6), 6)
+    add_row(ws, ["Итого", None, None, None, None, sum(r["sum"] for r in kit["modules"])], (6,), 6, True)
+    auto_fit_columns(ws)
+
+    # Материалы (подмодули раскрыты)
+    ws = wb.create_sheet("Материалы")
+    headers = ["ID", "Код 1С", "Тип материала", "Название", "Ном Ток", "Цена за ед.", "Кол-во", "Сумма"]
+    sheet_title(ws, f"{title} — сводная по материалам", len(headers))
+    write_header(ws, headers)
+    for r in kit["materials"]:
+        values = [r["id"], r["code_1c"], r["type"], r["name"], r["nom_tok"] or None, r["price"], r["quantity"]]
+        add_row(ws, [*values, r["sum"]], (6, 8), len(headers))
+    add_row(ws, ["Итого", *[None] * 6, sum(r["sum"] for r in kit["materials"])], (8,), len(headers), True)
+    auto_fit_columns(ws)
+
+    return xlsx_response(wb, f"komplektaciya_tkp_{req.id}_{dt.now().strftime('%Y%m%d')}.xlsx")
