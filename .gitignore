@@ -10,3 +10,8 @@ dist/
 build/
 .coverage
 coverage.xml
+
+# AI-инструменты и заметки
+.mimocode/
+.claude/
+*.md

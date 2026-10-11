@@ -125,15 +125,18 @@ function renderBlock(data, index) {
                 <label>Рентабельность</label>
                 ${moneyInput('f-profit-rub', 0)}
             </div>
-            <div class="form-group">
-                <label>Общая стоимость</label>
-                ${moneyInput('f-final calc-strong', 0)}
+            <div class="calc-final-row">
+                <div class="form-group">
+                    <label>Общая стоимость</label>
+                    ${moneyInput('f-final calc-strong', 0)}
+                </div>
+                ${MULTI ? `
+                <div class="form-group calc-qty-group">
+                    <label>Кол-во</label>
+                    <input type="number" class="f-qty" value="${data.quantity}" min="0" step="1">
+                </div>` : ''}
             </div>
             ${MULTI ? `
-            <div class="form-group">
-                <label>Количество</label>
-                <input type="number" class="f-qty" value="${data.quantity}" min="0" step="1">
-            </div>
             <div class="form-group">
                 <label>Итого × кол-во</label>
                 ${moneyInput('f-block-total calc-strong', 0, 'readonly tabindex="-1"')}
