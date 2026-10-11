@@ -6,7 +6,12 @@
         <h1>{{ mt.name }} — модули по умолчанию</h1>
         <div class="subtitle">Slug: {{ mt.slug }}</div>
     </div>
-    <a href="/reg/module-types-calc" class="btn btn-ghost">&larr; Назад</a>
+    <div style="display:flex;gap:0.5rem;flex-wrap:wrap;">
+        <a href="/reg/api/module-types/{{ mt.id }}/defaults/export-excel" class="btn btn-primary" download>Выгрузить Excel</a>
+        <button type="button" class="btn btn-success" onclick="document.getElementById('importFile').click()">Загрузить Excel</button>
+        <input type="file" id="importFile" accept=".xlsx" style="display:none" onchange="importExcel(this)">
+        <a href="/reg/module-types-calc" class="btn btn-ghost">&larr; Назад</a>
+    </div>
 </div>
 
 <div class="card" style="margin-bottom:1rem;">
@@ -16,7 +21,7 @@
             <select id="moduleSelect" style="width:100%;">
                 <option value="">-- Выберите модуль --</option>
                 {% for mod in modules %}
-                <option value="{{ mod.id }}">{{ mod.name }} ({{ mod.total_price|money }})</option>
+                <option value="{{ mod.id }}">{{ mod.name }} ({{ prices.get(mod.id, 0)|money }})</option>
                 {% endfor %}
             </select>
         </div>
@@ -40,8 +45,8 @@
                 <td>
                     <input type="number" value="{{ d.quantity }}" min="1" style="width:70px;" onchange="updateQty({{ d.id }}, this.value)">
                 </td>
-                <td>{{ (d.module.total_price if d.module else 0)|money }}</td>
-                <td>{{ (d.module.total_price * d.quantity if d.module else 0)|money }}</td>
+                <td>{{ prices.get(d.module_id, 0)|money }}</td>
+                <td>{{ (prices.get(d.module_id, 0) * d.quantity)|money }}</td>
                 <td><button class="btn btn-danger btn-sm" onclick="removeDefault({{ d.id }}, this)">Удалить</button></td>
             </tr>
             {% endfor %}
@@ -113,6 +118,22 @@ async function removeDefault(id, btn) {
     if (resp.ok) {
         btn.closest('tr').remove();
         showToast('Удалено');
+    }
+}
+
+async function importExcel(input) {
+    const file = input.files[0];
+    if (!file) return;
+    const fd = new FormData();
+    fd.append('file', file);
+    const resp = await fetch('/reg/api/module-types/' + typeId + '/defaults/import-excel', {method: 'POST', body: fd});
+    input.value = '';
+    const data = await resp.json().catch(() => ({}));
+    if (resp.ok) {
+        showToast(data.message || 'Загружено');
+        setTimeout(() => location.reload(), 1200);
+    } else {
+        showToast('Ошибка: ' + (data.detail || resp.status));
     }
 }
 

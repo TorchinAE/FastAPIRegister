@@ -307,6 +307,8 @@ class ModuleUpdateSchema(BaseModel):
 
     id: int
     name: str | None = None
+    nom_tok: int | None = Field(None, ge=0, le=7000)
+    nom_tok_manual: bool | None = None
 
 
 class ModuleResponseSchema(BaseModel):
@@ -316,6 +318,8 @@ class ModuleResponseSchema(BaseModel):
     name: str
     items_count: int = 0
     total_price: float = 0
+    nom_tok: int = 0
+    nom_tok_manual: bool = False
     created_by: str | None = None
 
 
@@ -802,6 +806,8 @@ class RequestCalcUpdateSchema(BaseModel):
     profitability_percent: float | None = Field(None, ge=0, le=100)
     total_cost: float | None = Field(None, ge=0)
     final_price: float | None = Field(None, ge=0)
+    quantity: int | None = Field(None, ge=0)
+    works_cost: float | None = Field(None, ge=0)
 
 
 class RequestCalcItemCreateSchema(BaseModel):
@@ -841,6 +847,8 @@ class RequestCalcResponseSchema(BaseModel):
     profitability_percent: float = 0
     total_cost: float = 0
     final_price: float = 0
+    quantity: int = 1
+    works_cost: float = 0
 
 
 # --- Pagination ---

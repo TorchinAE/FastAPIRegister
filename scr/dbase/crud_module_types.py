@@ -50,6 +50,9 @@ async def add_module_type(
     existing = await get_module_type_by_slug(session, data.slug)
     if existing:
         return existing
+    by_name = (await session.execute(select(ModuleType).where(ModuleType.name == data.name))).scalar_one_or_none()
+    if by_name:
+        return by_name
     obj = ModuleType(**data.model_dump())
     obj.created_by = created_by
     session.add(obj)
@@ -106,6 +109,14 @@ async def get_defaults(session: AsyncSession, module_type_id: int) -> list[Modul
 
 
 async def add_default(session: AsyncSession, data: ModuleTypeDefaultCreateSchema) -> ModuleTypeDefault:
+    stmt = select(ModuleTypeDefault).where(
+        ModuleTypeDefault.module_type_id == data.module_type_id, ModuleTypeDefault.module_id == data.module_id
+    )
+    existing = (await session.execute(stmt)).scalar_one_or_none()
+    if existing:
+        existing.quantity += data.quantity
+        await session.flush()
+        return existing
     obj = ModuleTypeDefault(**data.model_dump())
     session.add(obj)
     await session.flush()
@@ -122,63 +133,163 @@ async def delete_default(session: AsyncSession, default_id: int) -> ModuleTypeDe
 
 # ── RequestCalc ──
 
+# Разделы расчёта → поле стоимости в Request
+SECTION_COST_FIELDS = {
+    "corpusa": "corpusa_cost",
+    "kso": "kso_cost",
+    "kru": "kru_cost",
+    "sho": "sho_cost",
+    "ktp": "ktp_cost",
+    "pku": "pku_cost",
+    "pus": "pus_cost",
+    "delivery": "delivery_cost",
+    "chief-engineer": "chief_engineer_cost",
+    "smr": "smr_cost",
+    "pnr": "pnr_cost",
+}
+# Разделы, где можно добавлять несколько блоков расчёта
+MULTI_BLOCK_SECTIONS = {"kso", "kru", "sho"}
+# Разделы работ: вместо модулей — себестоимость работ
+WORKS_SECTIONS = {"chief-engineer", "smr", "pnr"}
 
-async def get_or_create_calc(session: AsyncSession, request_id: int, module_type_id: int) -> RequestCalc:
+
+def _calc_options():
+    return selectinload(RequestCalc.items).selectinload(RequestCalcItem.module)
+
+
+async def get_calcs(session: AsyncSession, request_id: int, module_type_id: int) -> list[RequestCalc]:
     stmt = (
         select(RequestCalc)
         .where(RequestCalc.request_id == request_id, RequestCalc.module_type_id == module_type_id)
-        .options(selectinload(RequestCalc.items).selectinload(RequestCalcItem.module))
+        .options(_calc_options())
+        .order_by(RequestCalc.id)
     )
     result = await session.execute(stmt)
-    calc = result.scalar_one_or_none()
+    return list(result.scalars().all())
 
-    # Get module type with linked items
+
+async def create_calc(session: AsyncSession, request_id: int, module_type_id: int) -> RequestCalc:
+    """Новый блок расчёта со значениями по умолчанию: ФОТ/Накладные из справочников, модули по умолчанию."""
     mod_type = await get_module_type_by_id(session, module_type_id)
-
-    if calc:
-        # Refresh fot/overhead from linked items if calc values are still 0
-        if mod_type and mod_type.fot_item and float(calc.fot) == 0 and float(mod_type.fot_item.cost) > 0:
-            calc.fot = float(mod_type.fot_item.cost)
-        if mod_type and mod_type.overhead_item and float(calc.overhead) == 0 and float(mod_type.overhead_item.cost) > 0:
-            calc.overhead = float(mod_type.overhead_item.cost)
-        return calc
-
-    fot_val = float(mod_type.fot_item.cost) if mod_type and mod_type.fot_item else 0
-    overhead_val = float(mod_type.overhead_item.cost) if mod_type and mod_type.overhead_item else 0
-
     calc = RequestCalc(
         request_id=request_id,
         module_type_id=module_type_id,
-        fot=fot_val,
-        overhead=overhead_val,
+        fot=float(mod_type.fot_item.cost) if mod_type and mod_type.fot_item else 0,
+        overhead=float(mod_type.overhead_item.cost) if mod_type and mod_type.overhead_item else 0,
+        quantity=1,
+        works_cost=0,
     )
     session.add(calc)
     await session.flush()
 
-    # Copy defaults
-    if mod_type:
-        defaults = await get_defaults(session, module_type_id)
-        for d in defaults:
-            item = RequestCalcItem(calc_id=calc.id, module_id=d.module_id, quantity=d.quantity)
-            session.add(item)
+    if mod_type and mod_type.slug not in WORKS_SECTIONS:
+        for d in await get_defaults(session, module_type_id):
+            session.add(RequestCalcItem(calc_id=calc.id, module_id=d.module_id, quantity=d.quantity))
         await session.flush()
 
-    # Reload with items eagerly loaded
-    stmt = (
-        select(RequestCalc)
-        .where(RequestCalc.id == calc.id)
-        .options(selectinload(RequestCalc.items).selectinload(RequestCalcItem.module))
-    )
-    result = await session.execute(stmt)
-    return result.scalar_one()
+    calc = await get_calc_by_id(session, calc.id)
+    # Итоги блока сразу, чтобы стоимость раздела учитывала новый блок без нажатия «Сохранить»
+    from scr.dbase.crud_modules import get_module_prices
+
+    prices = await get_module_prices(session)
+    profit = await default_profitability(session, request_id)
+    total = calc_base_cost(calc, prices, works=bool(mod_type and mod_type.slug in WORKS_SECTIONS))
+    calc.profitability_percent = profit
+    calc.total_cost = round(total, 2)
+    calc.final_price = round(total * (1 + profit / 100), 2)
+    await session.flush()
+    return calc
+
+
+async def default_profitability(session: AsyncSession, request_id: int) -> float:
+    """Рентабельность по умолчанию — из организации заявки (15%, если не задана)."""
+    from scr.dbase.models import Organization, Request
+
+    stmt = select(Organization.profitability).join(Request, Request.company_id == Organization.id)
+    value = (await session.execute(stmt.where(Request.id == request_id))).scalar_one_or_none()
+    return float(value) if value else 15.0
+
+
+def calc_base_cost(calc: RequestCalc, prices: dict[int, float], works: bool) -> float:
+    """Себестоимость блока: модули (или себестоимость работ) + ФОТ + Накладные."""
+    if works:
+        base = float(calc.works_cost or 0)
+    else:
+        base = sum(prices.get(it.module_id, 0.0) * it.quantity for it in calc.items)
+    return base + float(calc.fot or 0) + float(calc.overhead or 0)
+
+
+def calc_block_data(calc: RequestCalc, prices: dict[int, float], default_profit: float) -> dict:
+    """Данные блока расчёта для страницы."""
+    profit = float(calc.profitability_percent or 0)
+    return {
+        "id": calc.id,
+        "fot": float(calc.fot or 0),
+        "overhead": float(calc.overhead or 0),
+        "profitability_percent": profit if profit > 0 else default_profit,
+        "quantity": calc.quantity if calc.quantity is not None else 1,
+        "works_cost": float(calc.works_cost or 0),
+        "total_cost": float(calc.total_cost or 0),
+        "final_price": float(calc.final_price or 0),
+        "items": [
+            {
+                "id": it.id,
+                "module_id": it.module_id,
+                "module_name": it.module.name if it.module else "?",
+                "quantity": it.quantity,
+                "module_price": prices.get(it.module_id, 0.0),
+            }
+            for it in calc.items
+        ],
+    }
+
+
+async def get_or_create_calcs(session: AsyncSession, request_id: int, module_type_id: int) -> list[RequestCalc]:
+    calcs = await get_calcs(session, request_id, module_type_id)
+    if not calcs:
+        return [await create_calc(session, request_id, module_type_id)]
+
+    # Refresh fot/overhead from linked items if calc values are still 0
+    mod_type = await get_module_type_by_id(session, module_type_id)
+    for calc in calcs:
+        if mod_type and mod_type.fot_item and float(calc.fot) == 0 and float(mod_type.fot_item.cost) > 0:
+            calc.fot = float(mod_type.fot_item.cost)
+        if mod_type and mod_type.overhead_item and float(calc.overhead) == 0 and float(mod_type.overhead_item.cost) > 0:
+            calc.overhead = float(mod_type.overhead_item.cost)
+    return calcs
+
+
+async def get_or_create_calc(session: AsyncSession, request_id: int, module_type_id: int) -> RequestCalc:
+    return (await get_or_create_calcs(session, request_id, module_type_id))[0]
+
+
+async def recalc_section_cost(session: AsyncSession, request_id: int, module_type_id: int) -> float:
+    """Стоимость раздела в ТКП = сумма (общая стоимость блока × количество)."""
+    from scr.dbase.models import Request
+
+    mod_type = await session.get(ModuleType, module_type_id)
+    req = await session.get(Request, request_id)
+    if not mod_type or not req:
+        return 0.0
+    calcs = await get_calcs(session, request_id, module_type_id)
+    total = sum(float(c.final_price or 0) * (c.quantity or 0) for c in calcs)
+    field = SECTION_COST_FIELDS.get(mod_type.slug)
+    if field:
+        setattr(req, field, round(total, 2))
+        await session.flush()
+    return total
+
+
+async def delete_calc(session: AsyncSession, calc_id: int) -> RequestCalc | None:
+    calc = await session.get(RequestCalc, calc_id)
+    if calc:
+        await session.delete(calc)
+        await session.flush()
+    return calc
 
 
 async def get_calc_by_id(session: AsyncSession, calc_id: int) -> RequestCalc | None:
-    stmt = (
-        select(RequestCalc)
-        .where(RequestCalc.id == calc_id)
-        .options(selectinload(RequestCalc.items).selectinload(RequestCalcItem.module))
-    )
+    stmt = select(RequestCalc).where(RequestCalc.id == calc_id).options(_calc_options())
     result = await session.execute(stmt)
     return result.scalar_one_or_none()
 
@@ -198,6 +309,15 @@ async def update_calc(session: AsyncSession, data: RequestCalcUpdateSchema) -> R
 
 
 async def add_calc_item(session: AsyncSession, data: RequestCalcItemCreateSchema) -> RequestCalcItem:
+    # Модуль уже есть в блоке — увеличиваем количество (уникальность calc_id + module_id)
+    stmt = select(RequestCalcItem).where(
+        RequestCalcItem.calc_id == data.calc_id, RequestCalcItem.module_id == data.module_id
+    )
+    existing = (await session.execute(stmt)).scalar_one_or_none()
+    if existing:
+        existing.quantity += data.quantity
+        await session.flush()
+        return existing
     obj = RequestCalcItem(**data.model_dump())
     session.add(obj)
     await session.flush()

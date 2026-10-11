@@ -22,6 +22,7 @@ from scr.Routers.material_types import mt_router
 from scr.Routers.materials import mat_router
 from scr.Routers.module_types import mt_calc_router
 from scr.Routers.modules import mod_router
+from scr.Routers.nominal_currents import nc_router
 from scr.Routers.pages import pages_router
 from scr.Routers.payments import pay_router
 from scr.Routers.positions import pos_router
@@ -36,15 +37,11 @@ from scr.Routers.users import users_router
 async def lifespan(_: FastAPI):
     async with db_helper.engine.begin() as conn:
         await conn.run_sync(Base.metadata.create_all)
-    # Migrate: add new columns to module_types_calc if missing
-    from sqlalchemy import text
+    # Migrate: add missing columns, drop obsolete ones
+    from scr.dbase.startup_migrations import run_startup_migrations
 
     async with db_helper.engine.begin() as conn:
-        for col in ("fot_item_id", "overhead_item_id"):
-            try:
-                await conn.execute(text(f"ALTER TABLE module_types_calc ADD COLUMN {col} INTEGER"))
-            except Exception:  # noqa: BLE001, S110
-                pass  # column already exists
+        await run_startup_migrations(conn)
     # Seed default probabilities
     from sqlalchemy import select
 
@@ -102,6 +99,16 @@ async def lifespan(_: FastAPI):
             for name, slug in DEFAULT_MODULE_TYPES:
                 session.add(ModuleType(name=name, slug=slug))
             await session.commit()
+    # Seed nominal currents: standard values + values already used in materials
+    from scr.dbase import crud_nominal_currents
+    from scr.dbase.models import DEFAULT_NOMINAL_CURRENTS
+
+    async with db_helper.session_factory() as session:
+        if not await crud_nominal_currents.get_values(session):
+            for value in DEFAULT_NOMINAL_CURRENTS:
+                await crud_nominal_currents.ensure_value(session, value)
+        await crud_nominal_currents.sync_from_materials(session)
+        await session.commit()
     yield
 
 
@@ -155,6 +162,7 @@ app.include_router(mat_router, prefix="/reg")
 app.include_router(mt_router, prefix="/reg")
 app.include_router(mt_calc_router, prefix="/reg")
 app.include_router(mod_router, prefix="/reg")
+app.include_router(nc_router, prefix="/reg")
 app.include_router(del_router, prefix="/reg")
 app.include_router(cs_router, prefix="/reg")
 app.include_router(sc_router, prefix="/reg")

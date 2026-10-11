@@ -32,6 +32,15 @@ body { font-family: 'Segoe UI', system-ui, -apple-system, sans-serif; background
 .sidebar nav a:hover { background: rgba(255,255,255,0.08); color: #fff; }
 .sidebar nav a.active { background: var(--sidebar-active); color: #fff; font-weight: 600; }
 .sidebar nav a .icon { width: 20px; text-align: center; font-size: 1rem; }
+.sidebar nav { overflow-y: auto; }
+.sidebar .nav-group summary { display: flex; align-items: center; gap: 0.5rem; padding: 0.6rem 1rem; color: var(--sidebar-text); font-size: 0.85rem; cursor: pointer; list-style: none; white-space: nowrap; transition: all var(--transition); }
+.sidebar .nav-group summary::-webkit-details-marker { display: none; }
+.sidebar .nav-group summary:hover { background: rgba(255,255,255,0.08); color: #fff; }
+.sidebar .nav-group summary.has-active { color: #fff; font-weight: 600; }
+.sidebar .nav-group summary .icon { width: 20px; text-align: center; font-size: 1rem; }
+.sidebar .nav-group summary .chevron { margin-left: auto; font-size: 0.7rem; transition: transform var(--transition); }
+.sidebar .nav-group[open] summary .chevron { transform: rotate(180deg); }
+.sidebar .nav-group-items a { padding-left: 1.75rem; font-size: 0.8rem; }
 .sidebar .user-section { padding: 0.75rem 1rem; border-top: 1px solid rgba(255,255,255,0.1); overflow: hidden; white-space: nowrap; }
 .sidebar .user-section .user-name { font-size: 0.85rem; color: #fff; font-weight: 600; }
 .sidebar .user-section .user-email { font-size: 0.75rem; color: var(--sidebar-text); }
@@ -259,3 +268,36 @@ form { background: var(--surface); padding: 1.5rem; border-radius: var(--radius)
 .search-select .ss-option.ss-hidden { display: none; }
 .search-select.open .ss-dropdown { display: block; }
 .search-select.open .ss-input { border-radius: 4px 4px 0 0; }
+
+/* Блоки расчёта раздела (КСО, КРУ, ЩО и др.) */
+.calc-section-total { display: flex; align-items: baseline; gap: 0.75rem; flex-wrap: wrap; margin-bottom: 1rem; }
+.calc-section-total strong { font-size: 1.25rem; color: #16a34a; }
+.calc-hint { font-size: 0.8rem; color: var(--text-muted); }
+.calc-blocks { display: flex; gap: 1rem; align-items: stretch; }
+.calc-blocks.multi { overflow-x: auto; padding-bottom: 0.5rem; }
+.calc-blocks.multi .calc-block { flex: 0 0 400px; max-width: 90vw; }
+.calc-blocks.single .calc-block { flex: 1; }
+.calc-block { display: flex; flex-direction: column; gap: 0.75rem; margin: 0; }
+.calc-block .form-group { margin-bottom: 0; }
+.calc-block .form-group input { width: 100%; }
+.calc-block-head { display: flex; justify-content: space-between; align-items: center; }
+.calc-block-title { font-weight: 700; }
+.calc-add-row { display: flex; gap: 0.5rem; align-items: center; }
+.calc-add-row .f-module { flex: 1; min-width: 0; }
+.calc-add-row .f-module-qty { width: 64px; }
+.calc-block-table table { font-size: 0.85rem; }
+.calc-fields { display: grid; grid-template-columns: 1fr; gap: 0.75rem; }
+.calc-blocks.single .calc-fields { grid-template-columns: repeat(3, 1fr); }
+.calc-fmt { font-size: 0.85rem; color: var(--text-muted); margin-top: 0.25rem; }
+.calc-fmt-strong { font-size: 0.95rem; font-weight: bold; color: #16a34a; }
+.calc-value { font-size: 1.1rem; font-weight: bold; padding: 0.5rem; border: 1px solid var(--border, #e2e8f0); border-radius: 6px; background: #f8fafc; }
+.calc-value-green { background: #f0fdf4; }
+.calc-block-actions { margin-top: auto; display: flex; gap: 0.75rem; }
+.calc-block-add { flex: 0 0 160px; min-height: 200px; display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 0.5rem; border: 2px dashed var(--border, #cbd5e1); border-radius: 12px; background: transparent; color: var(--text-muted); font-size: 1rem; cursor: pointer; transition: all var(--transition); }
+.calc-block-add .plus { font-size: 2.5rem; line-height: 1; }
+.calc-block-add:hover { border-color: var(--sidebar-active); color: var(--sidebar-active); background: rgba(79, 70, 229, 0.04); }
+.calc-block-add:disabled { opacity: 0.5; cursor: wait; }
+@media (max-width: 900px) { .calc-blocks.single .calc-fields { grid-template-columns: 1fr; } }
+.calc-blocks .calc-block + .calc-block { margin-top: 0; }
+.nom-tok-badge { font-size: 0.7rem; font-weight: 600; padding: 0.05rem 0.4rem; border-radius: 999px; background: #fef3c7; color: #92400e; margin-left: 0.25rem; }
+.nom-tok-badge.auto { background: #e0e7ff; color: #3730a3; }

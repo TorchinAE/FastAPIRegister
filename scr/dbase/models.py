@@ -347,9 +347,27 @@ class Material(BaseID):
         return f"Material(id={self.id}, name='{self.name}', price={self.price})"
 
 
+class NominalCurrent(Base):
+    """Справочник номинальных токов"""
+
+    __tablename__ = "nominal_currents"
+
+    id: Mapped[int] = mapped_column(primary_key=True)
+    value: Mapped[int] = mapped_column(Integer, unique=True, nullable=False)
+
+    def __repr__(self) -> str:
+        return f"NominalCurrent(id={self.id}, value={self.value})"
+
+
+DEFAULT_NOMINAL_CURRENTS = [16, 25, 40, 63, 100, 160, 250, 400, 630, 800, 1000, 1250, 1600, 2000, 2500, 3150, 4000]
+
+
 class Module(BaseID):
     __tablename__ = "modules"
     name: Mapped[str] = mapped_column(String(200), unique=True, nullable=False)
+    # Ном ток: по умолчанию — максимальный из материалов состава; nom_tok_manual=True — задан вручную
+    nom_tok: Mapped[int] = mapped_column(Integer, default=0, server_default="0", nullable=False)
+    nom_tok_manual: Mapped[bool] = mapped_column(default=False, server_default="0", nullable=False)
 
     items: Mapped[list["ModuleItem"]] = relationship(
         back_populates="module", cascade="all, delete-orphan", foreign_keys="ModuleItem.module_id"
@@ -463,6 +481,10 @@ class RequestCalc(BaseID):
     profitability_percent: Mapped[float] = mapped_column(Numeric(5, 2), default=0)
     total_cost: Mapped[float] = mapped_column(Numeric(12, 2), default=0)
     final_price: Mapped[float] = mapped_column(Numeric(12, 2), default=0)
+    # Количество одинаковых блоков (КСО, КРУ, ЩО); стоимость раздела = final_price * quantity
+    quantity: Mapped[int] = mapped_column(Integer, default=1, server_default="1", nullable=False)
+    # Себестоимость работ (Шеф-инженер, СМР, ПНР) — вместо модулей
+    works_cost: Mapped[float] = mapped_column(Numeric(12, 2), default=0, server_default="0", nullable=False)
 
     request: Mapped["Request"] = relationship(foreign_keys=[request_id])
     module_type: Mapped["ModuleType"] = relationship(foreign_keys=[module_type_id])

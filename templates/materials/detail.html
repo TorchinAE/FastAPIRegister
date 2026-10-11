@@ -26,7 +26,11 @@
             </div>
             <div class="form-group">
                 <label>Ном Ток</label>
-                <input type="number" name="nom_tok" id="nom_tok" value="{{ mat.nom_tok }}" min="0" max="7000" style="width:100%;min-width:0">
+                <select name="nom_tok" id="nom_tok" style="width:100%;min-width:0">
+                    <option value="0" {{ 'selected' if not mat.nom_tok else '' }}>0</option>
+                    {% for v in nom_tok_values %}<option value="{{ v }}" {{ 'selected' if mat.nom_tok == v else '' }}>{{ v }}</option>{% endfor %}
+                    {% if mat.nom_tok and mat.nom_tok not in nom_tok_values %}<option value="{{ mat.nom_tok }}" selected>{{ mat.nom_tok }}</option>{% endif %}
+                </select>
             </div>
             <div class="form-group">
                 <label>Напряжение</label>

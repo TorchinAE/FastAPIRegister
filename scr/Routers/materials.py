@@ -5,7 +5,7 @@ from fastapi.responses import StreamingResponse
 from openpyxl import Workbook, load_workbook
 from sqlalchemy.ext.asyncio import AsyncSession
 
-from scr.dbase import crud_material_types, crud_materials
+from scr.dbase import crud_material_types, crud_materials, crud_modules, crud_nominal_currents
 from scr.dbase.database import db_helper
 from scr.dbase.schemas.schemas import (
     MaterialCreateSchema,
@@ -40,6 +40,7 @@ async def add_material(
     session: AsyncSession = Depends(db_helper.session_dependency),
 ):
     new_mat = await crud_materials.add_material(session=session, in_mat=data)
+    await crud_nominal_currents.ensure_value(session, data.nom_tok)
     await session.commit()
     await session.refresh(new_mat, ["type"])
     return _mat_response(new_mat)
@@ -206,6 +207,8 @@ async def import_materials_excel(
         return {"status": "confirm", "conflicts": conflicts, "total": len(new_rows)}
 
     imported = await _do_import(session, rows)
+    await crud_nominal_currents.sync_from_materials(session)
+    await crud_modules.recalc_nom_tok(session)
     await session.commit()
     return {"status": "ok", "message": f"Импортировано: {imported}", "imported": imported}
 
@@ -221,6 +224,8 @@ async def import_materials_excel_confirm(
     ws = wb.active
     rows = list(ws.iter_rows(values_only=True))
     imported = await _do_import(session, rows)
+    await crud_nominal_currents.sync_from_materials(session)
+    await crud_modules.recalc_nom_tok(session)
     await session.commit()
     return {"status": "ok", "message": f"Импортировано: {imported}", "imported": imported}
 
@@ -577,6 +582,9 @@ async def update_material(
     result = await crud_materials.update_material(session=session, upd_mat=data)
     if not result:
         raise HTTPException(status_code=404, detail="Материал не найден")
+    if data.nom_tok is not None:
+        await crud_nominal_currents.ensure_value(session, data.nom_tok)
+        await crud_modules.recalc_nom_tok(session)
     await session.commit()
     await session.refresh(result, ["type"])
     return _mat_response(result)

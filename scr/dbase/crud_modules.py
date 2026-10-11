@@ -79,6 +79,13 @@ async def update_module(session: AsyncSession, upd_mod: ModuleUpdateSchema) -> M
         return None
     if upd_mod.name is not None:
         check_mod.name = upd_mod.name
+    if upd_mod.nom_tok_manual is False:
+        # Вернуть автоматический расчёт ном. тока
+        check_mod.nom_tok_manual = False
+        await recalc_nom_tok(session)
+    elif upd_mod.nom_tok is not None:
+        check_mod.nom_tok = upd_mod.nom_tok
+        check_mod.nom_tok_manual = True
     await session.flush()
     return check_mod
 
@@ -130,3 +137,78 @@ async def get_module_items(session: AsyncSession, module_id: int) -> list[Module
     )
     result = await session.execute(stmt)
     return list(result.scalars().all())
+
+
+# ── Цены и ном. ток модулей с учётом вложенности ──
+
+
+async def _load_tree(session: AsyncSession) -> tuple[dict[int, list[tuple]], dict[int, tuple[float, int]]]:
+    """Состав всех модулей одной выборкой: {module_id: [(material_id, sub_module_id, qty)]} и данные материалов."""
+    from scr.dbase.models import Material
+
+    items_result = await session.execute(
+        select(ModuleItem.module_id, ModuleItem.material_id, ModuleItem.sub_module_id, ModuleItem.quantity)
+    )
+    tree: dict[int, list[tuple]] = {}
+    for module_id, material_id, sub_module_id, qty in items_result.all():
+        tree.setdefault(module_id, []).append((material_id, sub_module_id, qty))
+    mat_result = await session.execute(select(Material.id, Material.price, Material.nom_tok))
+    materials = {mid: (float(price or 0), nom_tok or 0) for mid, price, nom_tok in mat_result.all()}
+    return tree, materials
+
+
+async def get_module_prices(session: AsyncSession) -> dict[int, float]:
+    """Стоимость каждого модуля (рекурсивно по подмодулям, с защитой от циклов)."""
+    tree, materials = await _load_tree(session)
+    prices: dict[int, float] = {}
+
+    def price_of(module_id: int, stack: frozenset) -> float:
+        if module_id in prices:
+            return prices[module_id]
+        if module_id in stack:
+            return 0.0
+        total = 0.0
+        for material_id, sub_module_id, qty in tree.get(module_id, []):
+            if material_id is not None:
+                total += materials.get(material_id, (0.0, 0))[0] * qty
+            elif sub_module_id is not None:
+                total += price_of(sub_module_id, stack | {module_id}) * qty
+        prices[module_id] = total
+        return total
+
+    ids = await session.execute(select(Module.id))
+    for (module_id,) in ids.all():
+        price_of(module_id, frozenset())
+    return prices
+
+
+async def recalc_nom_tok(session: AsyncSession) -> None:
+    """Пересчитывает ном. ток модулей без ручного значения: максимум из материалов состава (с подмодулями)."""
+    tree, materials = await _load_tree(session)
+    modules = list((await session.execute(select(Module))).scalars().all())
+    by_id = {m.id: m for m in modules}
+    auto: dict[int, int] = {}
+
+    def tok_of(module_id: int, stack: frozenset) -> int:
+        mod = by_id.get(module_id)
+        if mod is not None and mod.nom_tok_manual:
+            return mod.nom_tok or 0
+        if module_id in auto:
+            return auto[module_id]
+        if module_id in stack:
+            return 0
+        best = 0
+        for material_id, sub_module_id, _qty in tree.get(module_id, []):
+            if material_id is not None:
+                best = max(best, materials.get(material_id, (0.0, 0))[1])
+            elif sub_module_id is not None:
+                best = max(best, tok_of(sub_module_id, stack | {module_id}))
+        auto[module_id] = best
+        return best
+
+    for mod in modules:
+        if not mod.nom_tok_manual:
+            value = tok_of(mod.id, frozenset())
+            if mod.nom_tok != value:
+                mod.nom_tok = value
+    await session.flush()

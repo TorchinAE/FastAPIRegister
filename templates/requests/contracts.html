@@ -81,6 +81,8 @@ existingContracts.sort((a,b) => a - b).forEach(n => {
     opt.textContent = 'Договор №' + n;
     contractSelect.appendChild(opt);
 });
+// По умолчанию выбран последний договор
+if (existingContracts.length) contractSelect.value = Math.max(...existingContracts);
 
 async function newContract(reqId, companyId) {
     const resp = await fetch('/reg/api/contract-specs/', {

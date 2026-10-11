@@ -27,64 +27,34 @@
                 </tr>
             </thead>
             <tbody>
-                {% for calc in all_calcs %}
-                {% set modules_sum = [] %}
-                {% for item in calc.items %}{% if item.module %}{% if modules_sum.append(item.module.total_price * item.quantity) %}{% endif %}{% endif %}{% endfor %}
-                {% set comp = modules_sum|sum if modules_sum else 0 %}
-                {% set qty = section_quantities.get(calc.module_type.slug, 0) %}
+                {% for row in rows %}
                 <tr>
-                    <td><a href="/reg/requests/{{ req.id }}/calc/{{ calc.module_type.slug }}">{{ calc.module_type.name }}</a></td>
-                    <td style="text-align:right;">{{ qty }}</td>
-                    <td style="text-align:right;">{{ comp|money }}</td>
-                    <td style="text-align:right;">{{ calc.fot|money }}</td>
-                    <td style="text-align:right;">{{ calc.overhead|money }}</td>
-                    <td style="text-align:right;">{{ calc.total_cost|money }}</td>
-                    <td style="text-align:right;">{{ "%.2f"|format(calc.profitability_percent) }}%</td>
-                    <td style="text-align:right;font-weight:bold;">{{ calc.final_price|money }}</td>
-                    <td style="text-align:right;font-weight:bold;color:#16a34a;">{{ (float(calc.final_price) * (1 + nds_percent / 100))|money }}</td>
+                    <td><a href="/reg/requests/{{ req.id }}/calc/{{ row.slug }}">{{ row.name }}</a></td>
+                    <td style="text-align:right;">{{ row.quantity }}</td>
+                    <td style="text-align:right;">{{ row.comp|money if row.comp else '—' }}</td>
+                    <td style="text-align:right;">{{ row.fot|money if row.fot else '—' }}</td>
+                    <td style="text-align:right;">{{ row.overhead|money if row.overhead else '—' }}</td>
+                    <td style="text-align:right;">{{ row.cost|money }}</td>
+                    <td style="text-align:right;">{{ "%.2f"|format(row.profit_percent) }}%</td>
+                    <td style="text-align:right;font-weight:bold;">{{ row.final|money }}</td>
+                    <td style="text-align:right;font-weight:bold;color:#16a34a;">{{ row.final_nds|money }}</td>
                 </tr>
                 {% endfor %}
-                {% if delivery and delivery.final_price and delivery.final_price > 0 %}
-                <tr>
-                    <td><a href="/reg/requests/{{ req.id }}/calc/delivery">Доставка</a></td>
-                    <td style="text-align:right;">{{ delivery.trucks_count or 0 }}</td>
-                    <td style="text-align:right;">—</td>
-                    <td style="text-align:right;">—</td>
-                    <td style="text-align:right;">—</td>
-                    <td style="text-align:right;">{{ ((delivery.cost_per_truck or 0) * (delivery.trucks_count or 0))|money }}</td>
-                    <td style="text-align:right;">{{ "%.2f"|format(delivery.profitability_percent or 0) }}%</td>
-                    <td style="text-align:right;font-weight:bold;">{{ delivery.final_price|money }}</td>
-                    <td style="text-align:right;font-weight:bold;color:#16a34a;">{{ (float(delivery.final_price) * (1 + nds_percent / 100))|money }}</td>
-                </tr>
+                {% if not rows %}
+                <tr><td colspan="9" style="text-align:center;color:var(--text-muted);padding:1.5rem;">Нет расчётов</td></tr>
                 {% endif %}
-                {% for section, label in [('chief-engineer', 'Шеф-инженер'), ('smr', 'СМР'), ('pnr', 'ПНР')] %}
-                {% set sc = service_calcs.get(section) %}
-                {% if sc and sc.final_price and sc.final_price > 0 %}
-                <tr>
-                    <td><a href="/reg/requests/{{ req.id }}/calc/{{ section }}">{{ label }}</a></td>
-                    <td style="text-align:right;">{{ sc.quantity or 1 }}</td>
-                    <td style="text-align:right;">—</td>
-                    <td style="text-align:right;">—</td>
-                    <td style="text-align:right;">—</td>
-                    <td style="text-align:right;">{{ sc.base_cost|money }}</td>
-                    <td style="text-align:right;">{{ "%.2f"|format(sc.profitability_percent or 0) }}%</td>
-                    <td style="text-align:right;font-weight:bold;">{{ sc.final_price|money }}</td>
-                    <td style="text-align:right;font-weight:bold;color:#16a34a;">{{ (float(sc.final_price) * (1 + nds_percent / 100))|money }}</td>
-                </tr>
-                {% endif %}
-                {% endfor %}
             </tbody>
             <tfoot>
                 <tr style="font-weight:bold;background:#f0fdf4;">
                     <td>ИТОГО</td>
                     <td></td>
-                    <td style="text-align:right;" id="sumComp">0.00</td>
-                    <td style="text-align:right;" id="sumFot">0.00</td>
-                    <td style="text-align:right;" id="sumOverhead">0.00</td>
-                    <td style="text-align:right;" id="sumCost">0.00</td>
+                    <td style="text-align:right;">{{ totals.comp|money }}</td>
+                    <td style="text-align:right;">{{ totals.fot|money }}</td>
+                    <td style="text-align:right;">{{ totals.overhead|money }}</td>
+                    <td style="text-align:right;">{{ totals.cost|money }}</td>
                     <td></td>
-                    <td style="text-align:right;" id="sumFinal">0.00</td>
-                    <td style="text-align:right;color:#16a34a;" id="sumFinalNds">0.00</td>
+                    <td style="text-align:right;">{{ totals.final|money }}</td>
+                    <td style="text-align:right;color:#16a34a;">{{ totals.final_nds|money }}</td>
                 </tr>
             </tfoot>
         </table>
@@ -92,35 +62,4 @@
 </div>
 
 <div id="toast" class="toast" style="display:none"></div>
-{% endblock %}
-
-{% block scripts %}
-<script>
-const ndsPercent = {{ nds_percent }};
-
-(function() {
-    let sumComp = 0, sumFot = 0, sumOverhead = 0, sumCost = 0, sumFinal = 0;
-    document.querySelectorAll('table tbody tr').forEach(tr => {
-        const cells = tr.querySelectorAll('td');
-        if (cells.length >= 9) {
-            const comp = parseFloat(cells[2].textContent.replace(/\s/g, '').replace(',', '.')) || 0;
-            const fot = parseFloat(cells[3].textContent.replace(/\s/g, '').replace(',', '.')) || 0;
-            const oh = parseFloat(cells[4].textContent.replace(/\s/g, '').replace(',', '.')) || 0;
-            const cost = parseFloat(cells[5].textContent.replace(/\s/g, '').replace(',', '.')) || 0;
-            const fin = parseFloat(cells[7].textContent.replace(/\s/g, '').replace(',', '.')) || 0;
-            if (comp > 0) sumComp += comp;
-            if (fot > 0) sumFot += fot;
-            if (oh > 0) sumOverhead += oh;
-            if (cost > 0) sumCost += cost;
-            if (fin > 0) sumFinal += fin;
-        }
-    });
-    document.getElementById('sumComp').textContent = formatFinancial(sumComp);
-    document.getElementById('sumFot').textContent = formatFinancial(sumFot);
-    document.getElementById('sumOverhead').textContent = formatFinancial(sumOverhead);
-    document.getElementById('sumCost').textContent = formatFinancial(sumCost);
-    document.getElementById('sumFinal').textContent = formatFinancial(sumFinal);
-    document.getElementById('sumFinalNds').textContent = formatFinancial(sumFinal * (1 + ndsPercent / 100));
-})();
-</script>
 {% endblock %}

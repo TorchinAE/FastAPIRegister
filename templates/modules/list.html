@@ -25,11 +25,12 @@
     <table id="dataTable">
         <thead>
             <tr>
-                <th>ID</th><th>Название</th><th>Компонентов</th><th>Стоимость</th><th></th>
+                <th>ID</th><th>Название</th><th>Ном Ток</th><th>Компонентов</th><th>Стоимость</th><th></th>
             </tr>
             <tr class="table-filter">
                 <th><input type="text" data-col="0" data-min="1" placeholder="Фильтр..." class="tf-input"></th>
                 <th><input type="text" data-col="1" placeholder="Фильтр..." class="tf-input"></th>
+                <th></th>
                 <th></th>
                 <th></th>
                 <th></th>
@@ -40,14 +41,15 @@
             <tr style="cursor:pointer" onclick="location.href='/reg/modules/{{ item.id }}'">
                 <td><strong>{{ item.id }}</strong></td>
                 <td>{{ item.name }}</td>
+                <td>{{ item.nom_tok or 0 }}</td>
                 <td>{{ item.items_count }}</td>
-                <td>{{ item.total_price|money }}</td>
+                <td>{{ prices.get(item.id, 0)|money }}</td>
                 <td style="text-align:center;width:40px">
                     <button class="btn btn-danger btn-sm btn-icon" title="Удалить" onclick="event.stopPropagation(); deleteMod({{ item.id }}, this)">&#10005;</button>
                 </td>
             </tr>
             {% endfor %}
-            {% if not items %}<tr class="empty-row"><td colspan="5">Нет модулей</td></tr>{% endif %}
+            {% if not items %}<tr class="empty-row"><td colspan="6">Нет модулей</td></tr>{% endif %}
         </tbody>
     </table>
 </div>

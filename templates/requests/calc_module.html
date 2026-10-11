@@ -6,94 +6,37 @@
         <h1>Расчёт ТКП — {{ mt.name }}</h1>
         <div class="subtitle">Код: {{ req.id }} &middot; {{ req.tkp_num or '' }}</div>
     </div>
-    <a href="/reg/requests/{{ req.id }}/calc" class="btn btn-ghost">&larr; Назад к расчёту</a>
-</div>
-
-<div class="card" style="margin-bottom:1rem;">
-    <div style="display:flex;gap:0.75rem;align-items:flex-end;flex-wrap:wrap;">
-        <div class="form-group" style="flex:2;min-width:200px;margin-bottom:0;">
-            <label>Модуль</label>
-            <select id="moduleSelect" style="width:100%;">
-                <option value="">-- Выберите модуль --</option>
-                {% for mod in modules %}
-                <option value="{{ mod.id }}" data-price="{{ mod.total_price }}">{{ mod.name }} ({{ mod.total_price|money }})</option>
-                {% endfor %}
-            </select>
-        </div>
-        <div class="form-group" style="width:80px;margin-bottom:0;">
-            <label>Кол-во</label>
-            <input type="number" id="moduleQty" value="1" min="1" style="width:100%;">
-        </div>
-        <button type="button" class="btn btn-success" style="height:38px;" onclick="addModule()">Добавить модуль</button>
-        <a href="/reg/module-types-calc/{{ mt.id }}/defaults" class="btn btn-ghost" style="height:38px;">По умолчанию</a>
+    <div style="display:flex;gap:0.5rem;flex-wrap:wrap;">
+        {% if not works %}
+        <a href="/reg/module-types-calc/{{ mt.id }}/defaults" class="btn btn-ghost">По умолчанию</a>
+        {% endif %}
+        <a href="/reg/requests/{{ req.id }}/calc" class="btn btn-ghost">&larr; Назад к расчёту</a>
     </div>
 </div>
 
-<div class="table-wrap">
-    <table>
-        <thead>
-            <tr><th>Модуль</th><th>Кол-во</th><th>Цена за ед.</th><th>Сумма</th><th></th></tr>
-        </thead>
-        <tbody id="calcBody">
-            {% for item in calc.items %}
-            <tr data-id="{{ item.id }}" data-price="{{ item.module.total_price if item.module else 0 }}">
-                <td>{{ item.module.name if item.module else '?' }}</td>
-                <td><input type="number" value="{{ item.quantity }}" min="1" style="width:70px;" onchange="updateQty({{ item.id }}, this.value, this)"></td>
-                <td class="col-price">{{ (item.module.total_price if item.module else 0)|money }}</td>
-                <td class="col-sum">{{ (item.module.total_price * item.quantity if item.module else 0)|money }}</td>
-                <td><button class="btn btn-danger btn-sm" onclick="removeItem({{ item.id }}, this)">Удалить</button></td>
-            </tr>
-            {% endfor %}
-        </tbody>
-        <tfoot>
-            <tr>
-                <td colspan="3" style="text-align:right;font-weight:bold;">Итого модули:</td>
-                <td style="font-weight:bold;" id="modulesTotal">0.00</td>
-                <td></td>
-            </tr>
-        </tfoot>
-    </table>
+{% if multi %}
+<div class="card calc-section-total">
+    <span>Итого по разделу «{{ mt.name }}»:</span>
+    <strong id="sectionTotal">0.00</strong>
+    <span class="calc-hint">сумма «Общая стоимость × Количество» всех блоков</span>
+</div>
+{% endif %}
+
+<div id="blocks" class="calc-blocks {{ 'multi' if multi else 'single' }}">
+    {% if multi %}
+    <button type="button" class="calc-block-add" id="addBlockBtn" onclick="addBlock()">
+        <span class="plus">+</span>
+        <span>Добавить</span>
+    </button>
+    {% endif %}
 </div>
 
-<div class="card" style="margin-top:1rem;">
-    <div style="display:grid;grid-template-columns:1fr 1fr 1fr;gap:1rem;">
-        <div class="form-group">
-            <label>ФОТ (₽)</label>
-            <input type="number" id="fot" value="{{ calc.fot }}" min="0" step="0.01" style="width:100%;" oninput="recalc()">
-            <div id="fotFmt" style="font-size:0.85rem;color:var(--text-muted);margin-top:0.25rem;"></div>
-        </div>
-        <div class="form-group">
-            <label>Накладные (₽)</label>
-            <input type="number" id="overhead" value="{{ calc.overhead }}" min="0" step="0.01" style="width:100%;" oninput="recalc()">
-            <div id="overheadFmt" style="font-size:0.85rem;color:var(--text-muted);margin-top:0.25rem;"></div>
-        </div>
-        <div class="form-group">
-            <label>Себестоимость (₽)</label>
-            <div id="totalCost" style="font-size:1.2rem;font-weight:bold;padding:0.5rem;background:#f0fdf4;border:1px solid var(--border,#e2e8f0);border-radius:6px;">0.00</div>
-        </div>
-    </div>
-    <div style="display:grid;grid-template-columns:1fr 1fr 1fr;gap:1rem;margin-top:1rem;">
-        <div class="form-group">
-            <label>Рентабельность (%)</label>
-            <input type="number" id="profitPercent" value="{{ profitability }}" min="0" max="100" step="0.01" style="width:100%;" oninput="recalcFromPercent()">
-            <div id="profitPercentFmt" style="font-size:0.85rem;color:var(--text-muted);margin-top:0.25rem;"></div>
-        </div>
-        <div class="form-group">
-            <label>Рентабельность (₽)</label>
-            <input type="number" id="profitRubInput" min="0" step="0.01" style="width:100%;" oninput="recalcFromProfitRub()">
-            <div id="profitRub" style="padding:0.5rem;background:#f8fafc;border:1px solid var(--border,#e2e8f0);border-radius:6px;margin-top:0.25rem;">0.00</div>
-        </div>
-        <div class="form-group">
-            <label>Общая стоимость (₽)</label>
-            <input type="number" id="finalPrice" min="0" step="0.01" style="width:100%;background:#f0fdf4;font-weight:bold;font-size:1.1rem;" oninput="recalcFromFinal()">
-            <div id="finalPriceFmt" style="font-size:0.95rem;font-weight:bold;color:#16a34a;margin-top:0.25rem;"></div>
-        </div>
-    </div>
-    <div class="actions" style="margin-top:1.5rem;display:flex;gap:0.75rem;">
-        <button type="button" class="btn btn-primary" onclick="saveAll()">Сохранить</button>
-        <button type="button" class="btn btn-danger" onclick="clearAll()">Очистить</button>
-    </div>
-</div>
+<template id="moduleOptions">
+    <option value="">-- Выберите модуль --</option>
+    {% for mod in modules %}
+    <option value="{{ mod.id }}">{{ mod.name }} ({{ prices.get(mod.id, 0)|money }})</option>
+    {% endfor %}
+</template>
 
 <div id="toast" class="toast" style="display:none"></div>
 {% endblock %}
@@ -101,208 +44,321 @@
 {% block scripts %}
 <script>
 const reqId = {{ req.id }};
-const calcId = {{ calc.id }};
-const costField = '{{ cost_field }}';
-let suppressInput = false;
+const moduleTypeId = {{ mt.id }};
+const MULTI = {{ 'true' if multi else 'false' }};
+const WORKS = {{ 'true' if works else 'false' }};
+const initialBlocks = {{ blocks | tojson }};
 
-function recalcModulesTotal() {
+const blocksEl = document.getElementById('blocks');
+const addBtn = document.getElementById('addBlockBtn');
+
+function esc(s) {
+    return String(s ?? '').replace(/[&<>"']/g, c => ({'&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;'}[c]));
+}
+function num(el) { return parseFloat(el.value) || 0; }
+
+function renderBlock(data, index) {
+    const el = document.createElement('div');
+    el.className = 'card calc-block';
+    el.dataset.id = data.id;
+
+    const modulesPart = WORKS ? `
+        <div class="form-group">
+            <label>Себестоимость работ (₽)</label>
+            <input type="number" class="f-works" value="${data.works_cost}" min="0" step="0.01">
+            <div class="calc-fmt f-works-fmt"></div>
+        </div>` : `
+        <div class="calc-add-row">
+            <select class="f-module"></select>
+            <input type="number" class="f-module-qty" value="1" min="1" title="Кол-во">
+            <button type="button" class="btn btn-success btn-sm f-add-module">Добавить модуль</button>
+        </div>
+        <div class="table-wrap calc-block-table">
+            <table>
+                <thead><tr><th>Модуль</th><th>Кол-во</th><th>Цена за ед.</th><th>Сумма</th><th></th></tr></thead>
+                <tbody class="f-items"></tbody>
+                <tfoot><tr>
+                    <td colspan="3" style="text-align:right;font-weight:bold;">Итого модули:</td>
+                    <td class="f-modules-total" style="font-weight:bold;">0.00</td><td></td>
+                </tr></tfoot>
+            </table>
+        </div>`;
+
+    el.innerHTML = `
+        ${MULTI ? `<div class="calc-block-head">
+            <span class="calc-block-title">Блок ${index}</span>
+            <button type="button" class="btn btn-danger btn-sm btn-icon f-delete-block" title="Удалить блок">&#10005;</button>
+        </div>` : ''}
+        ${modulesPart}
+        <div class="calc-fields">
+            <div class="form-group">
+                <label>ФОТ (₽)</label>
+                <input type="number" class="f-fot" value="${data.fot}" min="0" step="0.01">
+                <div class="calc-fmt f-fot-fmt"></div>
+            </div>
+            <div class="form-group">
+                <label>Накладные (₽)</label>
+                <input type="number" class="f-overhead" value="${data.overhead}" min="0" step="0.01">
+                <div class="calc-fmt f-overhead-fmt"></div>
+            </div>
+            <div class="form-group">
+                <label>Себестоимость (₽)</label>
+                <div class="calc-value calc-value-green f-total-cost">0.00</div>
+            </div>
+            <div class="form-group">
+                <label>Рентабельность (%)</label>
+                <input type="number" class="f-profit-pct" value="${data.profitability_percent}" min="0" max="100" step="0.01">
+            </div>
+            <div class="form-group">
+                <label>Рентабельность (₽)</label>
+                <input type="number" class="f-profit-rub" min="0" step="0.01">
+                <div class="calc-fmt f-profit-rub-fmt"></div>
+            </div>
+            <div class="form-group">
+                <label>Общая стоимость (₽)</label>
+                <input type="number" class="f-final" min="0" step="0.01" style="background:#f0fdf4;font-weight:bold;">
+                <div class="calc-fmt calc-fmt-strong f-final-fmt"></div>
+            </div>
+            ${MULTI ? `
+            <div class="form-group">
+                <label>Количество</label>
+                <input type="number" class="f-qty" value="${data.quantity}" min="0" step="1">
+            </div>
+            <div class="form-group">
+                <label>Итого × кол-во (₽)</label>
+                <div class="calc-value calc-value-green f-block-total">0.00</div>
+            </div>` : ''}
+        </div>
+        <div class="actions calc-block-actions">
+            <button type="button" class="btn btn-primary f-save">Сохранить</button>
+            <button type="button" class="btn btn-danger f-clear">Очистить</button>
+        </div>`;
+
+    if (!WORKS) {
+        el.querySelector('.f-module').innerHTML = document.getElementById('moduleOptions').innerHTML;
+        data.items.forEach(item => appendItemRow(el, item));
+        el.querySelector('.f-add-module').addEventListener('click', () => addModule(el));
+    }
+    el.querySelector('.f-fot').addEventListener('input', () => recalc(el));
+    el.querySelector('.f-overhead').addEventListener('input', () => recalc(el));
+    el.querySelector('.f-profit-pct').addEventListener('input', () => recalc(el));
+    el.querySelector('.f-profit-rub').addEventListener('input', () => recalc(el, 'rub'));
+    el.querySelector('.f-final').addEventListener('input', () => recalc(el, 'final'));
+    if (WORKS) el.querySelector('.f-works').addEventListener('input', () => recalc(el));
+    if (MULTI) {
+        el.querySelector('.f-qty').addEventListener('input', () => recalc(el));
+        el.querySelector('.f-delete-block').addEventListener('click', () => deleteBlock(el));
+    }
+    el.querySelector('.f-save').addEventListener('click', () => saveBlock(el));
+    el.querySelector('.f-clear').addEventListener('click', () => clearBlock(el));
+
+    if (addBtn) blocksEl.insertBefore(el, addBtn); else blocksEl.appendChild(el);
+    recalc(el);
+    return el;
+}
+
+function appendItemRow(el, item) {
+    const tbody = el.querySelector('.f-items');
+    let tr = tbody.querySelector(`tr[data-item-id="${item.id}"]`);
+    if (!tr) {
+        tr = document.createElement('tr');
+        tr.dataset.itemId = item.id;
+        tr.innerHTML = `
+            <td>${esc(item.module_name)}</td>
+            <td><input type="number" class="f-item-qty" min="1" style="width:64px;"></td>
+            <td class="col-price"></td>
+            <td class="col-sum"></td>
+            <td><button type="button" class="btn btn-danger btn-sm btn-icon" title="Удалить">&#10005;</button></td>`;
+        tr.querySelector('.f-item-qty').addEventListener('change', e => updateItemQty(el, tr, e.target.value));
+        tr.querySelector('button').addEventListener('click', () => removeItem(el, tr));
+        tbody.appendChild(tr);
+    }
+    tr.dataset.price = item.module_price;
+    tr.querySelector('.f-item-qty').value = item.quantity;
+    tr.querySelector('.col-price').textContent = formatFinancial(item.module_price);
+}
+
+function modulesSum(el) {
+    if (WORKS) return num(el.querySelector('.f-works'));
     let total = 0;
-    document.querySelectorAll('#calcBody tr').forEach(tr => {
-        const price = parseFloat(tr.dataset.price) || 0;
-        const qty = parseInt(tr.querySelector('input')?.value) || 0;
-        const sum = price * qty;
+    el.querySelectorAll('.f-items tr').forEach(tr => {
+        const sum = (parseFloat(tr.dataset.price) || 0) * (parseInt(tr.querySelector('.f-item-qty').value) || 0);
         tr.querySelector('.col-sum').textContent = formatFinancial(sum);
         total += sum;
     });
-    document.getElementById('modulesTotal').textContent = formatFinancial(total);
+    el.querySelector('.f-modules-total').textContent = formatFinancial(total);
     return total;
 }
 
-function recalcAll(modulesSum) {
-    const fot = parseFloat(document.getElementById('fot').value) || 0;
-    const overhead = parseFloat(document.getElementById('overhead').value) || 0;
-    const totalCost = modulesSum + fot + overhead;
-    const profitPercent = parseFloat(document.getElementById('profitPercent').value) || 0;
-    const profitRub = totalCost * profitPercent / 100;
-    const finalPrice = totalCost + profitRub;
+// mode: 'pct' — от процента, 'rub' — от рентабельности в рублях, 'final' — от общей стоимости
+function recalc(el, mode = 'pct') {
+    const base = modulesSum(el);
+    const fot = num(el.querySelector('.f-fot'));
+    const overhead = num(el.querySelector('.f-overhead'));
+    const totalCost = base + fot + overhead;
+    const pctEl = el.querySelector('.f-profit-pct');
+    const rubEl = el.querySelector('.f-profit-rub');
+    const finalEl = el.querySelector('.f-final');
+    let profitRub, finalPrice;
 
-    document.getElementById('fotFmt').textContent = formatFinancial(fot);
-    document.getElementById('overheadFmt').textContent = formatFinancial(overhead);
-    document.getElementById('totalCost').textContent = formatFinancial(totalCost);
-    document.getElementById('profitPercentFmt').textContent = profitPercent.toFixed(2) + '%';
-    document.getElementById('profitRubInput').value = profitRub.toFixed(2);
-    document.getElementById('profitRub').textContent = formatFinancial(profitRub);
-    document.getElementById('finalPrice').value = finalPrice.toFixed(2);
-    document.getElementById('finalPriceFmt').textContent = formatFinancial(finalPrice);
+    if (mode === 'rub') {
+        profitRub = num(rubEl);
+        finalPrice = totalCost + profitRub;
+        pctEl.value = (totalCost > 0 ? profitRub / totalCost * 100 : 0).toFixed(2);
+        finalEl.value = finalPrice.toFixed(2);
+    } else if (mode === 'final') {
+        finalPrice = num(finalEl);
+        profitRub = finalPrice - totalCost;
+        pctEl.value = (totalCost > 0 ? profitRub / totalCost * 100 : 0).toFixed(2);
+        rubEl.value = profitRub.toFixed(2);
+    } else {
+        profitRub = totalCost * num(pctEl) / 100;
+        finalPrice = totalCost + profitRub;
+        rubEl.value = profitRub.toFixed(2);
+        finalEl.value = finalPrice.toFixed(2);
+    }
+
+    if (WORKS) el.querySelector('.f-works-fmt').textContent = formatFinancial(base);
+    el.querySelector('.f-fot-fmt').textContent = formatFinancial(fot);
+    el.querySelector('.f-overhead-fmt').textContent = formatFinancial(overhead);
+    el.querySelector('.f-total-cost').textContent = formatFinancial(totalCost);
+    el.querySelector('.f-profit-rub-fmt').textContent = formatFinancial(profitRub);
+    el.querySelector('.f-final-fmt').textContent = formatFinancial(finalPrice);
+    if (MULTI) {
+        el.querySelector('.f-block-total').textContent = formatFinancial(finalPrice * (parseInt(el.querySelector('.f-qty').value) || 0));
+    }
+    el.dataset.totalCost = totalCost;
+    el.dataset.finalPrice = finalPrice;
+    updateSectionTotal();
 }
 
-function recalc() {
-    if (suppressInput) return;
-    suppressInput = true;
-    const modulesSum = recalcModulesTotal();
-    recalcAll(modulesSum);
-    suppressInput = false;
+function updateSectionTotal() {
+    const totalEl = document.getElementById('sectionTotal');
+    if (!totalEl) return;
+    let total = 0;
+    blocksEl.querySelectorAll('.calc-block').forEach(el => {
+        total += (parseFloat(el.dataset.finalPrice) || 0) * (parseInt(el.querySelector('.f-qty').value) || 0);
+    });
+    totalEl.textContent = formatFinancial(total);
 }
 
-function recalcFromPercent() {
-    if (suppressInput) return;
-    suppressInput = true;
-    const modulesSum = recalcModulesTotal();
-    recalcAll(modulesSum);
-    suppressInput = false;
+function renumberBlocks() {
+    blocksEl.querySelectorAll('.calc-block-title').forEach((t, i) => t.textContent = 'Блок ' + (i + 1));
 }
 
-function recalcFromProfitRub() {
-    if (suppressInput) return;
-    suppressInput = true;
-    const modulesSum = recalcModulesTotal();
-    const fot = parseFloat(document.getElementById('fot').value) || 0;
-    const overhead = parseFloat(document.getElementById('overhead').value) || 0;
-    const totalCost = modulesSum + fot + overhead;
-    const profitRub = parseFloat(document.getElementById('profitRubInput').value) || 0;
-    const profitPercent = totalCost > 0 ? (profitRub / totalCost * 100) : 0;
-    const finalPrice = totalCost + profitRub;
-
-    document.getElementById('fotFmt').textContent = formatFinancial(fot);
-    document.getElementById('overheadFmt').textContent = formatFinancial(overhead);
-    document.getElementById('totalCost').textContent = formatFinancial(totalCost);
-    document.getElementById('profitPercent').value = profitPercent.toFixed(2);
-    document.getElementById('profitPercentFmt').textContent = profitPercent.toFixed(2) + '%';
-    document.getElementById('profitRub').textContent = formatFinancial(profitRub);
-    document.getElementById('finalPrice').value = finalPrice.toFixed(2);
-    document.getElementById('finalPriceFmt').textContent = formatFinancial(finalPrice);
-    suppressInput = false;
+async function addBlock() {
+    addBtn.disabled = true;
+    try {
+        const resp = await fetch('/reg/api/request-calcs/', {
+            method: 'POST',
+            headers: {'Content-Type': 'application/json'},
+            body: JSON.stringify({request_id: reqId, module_type_id: moduleTypeId}),
+        });
+        if (!resp.ok) { showToast('Ошибка создания блока'); return; }
+        const data = await resp.json();
+        const el = renderBlock(data.block, blocksEl.querySelectorAll('.calc-block').length + 1);
+        el.scrollIntoView({behavior: 'smooth', inline: 'nearest', block: 'nearest'});
+        showToast('Блок добавлен');
+    } finally {
+        addBtn.disabled = false;
+    }
 }
 
-function recalcFromFinal() {
-    if (suppressInput) return;
-    suppressInput = true;
-    const modulesSum = recalcModulesTotal();
-    const fot = parseFloat(document.getElementById('fot').value) || 0;
-    const overhead = parseFloat(document.getElementById('overhead').value) || 0;
-    const totalCost = modulesSum + fot + overhead;
-    const finalPrice = parseFloat(document.getElementById('finalPrice').value) || 0;
-    const profitRub = finalPrice - totalCost;
-    const profitPercent = totalCost > 0 ? (profitRub / totalCost * 100) : 0;
-
-    document.getElementById('fotFmt').textContent = formatFinancial(fot);
-    document.getElementById('overheadFmt').textContent = formatFinancial(overhead);
-    document.getElementById('totalCost').textContent = formatFinancial(totalCost);
-    document.getElementById('profitPercent').value = profitPercent.toFixed(2);
-    document.getElementById('profitPercentFmt').textContent = profitPercent.toFixed(2) + '%';
-    document.getElementById('profitRubInput').value = profitRub.toFixed(2);
-    document.getElementById('profitRub').textContent = formatFinancial(profitRub);
-    document.getElementById('finalPriceFmt').textContent = formatFinancial(finalPrice);
-    suppressInput = false;
+async function deleteBlock(el) {
+    if (blocksEl.querySelectorAll('.calc-block').length <= 1) {
+        showToast('Нельзя удалить последний блок — используйте «Очистить»');
+        return;
+    }
+    if (!confirm('Удалить блок?')) return;
+    const resp = await fetch('/reg/api/request-calcs/' + el.dataset.id, {method: 'DELETE'});
+    if (resp.ok) {
+        el.remove();
+        renumberBlocks();
+        updateSectionTotal();
+        showToast('Блок удалён');
+    } else {
+        showToast('Ошибка удаления');
+    }
 }
 
-async function addModule() {
-    const modId = document.getElementById('moduleSelect').value;
-    const qty = parseInt(document.getElementById('moduleQty').value) || 1;
+async function addModule(el) {
+    const modId = el.querySelector('.f-module').value;
+    const qty = parseInt(el.querySelector('.f-module-qty').value) || 1;
     if (!modId) { showToast('Выберите модуль'); return; }
+    const calcId = parseInt(el.dataset.id);
     const resp = await fetch('/reg/api/request-calcs/' + calcId + '/items', {
         method: 'POST',
         headers: {'Content-Type': 'application/json'},
         body: JSON.stringify({calc_id: calcId, module_id: parseInt(modId), quantity: qty}),
     });
     if (resp.ok) {
-        const item = await resp.json();
-        const tr = document.createElement('tr');
-        tr.dataset.id = item.id;
-        tr.dataset.price = item.module_price;
-        tr.innerHTML = '<td>' + (item.module_name || '?') + '</td>' +
-            '<td><input type="number" value="' + item.quantity + '" min="1" style="width:70px;" onchange="updateQty(' + item.id + ', this.value, this)"></td>' +
-            '<td class="col-price">' + formatFinancial(item.module_price) + '</td>' +
-            '<td class="col-sum">' + formatFinancial(item.module_price * item.quantity) + '</td>' +
-            '<td><button class="btn btn-danger btn-sm" onclick="removeItem(' + item.id + ', this)">Удалить</button></td>';
-        document.getElementById('calcBody').appendChild(tr);
-        recalc();
+        appendItemRow(el, await resp.json());
+        recalc(el);
         showToast('Модуль добавлен');
     } else {
         showToast('Ошибка');
     }
 }
 
-async function updateQty(itemId, qty, input) {
-    const resp = await fetch('/reg/api/request-calcs/items/' + itemId, {
+async function updateItemQty(el, tr, qty) {
+    const resp = await fetch('/reg/api/request-calcs/items/' + tr.dataset.itemId, {
         method: 'PATCH',
         headers: {'Content-Type': 'application/json'},
-        body: JSON.stringify({id: itemId, quantity: parseInt(qty)}),
+        body: JSON.stringify({id: parseInt(tr.dataset.itemId), quantity: parseInt(qty) || 1}),
     });
-    if (resp.ok) {
-        recalc();
-    }
+    if (resp.ok) appendItemRow(el, await resp.json());
+    recalc(el);
 }
 
-async function removeItem(itemId, btn) {
+async function removeItem(el, tr) {
     if (!confirm('Удалить?')) return;
-    const resp = await fetch('/reg/api/request-calcs/items/' + itemId, { method: 'DELETE' });
+    const resp = await fetch('/reg/api/request-calcs/items/' + tr.dataset.itemId, {method: 'DELETE'});
     if (resp.ok) {
-        btn.closest('tr').remove();
-        recalc();
+        tr.remove();
+        recalc(el);
         showToast('Удалено');
     }
 }
 
-async function saveAll() {
-    const modulesSum = recalcModulesTotal();
-    const fot = parseFloat(document.getElementById('fot').value) || 0;
-    const overhead = parseFloat(document.getElementById('overhead').value) || 0;
-    const totalCost = modulesSum + fot + overhead;
-    const profitPercent = parseFloat(document.getElementById('profitPercent').value) || 0;
-    const finalPrice = parseFloat(document.getElementById('finalPrice').value) || 0;
-
-    // Update calc
-    await fetch('/reg/api/request-calcs/' + calcId, {
+async function putBlock(el, payload) {
+    return fetch('/reg/api/request-calcs/' + el.dataset.id, {
         method: 'PUT',
         headers: {'Content-Type': 'application/json'},
-        body: JSON.stringify({
-            id: calcId,
-            fot: fot,
-            overhead: overhead,
-            profitability_percent: profitPercent,
-            total_cost: totalCost,
-            final_price: finalPrice,
-        }),
+        body: JSON.stringify({id: parseInt(el.dataset.id), ...payload}),
     });
-
-    // Update request section cost
-    await fetch('/reg/api/requests/' + reqId, {
-        method: 'PUT',
-        headers: {'Content-Type': 'application/json'},
-        body: JSON.stringify({id: reqId, [costField]: finalPrice}),
-    });
-
-    showToast('Сохранено');
 }
 
-async function clearAll() {
-    if (!confirm('Очистить все данные расчёта?')) return;
-    // Remove all items
-    const rows = document.querySelectorAll('#calcBody tr');
-    for (const row of rows) {
-        const itemId = row.dataset.id;
-        if (itemId) {
-            await fetch('/reg/api/request-calcs/items/' + itemId, { method: 'DELETE' });
-        }
+async function saveBlock(el) {
+    recalc(el, 'final');
+    const payload = {
+        fot: num(el.querySelector('.f-fot')),
+        overhead: num(el.querySelector('.f-overhead')),
+        profitability_percent: Math.max(0, Math.min(100, num(el.querySelector('.f-profit-pct')))),
+        total_cost: Math.max(0, parseFloat(el.dataset.totalCost) || 0),
+        final_price: Math.max(0, parseFloat(el.dataset.finalPrice) || 0),
+    };
+    if (WORKS) payload.works_cost = num(el.querySelector('.f-works'));
+    if (MULTI) payload.quantity = Math.max(0, parseInt(el.querySelector('.f-qty').value) || 0);
+    const resp = await putBlock(el, payload);
+    showToast(resp.ok ? 'Сохранено' : 'Ошибка сохранения');
+}
+
+async function clearBlock(el) {
+    if (!confirm('Очистить данные блока?')) return;
+    for (const tr of el.querySelectorAll('.f-items tr')) {
+        await fetch('/reg/api/request-calcs/items/' + tr.dataset.itemId, {method: 'DELETE'});
+        tr.remove();
     }
-    // Reset calc
-    await fetch('/reg/api/request-calcs/' + calcId, {
-        method: 'PUT',
-        headers: {'Content-Type': 'application/json'},
-        body: JSON.stringify({id: calcId, fot: 0, overhead: 0, profitability_percent: 0, total_cost: 0, final_price: 0}),
+    const resp = await putBlock(el, {
+        fot: 0, overhead: 0, profitability_percent: 0, total_cost: 0, final_price: 0, works_cost: 0, quantity: 1,
     });
-    await fetch('/reg/api/requests/' + reqId, {
-        method: 'PUT',
-        headers: {'Content-Type': 'application/json'},
-        body: JSON.stringify({id: reqId, [costField]: 0}),
-    });
-    document.getElementById('calcBody').innerHTML = '';
-    document.getElementById('fot').value = '0';
-    document.getElementById('overhead').value = '0';
-    document.getElementById('profitPercent').value = '0';
-    recalc();
-    showToast('Очищено');
+    el.querySelector('.f-fot').value = '0';
+    el.querySelector('.f-overhead').value = '0';
+    el.querySelector('.f-profit-pct').value = '0';
+    if (WORKS) el.querySelector('.f-works').value = '0';
+    if (MULTI) el.querySelector('.f-qty').value = '1';
+    recalc(el);
+    showToast(resp.ok ? 'Очищено' : 'Ошибка');
 }
 
 function showToast(msg) {
@@ -312,7 +368,6 @@ function showToast(msg) {
     setTimeout(() => t.style.display = 'none', 2500);
 }
 
-// Initial calculation
-recalc();
+initialBlocks.forEach((b, i) => renderBlock(b, i + 1));
 </script>
 {% endblock %}

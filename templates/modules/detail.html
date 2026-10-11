@@ -4,10 +4,12 @@
 <div class="page-header">
     <div>
         <h1>{{ mod.name }}</h1>
-        <div class="subtitle">Модуль #{{ mod.id }} &middot; Стоимость: {{ mod.total_price|money }}</div>
+        <div class="subtitle">Модуль #{{ mod.id }} &middot; Стоимость: {{ prices.get(mod.id, 0)|money }}</div>
     </div>
-    <div style="display:flex;gap:0.5rem;">
+    <div style="display:flex;gap:0.5rem;flex-wrap:wrap;">
         <a href="/reg/api/modules/{{ mod.id }}/export-excel" class="btn btn-primary" download>Скачать Excel</a>
+        <button type="button" class="btn btn-success" onclick="document.getElementById('importFile').click()" title="Колонки: Название, Цена за ед., Кол-во, Тип материала (необязательно: ID, Код 1С)">Загрузить Excel</button>
+        <input type="file" id="importFile" accept=".xlsx" style="display:none" onchange="importExcel(this)">
         <a href="{{ back_to or '/modules' }}" class="btn btn-ghost">← Назад</a>
     </div>
 </div>
@@ -15,10 +17,24 @@
 <div class="card">
     <form id="editModForm">
         <input type="hidden" name="id" value="{{ mod.id }}">
-        <div class="form-row" style="grid-template-columns: 1fr;">
+        <div class="form-row" style="grid-template-columns: 1fr 220px;">
             <div class="form-group">
                 <label>Название</label>
                 <input type="text" name="name" value="{{ mod.name }}" required style="width:100%;min-width:0">
+            </div>
+            <div class="form-group">
+                <label>Ном Ток, А {% if mod.nom_tok_manual %}<span class="nom-tok-badge" title="Задан вручную">вручную</span>{% else %}<span class="nom-tok-badge auto" title="Максимальный из материалов состава">авто</span>{% endif %}</label>
+                <div style="display:flex;gap:0.35rem;">
+                    <select name="nom_tok" id="nomTok" style="flex:1;min-width:0">
+                        <option value="0" {{ 'selected' if not mod.nom_tok else '' }}>0</option>
+                        {% for v in nom_tok_values %}
+                        <option value="{{ v }}" {{ 'selected' if mod.nom_tok == v else '' }}>{{ v }}</option>
+                        {% endfor %}
+                    </select>
+                    {% if mod.nom_tok_manual %}
+                    <button type="button" class="btn btn-ghost btn-sm" onclick="resetNomTok()" title="Вернуть автоматический расчёт">Авто</button>
+                    {% endif %}
+                </div>
             </div>
         </div>
         <div class="actions">
@@ -86,9 +102,9 @@
                 <td>{% if item.material_id %}Материал{% else %}Модуль{% endif %}</td>
                 <td>{% if item.material and item.material.type %}{{ item.material.type.name }}{% endif %}</td>
                 <td>{% if item.material %}<a href="/reg/materials/{{ item.material_id }}" onclick="event.stopPropagation()">{{ item.material.name }}</a>{% elif item.sub_module %}<a href="/reg/modules/{{ item.sub_module_id }}" onclick="event.stopPropagation()">{{ item.sub_module.name }}</a>{% endif %}</td>
-                <td>{% if item.material %}{{ item.material.price|money }}{% elif item.sub_module %}{{ item.sub_module.total_price|money }}{% endif %}</td>
+                <td>{% if item.material %}{{ item.material.price|money }}{% elif item.sub_module %}{{ prices.get(item.sub_module_id, 0)|money }}{% endif %}</td>
                 <td><input type="number" value="{{ item.quantity }}" min="1" style="width:100%;" onchange="updateQty({{ item.id }}, this)" onclick="event.stopPropagation()"></td>
-                <td>{% if item.material %}{{ (item.material.price * item.quantity)|money }}{% elif item.sub_module %}{{ (item.sub_module.total_price * item.quantity)|money }}{% endif %}</td>
+                <td>{% if item.material %}{{ (item.material.price * item.quantity)|money }}{% elif item.sub_module %}{{ (prices.get(item.sub_module_id, 0) * item.quantity)|money }}{% endif %}</td>
                 <td style="text-align:center;width:40px">
                     <button class="btn btn-danger btn-sm btn-icon" title="Удалить" onclick="deleteItem({{ item.id }}, this)">&#10005;</button>
                 </td>
@@ -99,7 +115,7 @@
         <tfoot>
             <tr>
                 <td colspan="5" style="text-align:right;font-weight:bold;">Итого:</td>
-                <td style="font-weight:bold;" id="totalPrice">{{ mod.total_price|money }}</td>
+                <td style="font-weight:bold;" id="totalPrice">{{ prices.get(mod.id, 0)|money }}</td>
                 <td></td>
             </tr>
         </tfoot>
@@ -238,14 +254,47 @@ document.getElementById('editModForm').addEventListener('submit', async function
     e.preventDefault();
     const fd = new FormData(this);
     const data = { id: parseInt(fd.get('id')), name: fd.get('name') };
+    // Ном ток отправляем только если изменён — иначе модуль останется на автоматическом расчёте
+    const nomTok = parseInt(fd.get('nom_tok')) || 0;
+    if (nomTok !== {{ mod.nom_tok or 0 }}) data.nom_tok = nomTok;
     const resp = await fetch('/reg/api/modules/', {
         method: 'PATCH',
         headers: {'Content-Type': 'application/json'},
         body: JSON.stringify(data),
     });
-    if (resp.ok) showToast('Сохранено');
-    else showToast('Ошибка сохранения');
+    if (resp.ok) {
+        showToast('Сохранено');
+        if ('nom_tok' in data) setTimeout(() => location.reload(), 600);
+    } else showToast('Ошибка сохранения');
 });
+
+async function resetNomTok() {
+    const resp = await fetch('/reg/api/modules/', {
+        method: 'PATCH',
+        headers: {'Content-Type': 'application/json'},
+        body: JSON.stringify({id: {{ mod.id }}, nom_tok_manual: false}),
+    });
+    if (resp.ok) location.reload();
+    else showToast('Ошибка');
+}
+
+async function importExcel(input) {
+    const file = input.files[0];
+    if (!file) return;
+    const fd = new FormData();
+    fd.append('file', file);
+    const resp = await fetch('/reg/api/modules/{{ mod.id }}/import-excel', {method: 'POST', body: fd});
+    input.value = '';
+    const data = await resp.json().catch(() => ({}));
+    if (resp.ok) {
+        let msg = data.message || 'Загружено';
+        if (data.skipped && data.skipped.length) msg += '. Пропущено: ' + data.skipped.join('; ');
+        showToast(msg);
+        setTimeout(() => location.reload(), 1500);
+    } else {
+        showToast('Ошибка: ' + (data.detail || resp.status));
+    }
+}
 
 async function duplicateMod() {
     const resp = await fetch('/reg/api/modules/{{ mod.id }}/duplicate', {method: 'POST'});

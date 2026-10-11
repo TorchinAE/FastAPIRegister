@@ -39,7 +39,11 @@
                     <span>{{ label }}</span>
                     <span class="calc-cost" id="cost-{{ field }}" data-raw="{{ cost or 0 }}">{{ "%.2f"|format(cost or 0) }}</span>
                 </a>
+                {% if key == 'tkp' %}
+                <span style="width:1.9rem;" title="Итого без НДС по сводной таблице"></span>
+                {% else %}
                 <button class="btn btn-danger btn-sm" style="padding:0 0.5rem;font-size:0.75rem;white-space:nowrap;" onclick="clearCost('{{ field }}')" title="Очистить стоимость">&#10005;</button>
+                {% endif %}
             </div>
             {% endfor %}
         </div>
