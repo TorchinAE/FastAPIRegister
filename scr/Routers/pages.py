@@ -1,3 +1,5 @@
+import os
+
 from fastapi import APIRouter, Depends, Form, Query, Request
 from fastapi.responses import HTMLResponse, JSONResponse, RedirectResponse
 from fastapi.templating import Jinja2Templates
@@ -35,6 +37,8 @@ def _money(value):
 
 templates.env.filters["money"] = _money
 templates.env.globals["float"] = float
+# Версия статики для сброса кеша браузера (nginx кеширует /static/ на 30 дней)
+templates.env.globals["static_v"] = int(os.path.getmtime(os.path.join("static", "style.css")))
 
 pages_router = APIRouter(tags=["Pages"])
 

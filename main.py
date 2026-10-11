@@ -135,6 +135,7 @@ os.makedirs(templates_dir, exist_ok=True)
 
 app.mount("/static", StaticFiles(directory=static_dir), name="static")
 templates = Jinja2Templates(directory=templates_dir)
+templates.env.globals["static_v"] = int(os.path.getmtime(os.path.join(static_dir, "style.css")))
 
 
 @app.exception_handler(404)
