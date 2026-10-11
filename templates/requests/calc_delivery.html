@@ -1,10 +1,11 @@
 {% extends "base.html" %}
 {% block title %}Расчёт ТКП #{{ req.id }} — Доставка{% endblock %}
 {% block content %}
+<div class="calc-page">
 <div class="page-header">
     <div>
         <h1>Расчёт ТКП — Доставка</h1>
-        <div class="subtitle">Код: {{ req.id }} &middot; {{ req.tkp_num or '' }}</div>
+        <div class="subtitle">Код: {{ req.id }} &middot; {{ req.tkp_num or '' }} &middot; изменения сохраняются автоматически</div>
     </div>
     <a href="/reg/requests/{{ req.id }}/calc" class="btn btn-ghost">&larr; Назад к расчёту</a>
 </div>
@@ -50,10 +51,11 @@
         </div>
 
         <div class="actions" style="margin-top:1.5rem;display:flex;gap:0.75rem;">
-            <button type="submit" class="btn btn-primary">Сохранить</button>
             <button type="button" class="btn btn-danger" onclick="clearDelivery()">Очистить</button>
+            <span id="saveStatus" class="calc-save-status" style="margin-left:0;align-self:center;"></span>
         </div>
     </form>
+</div>
 </div>
 
 <div id="toast" class="toast" style="display:none"></div>
@@ -139,9 +141,31 @@ function recalcFromFinal() {
     suppressInput = false;
 })();
 
-document.getElementById('deliveryForm').addEventListener('submit', async function(e) {
-    e.preventDefault();
-    const fd = new FormData(this);
+// ── Автосохранение ──
+const deliveryForm = document.getElementById('deliveryForm');
+let saveTimer = null;
+
+function setStatus(text, cls = '') {
+    const s = document.getElementById('saveStatus');
+    s.textContent = text;
+    s.className = 'calc-save-status ' + cls;
+}
+
+function scheduleSave() {
+    clearTimeout(saveTimer);
+    setStatus('…');
+    saveTimer = setTimeout(saveDelivery, 700);
+}
+
+deliveryForm.addEventListener('input', scheduleSave);
+deliveryForm.addEventListener('submit', e => { e.preventDefault(); saveDelivery(); });
+window.addEventListener('pagehide', () => { if (saveTimer) saveDelivery(true); });
+
+async function saveDelivery(keepalive = false) {
+    clearTimeout(saveTimer);
+    saveTimer = null;
+    setStatus('сохранение…');
+    const fd = new FormData(deliveryForm);
     const finalPrice = parseFloat(document.getElementById('finalPrice').value) || 0;
     const profitPercent = parseFloat(document.getElementById('profitPercent').value) || 0;
     const data = {
@@ -152,24 +176,31 @@ document.getElementById('deliveryForm').addEventListener('submit', async functio
         profitability_percent: profitPercent,
         final_price: finalPrice,
     };
-    const resp = await fetch('/reg/api/deliveries/' + deliveryId, {
-        method: 'PUT',
-        headers: {'Content-Type': 'application/json'},
-        body: JSON.stringify(data),
-    });
-    if (resp.ok) {
-        // Also update delivery_cost on the request
-        await fetch('/reg/api/requests/' + reqId, {
+    try {
+        const resp = await fetch('/reg/api/deliveries/' + deliveryId, {
             method: 'PUT',
             headers: {'Content-Type': 'application/json'},
-            body: JSON.stringify({id: reqId, delivery_cost: finalPrice}),
+            body: JSON.stringify(data),
+            keepalive,
         });
-        showToast('Сохранено');
-    } else {
-        const err = await resp.json();
-        showToast('Ошибка: ' + (err.detail || 'не удалось сохранить'));
+        if (resp.ok) {
+            // Also update delivery_cost on the request
+            await fetch('/reg/api/requests/' + reqId, {
+                method: 'PUT',
+                headers: {'Content-Type': 'application/json'},
+                body: JSON.stringify({id: reqId, delivery_cost: finalPrice}),
+                keepalive,
+            });
+            setStatus('✓ сохранено', 'ok');
+        } else {
+            const err = await resp.json().catch(() => ({}));
+            setStatus('ошибка', 'err');
+            showToast('Ошибка: ' + (err.detail || 'не удалось сохранить'));
+        }
+    } catch (e) {
+        setStatus('ошибка', 'err');
     }
-});
+}
 
 async function clearDelivery() {
     if (!confirm('Очистить все данные доставки?')) return;
