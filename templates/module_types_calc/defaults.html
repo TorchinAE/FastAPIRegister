@@ -134,8 +134,8 @@ function renderSlots() {
         tr.innerHTML = `
             <td><strong>${esc(slot.name)}</strong>${slot.hidden ? ' <span class="badge" style="background:#e2e8f0;color:#475569;" title="Не отображается в расчёте, но учитывается в стоимости">скрыта</span>' : ''}
                 ${slot.type_names.length ? `<div style="font-size:0.8rem;color:var(--text-muted);">${esc(slot.type_names.join(', '))}</div>` : ''}</td>
-            <td><select class="f-module" style="width:100%;min-width:220px;"><option value="">— не выбран —</option>${options}</select></td>
-            <td><input type="number" class="f-qty" value="${slot.quantity}" min="1" style="width:70px;"></td>
+            <td><select class="cell-input f-module" style="width:100%;min-width:220px;"><option value="">— не выбран —</option>${options}</select></td>
+            <td><input type="number" class="cell-input f-qty" value="${slot.quantity}" min="1"></td>
             <td class="f-price"></td>
             <td class="f-sum"></td>`;
         const update = () => {
