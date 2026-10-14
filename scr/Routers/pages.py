@@ -198,7 +198,8 @@ async def request_create_page(
         session, schema, manager_id=user.id, created_by=user.name, user_city=user.city
     )
     await session.commit()
-    return RedirectResponse(f"/requests/{new_req.id}", status_code=302)
+    # new=1 — только что созданная пустая заявка: удаляется при уходе со страницы без изменений
+    return RedirectResponse(f"/reg/requests/{new_req.id}?new=1", status_code=302)
 
 
 @pages_router.post("/requests/create", response_class=HTMLResponse)
@@ -256,6 +257,7 @@ async def request_create_submit(
 async def request_detail_page(
     req_id: int,
     request: Request,
+    new: bool = False,
     session: AsyncSession = Depends(db_helper.session_dependency),
 ):
     user = await get_current_user(request, session)
@@ -285,6 +287,7 @@ async def request_detail_page(
             "request": request,
             "user": user,
             "req": req,
+            "is_new": new and not req.counterparty_id,
             "counterparties": cps,
             "users_list": users_list,
             "equipment": equipment_list,

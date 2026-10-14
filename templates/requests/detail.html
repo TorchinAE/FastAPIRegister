@@ -7,7 +7,7 @@
         <div class="subtitle">Код: {{ req.id }} &middot; {{ req.tkp_num or '' }}</div>
     </div>
 </div>
-<form id="main-form" method="post" action="/reg/requests/{{ req.id }}" class="edit-form" style="padding:1rem;" data-is-new="{{ '1' if not req.counterparty_id else '' }}">
+<form id="main-form" method="post" action="/reg/requests/{{ req.id }}" class="edit-form" style="padding:1rem;" data-is-new="{{ '1' if is_new else '' }}">
 <div style="display:flex;gap:0.5rem;margin-bottom:0.75rem;flex-wrap:wrap;">
     <a href="/reg/requests" class="btn btn-ghost">← Назад к списку</a>
     <a href="/reg/requests/create" class="btn btn-success">+ Новое ТКП</a>
@@ -649,6 +649,17 @@ const mainForm = document.getElementById('main-form');
 let saveTimer = null;
 const isNewRequest = mainForm.dataset.isNew === '1';
 let hasUserChanges = false;
+if (isNewRequest) {
+    // Флаг только для первого открытия: после обновления страницы заявка уже не считается новой
+    history.replaceState(null, '', location.pathname);
+    // Любые изменения на странице и переход в разделы этой заявки (расчёт и т.п.) — заявку не удалять
+    document.addEventListener('input', () => { hasUserChanges = true; });
+    document.addEventListener('change', () => { hasUserChanges = true; });
+    document.addEventListener('click', e => {
+        const link = e.target.closest('a[href]');
+        if (link && link.getAttribute('href').startsWith(`/reg/requests/${REQ_ID}/`)) hasUserChanges = true;
+    });
+}
 
 async function autoSaveForm() {
     if (isNewRequest) hasUserChanges = true;
@@ -680,7 +691,7 @@ mainForm.addEventListener('submit', e => {
 // Delete empty new request on page unload
 window.addEventListener('beforeunload', () => {
     if (isNewRequest && !hasUserChanges) {
-        fetch(`/api/requests/${REQ_ID}`, {method: 'DELETE', keepalive: true});
+        fetch(`/reg/api/requests/${REQ_ID}`, {method: 'DELETE', keepalive: true});
     }
 });
 </script>
