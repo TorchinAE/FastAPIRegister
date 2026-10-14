@@ -21,7 +21,7 @@
                 <a href="/reg/equipment" class="{{ 'active' if active_page == 'equipment' else '' }}"><span class="icon">&#9881;</span> <span>Оборудование</span></a>
                 <a href="/reg/modules" class="{{ 'active' if active_page == 'modules' else '' }}"><span class="icon">&#9883;</span> <span>Модули</span></a>
                 <a href="/reg/users" class="{{ 'active' if active_page == 'users' else '' }}"><span class="icon">&#9824;</span> <span>Пользователи</span></a>
-                {% set settings_pages = ['settings', 'nakladnye', 'fot', 'materials', 'material_types', 'module_types_calc', 'module_type_slots', 'nominal_currents', 'units', 'positions', 'directors'] %}
+                {% set settings_pages = ['settings', 'nakladnye', 'fot', 'materials', 'material_types', 'module_types_calc', 'module_type_slots', 'nominal_currents', 'units', 'accuracy_classes', 'positions', 'directors'] %}
                 <details class="nav-group" {{ 'open' if active_page in settings_pages else '' }}>
                     <summary class="{{ 'has-active' if active_page in settings_pages else '' }}"><span class="icon">&#9776;</span> <span>Настройки</span><span class="chevron">&#9662;</span></summary>
                     <div class="nav-group-items">
@@ -34,6 +34,7 @@
                         <a href="/reg/module-type-slots" class="{{ 'active' if active_page == 'module_type_slots' else '' }}"><span class="icon">&#9776;</span> <span>Обязательные строки</span></a>
                         <a href="/reg/nominal-currents" class="{{ 'active' if active_page == 'nominal_currents' else '' }}"><span class="icon">&#9889;</span> <span>Ном. токи</span></a>
                         <a href="/reg/units" class="{{ 'active' if active_page == 'units' else '' }}"><span class="icon">&#9878;</span> <span>Ед. измерения</span></a>
+                        <a href="/reg/accuracy-classes" class="{{ 'active' if active_page == 'accuracy_classes' else '' }}"><span class="icon">&#9678;</span> <span>Классы точности</span></a>
                         <a href="/reg/positions" class="{{ 'active' if active_page == 'positions' else '' }}"><span class="icon">&#9830;</span> <span>Должности</span></a>
                         <a href="/reg/directors" class="{{ 'active' if active_page == 'directors' else '' }}"><span class="icon">&#9733;</span> <span>Директора</span></a>
                     </div>

@@ -1,0 +1,78 @@
+{% extends "base.html" %}
+{% block title %}Классы точности{% endblock %}
+{% block content %}
+<div class="page-header" style="gap:1rem; flex-wrap:wrap;">
+    <div style="display:flex; align-items:center; gap:0.75rem;">
+        <h1>Классы точности</h1>
+        <span class="subtitle">Всего: {{ total }}</span>
+    </div>
+</div>
+<form id="addForm" class="card" style="display:flex; gap:0.75rem; align-items:flex-end; margin-bottom:1rem; padding:1rem 1.25rem;">
+    <div class="form-group" style="width:200px; margin-bottom:0;">
+        <label>Новый класс</label>
+        <input type="text" id="newName" maxlength="20" placeholder="например, 0.5S" required>
+    </div>
+    <button type="submit" class="btn btn-success" style="height:38px;">Добавить</button>
+    <div style="font-size:0.85rem;color:var(--text-muted);">
+        Значения из справочника используются для поля «Класс точности» у материалов. Поле необязательное.
+    </div>
+</form>
+<div class="table-wrap">
+    <table>
+        <thead>
+            <tr><th>Класс точности</th><th>Используется (материалы)</th><th></th></tr>
+        </thead>
+        <tbody>
+            {% for item in items %}
+            <tr>
+                <td><strong>{{ item.name }}</strong></td>
+                <td>{{ usage.get(item.name, 0) }}</td>
+                <td style="text-align:center;width:40px">
+                    {% if not usage.get(item.name) %}
+                    <button class="btn btn-danger btn-sm btn-icon" title="Удалить" onclick="deleteClass({{ item.id }}, this)">&#10005;</button>
+                    {% endif %}
+                </td>
+            </tr>
+            {% endfor %}
+            {% if not items %}<tr class="empty-row"><td colspan="3">Нет значений</td></tr>{% endif %}
+        </tbody>
+    </table>
+</div>
+<div id="toast" class="toast" style="display:none"></div>
+{% endblock %}
+
+{% block scripts %}
+<script>
+document.getElementById('addForm').addEventListener('submit', async e => {
+    e.preventDefault();
+    const name = document.getElementById('newName').value.trim();
+    if (!name) return;
+    const resp = await fetch('/reg/api/accuracy-classes/', {
+        method: 'POST',
+        headers: {'Content-Type': 'application/json'},
+        body: JSON.stringify({name}),
+    });
+    if (resp.ok) location.reload();
+    else showToast('Ошибка добавления');
+});
+
+async function deleteClass(id, btn) {
+    if (!confirm('Удалить класс точности?')) return;
+    const resp = await fetch('/reg/api/accuracy-classes/' + id, {method: 'DELETE'});
+    if (resp.ok) {
+        btn.closest('tr').remove();
+        showToast('Удалено');
+    } else {
+        const err = await resp.json().catch(() => ({}));
+        showToast(err.detail || 'Ошибка удаления');
+    }
+}
+
+function showToast(msg) {
+    const t = document.getElementById('toast');
+    t.textContent = msg;
+    t.style.display = 'block';
+    setTimeout(() => t.style.display = 'none', 2500);
+}
+</script>
+{% endblock %}

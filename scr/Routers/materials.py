@@ -5,7 +5,14 @@ from fastapi.responses import StreamingResponse
 from openpyxl import Workbook, load_workbook
 from sqlalchemy.ext.asyncio import AsyncSession
 
-from scr.dbase import crud_material_types, crud_materials, crud_modules, crud_nominal_currents, crud_units
+from scr.dbase import (
+    crud_accuracy_classes,
+    crud_material_types,
+    crud_materials,
+    crud_modules,
+    crud_nominal_currents,
+    crud_units,
+)
 from scr.dbase.database import db_helper
 from scr.dbase.schemas.schemas import (
     MaterialCreateSchema,
@@ -32,6 +39,7 @@ def _mat_response(mat) -> MaterialResponseSchema:
         date=mat.date,
         voltage=mat.voltage,
         unit=mat.unit or "шт",
+        accuracy_class=mat.accuracy_class,
     )
 
 
@@ -43,6 +51,7 @@ async def add_material(
     new_mat = await crud_materials.add_material(session=session, in_mat=data)
     await crud_nominal_currents.ensure_value(session, data.nom_tok)
     await crud_units.ensure_name(session, data.unit)
+    await crud_accuracy_classes.ensure_name(session, data.accuracy_class)
     await session.commit()
     await session.refresh(new_mat, ["type"])
     return _mat_response(new_mat)
@@ -105,6 +114,7 @@ async def export_materials_excel(
         "Дата",
         "Ном Ток",
         "Напряжение",
+        "Класс точности",
         "стац",
         "втыч",
         "выкат",
@@ -138,6 +148,7 @@ async def export_materials_excel(
                 item.date.strftime("%d.%m.%Y") if item.date else "",
                 item.nom_tok,
                 item.voltage or "",
+                item.accuracy_class or "",
                 "+" if item.stats else "",
                 "+" if item.vtych else "",
                 "+" if item.vykat else "",
@@ -307,6 +318,10 @@ _HEADER_ALIASES = {
     "единица измерения": "unit",
     "единицы измерения": "unit",
     "unit": "unit",
+    "класс точности": "accuracy_class",
+    "кл. точности": "accuracy_class",
+    "кл точности": "accuracy_class",
+    "accuracy_class": "accuracy_class",
 }
 
 
@@ -392,6 +407,7 @@ def _parse_by_header(row, col_map: dict) -> dict | None:
         "url_agent": str(_get(row, col_map, "url_agent", "")).strip() or None,
         "voltage": str(_get(row, col_map, "voltage", "")).strip() or None,
         "unit": str(_get(row, col_map, "unit", "")).strip()[:20] or None,
+        "accuracy_class": str(_get(row, col_map, "accuracy_class", "")).strip()[:20] or None,
     }
 
 
@@ -557,6 +573,8 @@ async def _do_import(session: AsyncSession, rows: list) -> int:
                 existing.voltage = parsed["voltage"]
             if parsed.get("unit"):
                 existing.unit = parsed["unit"]
+            if parsed.get("accuracy_class"):
+                existing.accuracy_class = parsed["accuracy_class"]
         else:
             # Create new material
             schema = MaterialCreateSchema(
@@ -574,10 +592,12 @@ async def _do_import(session: AsyncSession, rows: list) -> int:
                 el_priv=parsed.get("el_priv", False),
                 voltage=parsed.get("voltage"),
                 unit=parsed.get("unit") or "шт",
+                accuracy_class=parsed.get("accuracy_class"),
                 date=date_val,
             )
             await crud_materials.add_material(session, schema)
         await crud_units.ensure_name(session, parsed.get("unit"))
+        await crud_accuracy_classes.ensure_name(session, parsed.get("accuracy_class"))
         imported += 1
     return imported
 
@@ -603,6 +623,7 @@ async def update_material(
         await crud_modules.recalc_nom_tok(session)
     if data.unit is not None:
         await crud_units.ensure_name(session, data.unit)
+    await crud_accuracy_classes.ensure_name(session, data.accuracy_class)
     await session.commit()
     await session.refresh(result, ["type"])
     return _mat_response(result)

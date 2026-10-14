@@ -1258,6 +1258,40 @@ async def units_page(
     )
 
 
+# --- Accuracy Classes ---
+@pages_router.get("/accuracy-classes", response_class=HTMLResponse)
+async def accuracy_classes_page(
+    request: Request,
+    session: AsyncSession = Depends(db_helper.session_dependency),
+):
+    user = await get_current_user(request, session)
+    if not user:
+        return RedirectResponse("/reg/", status_code=302)
+    from sqlalchemy import func, select
+
+    from scr.dbase import crud_accuracy_classes
+    from scr.dbase.models import Material
+
+    items = await crud_accuracy_classes.get_all(session)
+    stmt = (
+        select(Material.accuracy_class, func.count(Material.id))
+        .where(Material.accuracy_class.is_not(None))
+        .group_by(Material.accuracy_class)
+    )
+    usage = dict((await session.execute(stmt)).all())
+    return templates.TemplateResponse(
+        "accuracy_classes/list.html",
+        {
+            "request": request,
+            "user": user,
+            "items": items,
+            "usage": usage,
+            "total": len(items),
+            "active_page": "accuracy_classes",
+        },
+    )
+
+
 # --- Module Types Calc ---
 @pages_router.get("/module-types-calc", response_class=HTMLResponse)
 async def module_types_calc_page(
@@ -1481,6 +1515,9 @@ async def materials_page(
     from scr.dbase import crud_units
 
     units = await crud_units.get_names(session)
+    from scr.dbase import crud_accuracy_classes
+
+    accuracy_classes = await crud_accuracy_classes.get_names(session)
     return templates.TemplateResponse(
         "materials/list.html",
         {
@@ -1493,6 +1530,7 @@ async def materials_page(
             "module_names": module_names,
             "nom_tok_values": nom_tok_values,
             "units": units,
+            "accuracy_classes": accuracy_classes,
             "active_page": "materials",
         },
     )
@@ -1522,6 +1560,7 @@ async def materials_create_submit(
             "nom_tok": int(form.get("nom_tok", 0)),
             "voltage": form.get("voltage") or None,
             "unit": (form.get("unit") or "").strip() or "шт",
+            "accuracy_class": (form.get("accuracy_class") or "").strip() or None,
             "stats": form.get("stats") == "on",
             "vtych": form.get("vtych") == "on",
             "vykat": form.get("vykat") == "on",
@@ -1545,6 +1584,9 @@ async def materials_create_submit(
         from scr.dbase import crud_units
 
         await crud_units.ensure_name(session, data["unit"])
+        from scr.dbase import crud_accuracy_classes
+
+        await crud_accuracy_classes.ensure_name(session, data["accuracy_class"])
         await session.commit()
     return RedirectResponse("/reg/materials", status_code=302)
 
@@ -1569,6 +1611,9 @@ async def materials_detail_page(
     from scr.dbase import crud_units
 
     units = await crud_units.get_names(session)
+    from scr.dbase import crud_accuracy_classes
+
+    accuracy_classes = await crud_accuracy_classes.get_names(session)
     return templates.TemplateResponse(
         "materials/detail.html",
         {
@@ -1578,6 +1623,7 @@ async def materials_detail_page(
             "types": types,
             "nom_tok_values": nom_tok_values,
             "units": units,
+            "accuracy_classes": accuracy_classes,
             "back_to": back_to,
             "active_page": "materials",
         },

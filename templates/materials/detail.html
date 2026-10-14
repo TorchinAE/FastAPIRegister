@@ -55,12 +55,20 @@
                 <input type="text" name="url_agent" value="{{ mat.url_agent or '' }}" style="width:100%;min-width:0">
             </div>
         </div>
-        <div class="form-row" style="grid-template-columns: 200px 200px;">
+        <div class="form-row" style="grid-template-columns: 200px 200px 200px;">
             <div class="form-group">
                 <label>Ед. изм. <a href="/reg/units" title="Пополнить справочник единиц" style="font-weight:400;">справочник</a></label>
                 <select name="unit" style="width:100%;min-width:0">
                     {% for u in units %}<option value="{{ u }}" {{ 'selected' if (mat.unit or 'шт') == u else '' }}>{{ u }}</option>{% endfor %}
                     {% if mat.unit and mat.unit not in units %}<option value="{{ mat.unit }}" selected>{{ mat.unit }}</option>{% endif %}
+                </select>
+            </div>
+            <div class="form-group">
+                <label>Класс точности <a href="/reg/accuracy-classes" title="Пополнить справочник классов точности" style="font-weight:400;">справочник</a></label>
+                <select name="accuracy_class" style="width:100%;min-width:0">
+                    <option value="">—</option>
+                    {% for c in accuracy_classes %}<option value="{{ c }}" {{ 'selected' if mat.accuracy_class == c else '' }}>{{ c }}</option>{% endfor %}
+                    {% if mat.accuracy_class and mat.accuracy_class not in accuracy_classes %}<option value="{{ mat.accuracy_class }}" selected>{{ mat.accuracy_class }}</option>{% endif %}
                 </select>
             </div>
             <div class="form-group">
@@ -102,6 +110,7 @@ document.getElementById('editMatForm').addEventListener('submit', async function
         nom_tok: parseInt(fd.get('nom_tok')) || 0,
         voltage: fd.get('voltage') || null,
         unit: fd.get('unit') || 'шт',
+        accuracy_class: fd.get('accuracy_class') || null,
         stats: this.querySelector('[name="stats"]').checked,
         vtych: this.querySelector('[name="vtych"]').checked,
         vykat: this.querySelector('[name="vykat"]').checked,

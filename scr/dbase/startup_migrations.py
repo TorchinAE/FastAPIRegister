@@ -19,6 +19,7 @@ ADD_COLUMNS = [
     ("module_type_defaults", "slot_id", "INTEGER REFERENCES module_type_slots(id) ON DELETE SET NULL"),
     ("request_calc_items", "slot_id", "INTEGER REFERENCES module_type_slots(id) ON DELETE SET NULL"),
     ("materials", "unit", "VARCHAR(20) NOT NULL DEFAULT 'шт'"),
+    ("materials", "accuracy_class", "VARCHAR(20)"),
 ]
 
 # Таблицы с устаревшими UNIQUE-ограничениями: SQLite не умеет их удалять — таблица пересоздаётся по модели

@@ -221,6 +221,7 @@ class MaterialCreateSchema(BaseModel):
     nom_tok: int = Field(0, ge=0, le=7000)
     voltage: str | None = None
     unit: str = Field("шт", min_length=1, max_length=20)
+    accuracy_class: str | None = Field(None, max_length=20)
     stats: bool = True
     vtych: bool = False
     vykat: bool = False
@@ -242,6 +243,7 @@ class MaterialUpdateSchema(BaseModel):
     nom_tok: int | None = Field(None, ge=0, le=7000)
     voltage: str | None = None
     unit: str | None = Field(None, min_length=1, max_length=20)
+    accuracy_class: str | None = Field(None, max_length=20)
     stats: bool | None = None
     vtych: bool | None = None
     vykat: bool | None = None
@@ -264,6 +266,7 @@ class MaterialResponseSchema(BaseModel):
     nom_tok: int = 0
     voltage: str | None = None
     unit: str = "шт"
+    accuracy_class: str | None = None
     stats: bool = True
     vtych: bool = False
     vykat: bool = False

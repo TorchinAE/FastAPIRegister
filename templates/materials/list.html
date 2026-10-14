@@ -53,6 +53,16 @@
         <label>Напряжение</label>
         <input type="text" name="voltage" placeholder="Напряжение">
     </div>
+    <div class="form-group" style="flex:1; min-width:90px; margin-bottom:0;">
+        <label>Кл. точности</label>
+        <div style="display:flex;gap:0.35rem;align-items:center;">
+            <select name="accuracy_class" style="flex:1;">
+                <option value="">—</option>
+                {% for c in accuracy_classes %}<option value="{{ c }}">{{ c }}</option>{% endfor %}
+            </select>
+            <a href="/reg/accuracy-classes" class="btn btn-success btn-sm btn-icon" title="Пополнить справочник классов точности" style="flex-shrink:0;">+</a>
+        </div>
+    </div>
     <div style="display:flex;flex-wrap:wrap;gap:0.5rem 1rem;margin-bottom:0;align-items:center;">
         <label style="display:flex;align-items:center;gap:0.25rem;"><input type="checkbox" name="stats" id="stats_new"> стац</label>
         <label style="display:flex;align-items:center;gap:0.25rem;"><input type="checkbox" name="vtych"> втыч</label>
@@ -82,7 +92,7 @@
     <table id="dataTable">
         <thead>
             <tr>
-                <th>ID</th><th>Тип</th><th>Название</th><th>Цена</th><th>Ед. изм.</th><th>Дата</th><th>Ном Ток</th><th>Напряж.</th><th>стац</th><th>втыч</th><th>выкат</th><th>ручн</th><th>эл.прив</th><th>Код 1С</th><th>Код агент</th><th>URL агент</th><th>мод.</th><th></th>
+                <th>ID</th><th>Тип</th><th>Название</th><th>Цена</th><th>Ед. изм.</th><th>Дата</th><th>Ном Ток</th><th>Напряж.</th><th>Кл. точн.</th><th>стац</th><th>втыч</th><th>выкат</th><th>ручн</th><th>эл.прив</th><th>Код 1С</th><th>Код агент</th><th>URL агент</th><th>мод.</th><th></th>
             </tr>
             <tr class="table-filter">
                 <th><input type="text" data-col="0" data-min="1" placeholder="Фильтр..." class="tf-input"></th>
@@ -93,14 +103,15 @@
                 <th><input type="text" data-col="5" placeholder="Фильтр..." class="tf-input"></th>
                 <th><input type="text" data-col="6" placeholder="Фильтр..." class="tf-input"></th>
                 <th><input type="text" data-col="7" placeholder="Фильтр..." class="tf-input"></th>
-                <th><select data-col="8" class="tf-select"><option value="">—</option><option value="✓">✓</option><option value="✗">✗</option></select></th>
+                <th><select data-col="8" class="tf-select"><option value="">—</option><option value="__none__">не задан</option>{% for c in accuracy_classes %}<option value="{{ c }}">{{ c }}</option>{% endfor %}</select></th>
                 <th><select data-col="9" class="tf-select"><option value="">—</option><option value="✓">✓</option><option value="✗">✗</option></select></th>
                 <th><select data-col="10" class="tf-select"><option value="">—</option><option value="✓">✓</option><option value="✗">✗</option></select></th>
                 <th><select data-col="11" class="tf-select"><option value="">—</option><option value="✓">✓</option><option value="✗">✗</option></select></th>
                 <th><select data-col="12" class="tf-select"><option value="">—</option><option value="✓">✓</option><option value="✗">✗</option></select></th>
-                <th><input type="text" data-col="13" placeholder="Фильтр..." class="tf-input"></th>
+                <th><select data-col="13" class="tf-select"><option value="">—</option><option value="✓">✓</option><option value="✗">✗</option></select></th>
                 <th><input type="text" data-col="14" placeholder="Фильтр..." class="tf-input"></th>
                 <th><input type="text" data-col="15" placeholder="Фильтр..." class="tf-input"></th>
+                <th><input type="text" data-col="16" placeholder="Фильтр..." class="tf-input"></th>
                 <th></th>
                 <th></th>
             </tr>
@@ -144,6 +155,7 @@ const allData = [
         name: '{{ item.name|e }}',
         price: '{{ item.price|money }}',
         unit: '{{ (item.unit or "шт")|e }}',
+        accuracy: '{{ (item.accuracy_class or "")|e }}',
         date: '{{ item.date.strftime("%d.%m.%Y") if item.date else "" }}',
         nomTok: {{ item.nom_tok }},
         voltage: '{{ (item.voltage or "")|e }}',
@@ -197,6 +209,7 @@ function renderTable() {
             <td>${m.date}</td>
             <td>${m.nomTok}</td>
             <td>${m.voltage}</td>
+            <td>${m.accuracy}</td>
             <td style="text-align:center">${m.stats ? '✓' : '✗'}</td>
             <td style="text-align:center">${m.vtych ? '✓' : '✗'}</td>
             <td style="text-align:center">${m.vykat ? '✓' : '✗'}</td>
@@ -212,7 +225,7 @@ function renderTable() {
                 <button class="btn btn-danger btn-sm btn-icon" title="Удалить" onclick="event.stopPropagation(); deleteMat(${m.id}, this)">&#10005;</button>
             </td>
         </tr>`
-    ).join('') || '<tr class="empty-row"><td colspan="18">Нет материалов</td></tr>';
+    ).join('') || '<tr class="empty-row"><td colspan="19">Нет материалов</td></tr>';
 
     renderPagination();
 }
@@ -254,7 +267,7 @@ function applyFilters() {
     } else {
         filteredData = allData.filter(m => {
             const cells = [
-                String(m.id), m.type, m.name, m.price, m.unit, m.date, String(m.nomTok), m.voltage,
+                String(m.id), m.type, m.name, m.price, m.unit, m.date, String(m.nomTok), m.voltage, m.accuracy || '__none__',
                 m.stats ? '✓' : '✗', m.vtych ? '✓' : '✗', m.vykat ? '✓' : '✗',
                 m.ruchn ? '✓' : '✗', m.elPriv ? '✓' : '✗',
                 m.code1c, m.codeAgent, m.urlAgent,

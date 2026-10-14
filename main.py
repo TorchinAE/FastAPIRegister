@@ -9,6 +9,7 @@ from fastapi.templating import Jinja2Templates
 
 from scr.dbase.database import db_helper
 from scr.dbase.models import Base
+from scr.Routers.accuracy_classes import ac_router
 from scr.Routers.auth import auth_router
 from scr.Routers.companies import org_router
 from scr.Routers.contract_specs import cs_router
@@ -120,6 +121,16 @@ async def lifespan(_: FastAPI):
                 await crud_units.ensure_name(session, name)
         await crud_units.sync_from_materials(session)
         await session.commit()
+    # Seed accuracy classes: defaults + classes already used in materials
+    from scr.dbase import crud_accuracy_classes
+    from scr.dbase.models import DEFAULT_ACCURACY_CLASSES
+
+    async with db_helper.session_factory() as session:
+        if not await crud_accuracy_classes.get_names(session):
+            for name in DEFAULT_ACCURACY_CLASSES:
+                await crud_accuracy_classes.ensure_name(session, name)
+        await crud_accuracy_classes.sync_from_materials(session)
+        await session.commit()
     yield
 
 
@@ -176,6 +187,7 @@ app.include_router(mt_calc_router, prefix="/reg")
 app.include_router(mod_router, prefix="/reg")
 app.include_router(nc_router, prefix="/reg")
 app.include_router(units_router, prefix="/reg")
+app.include_router(ac_router, prefix="/reg")
 app.include_router(del_router, prefix="/reg")
 app.include_router(cs_router, prefix="/reg")
 app.include_router(sc_router, prefix="/reg")

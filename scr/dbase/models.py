@@ -336,6 +336,8 @@ class Material(BaseID):
     voltage: Mapped[str | None] = mapped_column(String(50), nullable=True)
     # Единица измерения — значение из справочника единиц (units)
     unit: Mapped[str] = mapped_column(String(20), default="шт", server_default="шт", nullable=False)
+    # Класс точности — значение из справочника accuracy_classes, необязательное
+    accuracy_class: Mapped[str | None] = mapped_column(String(20), nullable=True)
     stats: Mapped[bool] = mapped_column(default=True, nullable=False)
     vtych: Mapped[bool] = mapped_column(default=False, nullable=False)
     vykat: Mapped[bool] = mapped_column(default=False, nullable=False)
@@ -378,6 +380,21 @@ class Unit(Base):
 
 DEFAULT_UNIT = "шт"
 DEFAULT_UNITS = [DEFAULT_UNIT, "кг", "м2", "пог.м."]
+
+
+class AccuracyClass(Base):
+    """Справочник классов точности материалов"""
+
+    __tablename__ = "accuracy_classes"
+
+    id: Mapped[int] = mapped_column(primary_key=True)
+    name: Mapped[str] = mapped_column(String(20), unique=True, nullable=False)
+
+    def __repr__(self) -> str:
+        return f"AccuracyClass(id={self.id}, name='{self.name}')"
+
+
+DEFAULT_ACCURACY_CLASSES = ["0.2", "0.2S", "0.5", "0.5S", "1", "3", "5P", "10P"]
 
 
 class Module(BaseID):
