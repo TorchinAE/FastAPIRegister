@@ -2,6 +2,7 @@ import io
 
 from fastapi import APIRouter, Depends, File, HTTPException, UploadFile
 from openpyxl import Workbook, load_workbook
+from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from scr.dbase import crud_module_slots, crud_module_types, crud_modules
@@ -179,7 +180,6 @@ async def export_defaults_excel(
     slots = await crud_module_slots.get_slots(session, type_id)
     prices = await crud_modules.get_module_prices(session)
     by_slot = {d.slot_id: d for d in defaults if d.slot_id is not None}
-    slot_ids = {s.id for s in slots}
 
     wb = Workbook()
     ws = wb.active
@@ -189,9 +189,8 @@ async def export_defaults_excel(
     ws.merge_cells(start_row=1, start_column=1, end_row=1, end_column=len(headers))
     ws.cell(1, 1).font = Font(bold=True, size=14)
     write_header(ws, headers)
-    # Обязательные строки (включая скрытые) по порядку, затем остальные модули
+    # Обязательные строки (включая скрытые) по порядку
     rows = [(s.name, by_slot.get(s.id)) for s in slots]
-    rows += [(None, d) for d in defaults if d.slot_id not in slot_ids]
     for slot_name, d in rows:
         if d is None:
             ws.append([slot_name])
@@ -217,6 +216,7 @@ async def import_defaults_excel(
     """Модуль ищется по ID, затем по названию. Уже добавленный модуль — количество заменяется.
 
     Колонка «Строка» с названием обязательной строки — модуль ставится в эту строку.
+    Строки без обязательной строки пропускаются: модули по умолчанию — только обязательные строки.
 
     Модуль не найден — ищется (или создаётся) материал с этим названием (Код 1С, Цена за ед., Тип материала),
     из него создаётся модуль, который и добавляется в модули по умолчанию.
@@ -237,8 +237,6 @@ async def import_defaults_excel(
     if header_idx < 0:
         raise HTTPException(status_code=400, detail="Не найдена строка заголовка с колонкой «Модуль»")
 
-    defaults = await crud_module_types.get_defaults(session, type_id)
-    existing = {d.module_id: d for d in defaults if d.slot_id is None}
     slots = {s.name.strip().lower(): s for s in await crud_module_slots.get_slots(session, type_id)}
     find_or_create = await material_finder(session)
     added = updated = created_modules = created_materials = 0
@@ -273,20 +271,19 @@ async def import_defaults_excel(
             continue
         slot_name = cell(row, col_map, "slot")
         slot = slots.get(str(slot_name).strip().lower()) if slot_name else None
-        if slot:
-            try:
-                await crud_module_slots.set_slot_default(session, slot, mod.id, qty)
-            except ValueError as exc:
-                skipped.append(f"{mod.name}: {exc}")
-                continue
-            updated += 1
-        elif mod.id in existing:
-            existing[mod.id].quantity = qty
+        if not slot:
+            skipped.append(f"{mod.name}: нет обязательной строки «{slot_name or ''}»")
+            continue
+        default_stmt = select(ModuleTypeDefault.id).where(ModuleTypeDefault.slot_id == slot.id)
+        had_default = (await session.execute(default_stmt)).first() is not None
+        try:
+            await crud_module_slots.set_slot_default(session, slot, mod.id, qty)
+        except ValueError as exc:
+            skipped.append(f"{mod.name}: {exc}")
+            continue
+        if had_default:
             updated += 1
         else:
-            obj = ModuleTypeDefault(module_type_id=type_id, module_id=mod.id, quantity=qty)
-            session.add(obj)
-            existing[mod.id] = obj
             added += 1
     if created_modules:
         await session.flush()

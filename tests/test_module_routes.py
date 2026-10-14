@@ -98,3 +98,15 @@ async def test_read_modules_page(client):
     response = await client.get("/reg/modules")
     # Page requires auth — expect redirect to login
     assert response.status_code in (200, 302)
+
+
+async def test_delete_module_empty_and_used(client):
+    empty = (await client.post("/reg/api/modules/", json={"name": "Пустой модуль на удаление"})).json()
+    assert (await client.delete(f"/reg/api/modules/{empty['id']}")).status_code == 200
+
+    parent = (await client.post("/reg/api/modules/", json={"name": "Родитель удаления"})).json()
+    child = (await client.post("/reg/api/modules/", json={"name": "Подмодуль удаления"})).json()
+    await client.post(f"/reg/api/modules/{parent['id']}/items", json={"sub_module_id": child["id"], "quantity": 1})
+    resp = await client.delete(f"/reg/api/modules/{child['id']}")
+    assert resp.status_code == 400
+    assert "в составе модулей" in resp.json()["detail"]

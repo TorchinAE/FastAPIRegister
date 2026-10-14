@@ -52,7 +52,7 @@
 <script>
 async function deleteEq(id, btn) {
     if (!confirm('Удалить оборудование?')) return;
-    const resp = await fetch(`/api/equipment/${id}`, {method: 'DELETE'});
+    const resp = await fetch(`/reg/api/equipment/${id}`, {method: 'DELETE'});
     if (resp.ok) { btn.closest('tr').remove(); showToast('Удалено'); } else { showToast('Ошибка удаления'); }
 }
 function showToast(msg) {

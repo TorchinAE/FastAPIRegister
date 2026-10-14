@@ -1,6 +1,6 @@
 """Обязательные строки разделов расчёта (КСО, КРУ, ЩО, ...): одна строка — один модуль."""
 
-from sqlalchemy import select, update
+from sqlalchemy import delete, select, update
 from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy.orm import selectinload
 
@@ -87,12 +87,10 @@ async def move_slot(session: AsyncSession, slot_id: int, direction: int) -> Modu
 
 
 async def delete_slot(session: AsyncSession, slot_id: int) -> ModuleTypeSlot | None:
-    """Удаляет строку; её модули в «по умолчанию» и расчётах остаются обычными строками."""
+    """Удаляет строку и её модуль по умолчанию; в расчётах модули строки остаются обычными строками."""
     slot = await session.get(ModuleTypeSlot, slot_id)
     if slot:
-        await session.execute(
-            update(ModuleTypeDefault).where(ModuleTypeDefault.slot_id == slot_id).values(slot_id=None)
-        )
+        await session.execute(delete(ModuleTypeDefault).where(ModuleTypeDefault.slot_id == slot_id))
         await session.execute(update(RequestCalcItem).where(RequestCalcItem.slot_id == slot_id).values(slot_id=None))
         await session.delete(slot)
         await session.flush()

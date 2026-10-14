@@ -9,6 +9,7 @@ from scr.dbase.models import (
     ModuleItem,
     ModuleType,
     ModuleTypeDefault,
+    ModuleTypeSlot,
     Organization,
     Positions,
     Request,
@@ -46,11 +47,14 @@ async def _setup(s):
     mt = ModuleType(name="Calc KSO", slug="calc-kso")
     s.add_all([req, mat, sub, top, mt])
     await s.flush()
+    slot = ModuleTypeSlot(module_type_id=mt.id, name="Шкаф", sort_order=1)
+    s.add(slot)
+    await s.flush()
     s.add_all(
         [
             ModuleItem(module_id=sub.id, material_id=mat.id, quantity=2),
             ModuleItem(module_id=top.id, sub_module_id=sub.id, quantity=3),
-            ModuleTypeDefault(module_type_id=mt.id, module_id=top.id, quantity=1),
+            ModuleTypeDefault(module_type_id=mt.id, module_id=top.id, quantity=1, slot_id=slot.id),
         ]
     )
     await s.commit()
@@ -60,11 +64,11 @@ async def _setup(s):
 async def test_calc_blocks_prices_and_section_cost(client, db_session):
     ids = await _setup(db_session)
 
-    # Новый блок: модули по умолчанию с ценой с учётом подмодулей, рентабельность организации
+    # Новый блок: модули обязательных строк с ценой с учётом подмодулей, рентабельность организации
     resp = await client.post("/reg/api/request-calcs/", json={"request_id": ids["req"], "module_type_id": ids["mt"]})
     assert resp.status_code == 200
     block = resp.json()["block"]
-    assert block["items"][0]["module_price"] == 600.0
+    assert block["slots"][0]["item"]["module_price"] == 600.0
     assert block["profitability_percent"] == 10.0
     assert block["final_price"] == 660.0
 
@@ -146,19 +150,29 @@ async def _setup_module_only(s):
 async def test_defaults_import_creates_material_and_module(client, db_session):
     mt = ModuleType(name="Def KSO", slug="def-kso")
     db_session.add_all([mt, Module(name="DefExisting")])
+    await db_session.flush()
+    db_session.add_all(
+        [
+            ModuleTypeSlot(module_type_id=mt.id, name="Ввод", sort_order=1),
+            ModuleTypeSlot(module_type_id=mt.id, name="Шкаф", sort_order=2),
+        ]
+    )
     await db_session.commit()
     ids = {"mt": mt.id}
     files = _xlsx(
         [
-            ["ID", "Модуль", "Кол-во", "Цена за ед."],
-            [None, "DefExisting", 2, None],
-            [None, "Новый шкаф", 3, 250],
+            ["Строка", "ID", "Модуль", "Кол-во", "Цена за ед."],
+            ["Ввод", None, "DefExisting", 2, None],
+            ["Шкаф", None, "Новый шкаф", 3, 250],
+            [None, None, "DefExisting", 1, None],
         ]
     )
     resp = await client.post(f"/reg/api/module-types/{ids['mt']}/defaults/import-excel", files=files)
     assert resp.status_code == 200
     data = resp.json()
-    assert (data["added"], data["created_modules"], data["created_materials"], data["skipped"]) == (2, 1, 1, [])
+    # Модули по умолчанию — только обязательные строки: строка Excel без «Строки» пропускается
+    assert (data["added"], data["created_modules"], data["created_materials"]) == (2, 1, 1)
+    assert data["skipped"] == ["DefExisting: нет обязательной строки «»"]
 
     defaults = {d["module_name"]: d for d in (await client.get(f"/reg/api/module-types/{ids['mt']}/defaults")).json()}
     assert defaults["Новый шкаф"]["quantity"] == 3

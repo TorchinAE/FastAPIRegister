@@ -565,6 +565,9 @@ async def update_module(
 
 @mod_router.delete("/{mod_id}")
 async def delete_module(mod_id: int, session: AsyncSession = Depends(db_helper.session_dependency)):
+    usage = await crud_modules.module_usage(session, mod_id)
+    if usage:
+        raise HTTPException(status_code=400, detail="Модуль используется — " + ", ".join(usage))
     result = await crud_modules.delete_module(session=session, mod_id=mod_id)
     if not result:
         raise HTTPException(status_code=404, detail="Модуль не найден")

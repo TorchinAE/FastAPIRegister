@@ -69,8 +69,10 @@
 <script>
 async function deleteMod(id, btn) {
     if (!confirm('Удалить модуль?')) return;
-    const resp = await fetch(`/api/modules/${id}`, {method: 'DELETE'});
-    if (resp.ok) { btn.closest('tr').remove(); showToast('Удалено'); } else { showToast('Ошибка удаления'); }
+    const resp = await fetch(`/reg/api/modules/${id}`, {method: 'DELETE'});
+    if (resp.ok) { btn.closest('tr').remove(); showToast('Удалено'); return; }
+    const err = await resp.json().catch(() => ({}));
+    showToast(err.detail || 'Ошибка удаления');
 }
 async function importExcel(input) {
     if (!input.files.length) return;

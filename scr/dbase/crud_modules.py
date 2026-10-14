@@ -1,4 +1,4 @@
-from sqlalchemy import Result, func, select
+from sqlalchemy import Result, delete, func, select
 from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy.orm import selectinload
 
@@ -95,9 +95,31 @@ async def update_module(session: AsyncSession, upd_mod: ModuleUpdateSchema) -> M
     return check_mod
 
 
+async def module_usage(session: AsyncSession, mod_id: int) -> list[str]:
+    """Где используется модуль: в составе других модулей и в расчётах ТКП."""
+    from scr.dbase.models import RequestCalcItem
+
+    usage = []
+    in_modules = (
+        await session.execute(select(func.count(ModuleItem.id)).where(ModuleItem.sub_module_id == mod_id))
+    ).scalar() or 0
+    if in_modules:
+        usage.append(f"в составе модулей: {in_modules}")
+    in_calcs = (
+        await session.execute(select(func.count(RequestCalcItem.id)).where(RequestCalcItem.module_id == mod_id))
+    ).scalar() or 0
+    if in_calcs:
+        usage.append(f"в расчётах ТКП: {in_calcs}")
+    return usage
+
+
 async def delete_module(session: AsyncSession, mod_id: int) -> Module | None:
+    from scr.dbase.models import ModuleTypeDefault
+
     mod = await session.get(Module, mod_id)
     if mod:
+        # Модуль по умолчанию в разделах расчёта — строка остаётся пустой
+        await session.execute(delete(ModuleTypeDefault).where(ModuleTypeDefault.module_id == mod_id))
         await session.delete(mod)
         await session.flush()
     return mod

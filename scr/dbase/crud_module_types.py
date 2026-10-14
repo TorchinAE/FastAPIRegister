@@ -186,7 +186,10 @@ async def create_calc(session: AsyncSession, request_id: int, module_type_id: in
     await session.flush()
 
     if mod_type and mod_type.slug not in WORKS_SECTIONS:
+        # Состав нового блока — модули обязательных строк раздела
         for d in await get_defaults(session, module_type_id):
+            if d.slot_id is None:
+                continue
             session.add(RequestCalcItem(calc_id=calc.id, module_id=d.module_id, quantity=d.quantity, slot_id=d.slot_id))
         await session.flush()
 
