@@ -36,8 +36,13 @@
             {% for key, label, field, cost in sections %}
             <div style="display:flex;gap:0.35rem;align-items:stretch;">
                 <a href="/reg/requests/{{ req.id }}/calc/{{ key }}" class="btn btn-ghost calc-btn" style="flex:1;display:flex;justify-content:space-between;align-items:center;text-decoration:none;">
-                    <span>{{ label }}</span>
+                    {% set bt = block_totals.get(key) %}
+                    <span>{{ label }}{% if bt %} <span class="calc-blocks-qty" title="Количество по блокам расчёта">× {{ bt.qty }}</span>{% endif %}</span>
+                    {% if bt %}
+                    <span class="calc-cost" id="cost-{{ field }}" data-raw="{{ bt.final }}" title="Сумма блоков: стоимость × кол-во">{{ "%.2f"|format(bt.final) }}</span>
+                    {% else %}
                     <span class="calc-cost" id="cost-{{ field }}" data-raw="{{ cost or 0 }}">{{ "%.2f"|format(cost or 0) }}</span>
+                    {% endif %}
                 </a>
                 {% if key == 'tkp' %}
                 <span style="width:1.9rem;" title="Итого без НДС по сводной таблице"></span>

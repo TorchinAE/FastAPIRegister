@@ -33,6 +33,15 @@
         <label>Цена</label>
         <input type="number" name="price" placeholder="0" step="0.01" min="0" value="0">
     </div>
+    <div class="form-group" style="flex:1; min-width:90px; margin-bottom:0;">
+        <label>Ед. изм.</label>
+        <div style="display:flex;gap:0.35rem;align-items:center;">
+            <select name="unit" style="flex:1;">
+                {% for u in units %}<option value="{{ u }}" {{ 'selected' if u == 'шт' else '' }}>{{ u }}</option>{% endfor %}
+            </select>
+            <a href="/reg/units" class="btn btn-success btn-sm btn-icon" title="Пополнить справочник единиц" style="flex-shrink:0;">+</a>
+        </div>
+    </div>
     <div class="form-group" style="flex:1; min-width:80px; margin-bottom:0;">
         <label>Ном Ток</label>
         <select name="nom_tok" id="nom_tok_new">
@@ -73,7 +82,7 @@
     <table id="dataTable">
         <thead>
             <tr>
-                <th>ID</th><th>Тип</th><th>Название</th><th>Цена</th><th>Дата</th><th>Ном Ток</th><th>Напряж.</th><th>стац</th><th>втыч</th><th>выкат</th><th>ручн</th><th>эл.прив</th><th>Код 1С</th><th>Код агент</th><th>URL агент</th><th>мод.</th><th></th>
+                <th>ID</th><th>Тип</th><th>Название</th><th>Цена</th><th>Ед. изм.</th><th>Дата</th><th>Ном Ток</th><th>Напряж.</th><th>стац</th><th>втыч</th><th>выкат</th><th>ручн</th><th>эл.прив</th><th>Код 1С</th><th>Код агент</th><th>URL агент</th><th>мод.</th><th></th>
             </tr>
             <tr class="table-filter">
                 <th><input type="text" data-col="0" data-min="1" placeholder="Фильтр..." class="tf-input"></th>
@@ -83,14 +92,15 @@
                 <th><input type="text" data-col="4" placeholder="Фильтр..." class="tf-input"></th>
                 <th><input type="text" data-col="5" placeholder="Фильтр..." class="tf-input"></th>
                 <th><input type="text" data-col="6" placeholder="Фильтр..." class="tf-input"></th>
-                <th><select data-col="7" class="tf-select"><option value="">—</option><option value="✓">✓</option><option value="✗">✗</option></select></th>
+                <th><input type="text" data-col="7" placeholder="Фильтр..." class="tf-input"></th>
                 <th><select data-col="8" class="tf-select"><option value="">—</option><option value="✓">✓</option><option value="✗">✗</option></select></th>
                 <th><select data-col="9" class="tf-select"><option value="">—</option><option value="✓">✓</option><option value="✗">✗</option></select></th>
                 <th><select data-col="10" class="tf-select"><option value="">—</option><option value="✓">✓</option><option value="✗">✗</option></select></th>
                 <th><select data-col="11" class="tf-select"><option value="">—</option><option value="✓">✓</option><option value="✗">✗</option></select></th>
-                <th><input type="text" data-col="12" placeholder="Фильтр..." class="tf-input"></th>
+                <th><select data-col="12" class="tf-select"><option value="">—</option><option value="✓">✓</option><option value="✗">✗</option></select></th>
                 <th><input type="text" data-col="13" placeholder="Фильтр..." class="tf-input"></th>
                 <th><input type="text" data-col="14" placeholder="Фильтр..." class="tf-input"></th>
+                <th><input type="text" data-col="15" placeholder="Фильтр..." class="tf-input"></th>
                 <th></th>
                 <th></th>
             </tr>
@@ -133,6 +143,7 @@ const allData = [
         typeId: {{ item.type_id or 'null' }},
         name: '{{ item.name|e }}',
         price: '{{ item.price|money }}',
+        unit: '{{ (item.unit or "шт")|e }}',
         date: '{{ item.date.strftime("%d.%m.%Y") if item.date else "" }}',
         nomTok: {{ item.nom_tok }},
         voltage: '{{ (item.voltage or "")|e }}',
@@ -182,6 +193,7 @@ function renderTable() {
             <td>${m.typeId ? '<a href="/reg/material-types/' + m.typeId + '" onclick="event.stopPropagation()">' + m.type + '</a>' : ''}</td>
             <td>${m.name}</td>
             <td>${m.price}</td>
+            <td>${m.unit}</td>
             <td>${m.date}</td>
             <td>${m.nomTok}</td>
             <td>${m.voltage}</td>
@@ -200,7 +212,7 @@ function renderTable() {
                 <button class="btn btn-danger btn-sm btn-icon" title="Удалить" onclick="event.stopPropagation(); deleteMat(${m.id}, this)">&#10005;</button>
             </td>
         </tr>`
-    ).join('') || '<tr class="empty-row"><td colspan="17">Нет материалов</td></tr>';
+    ).join('') || '<tr class="empty-row"><td colspan="18">Нет материалов</td></tr>';
 
     renderPagination();
 }
@@ -242,7 +254,7 @@ function applyFilters() {
     } else {
         filteredData = allData.filter(m => {
             const cells = [
-                String(m.id), m.type, m.name, m.price, m.date, String(m.nomTok), m.voltage,
+                String(m.id), m.type, m.name, m.price, m.unit, m.date, String(m.nomTok), m.voltage,
                 m.stats ? '✓' : '✗', m.vtych ? '✓' : '✗', m.vykat ? '✓' : '✗',
                 m.ruchn ? '✓' : '✗', m.elPriv ? '✓' : '✗',
                 m.code1c, m.codeAgent, m.urlAgent,

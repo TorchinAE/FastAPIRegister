@@ -17,7 +17,7 @@
 <div class="card">
     <form id="editModForm">
         <input type="hidden" name="id" value="{{ mod.id }}">
-        <div class="form-row" style="grid-template-columns: 1fr 220px;">
+        <div class="form-row" style="grid-template-columns: 1fr 220px 220px;">
             <div class="form-group">
                 <label>Название</label>
                 <input type="text" name="name" value="{{ mod.name }}" required style="width:100%;min-width:0">
@@ -35,6 +35,15 @@
                     <button type="button" class="btn btn-ghost btn-sm" onclick="resetNomTok()" title="Вернуть автоматический расчёт">Авто</button>
                     {% endif %}
                 </div>
+            </div>
+            <div class="form-group">
+                <label title="По типу модуль подбирается в обязательные строки расчёта">Тип модуля</label>
+                <select name="material_type_id" style="width:100%;min-width:0">
+                    <option value="">— не задан —</option>
+                    {% for t in material_types %}
+                    <option value="{{ t.id }}" {{ 'selected' if mod.material_type_id == t.id else '' }}>{{ t.name }}</option>
+                    {% endfor %}
+                </select>
             </div>
         </div>
         <div class="actions">
@@ -94,6 +103,21 @@
         <thead>
             <tr>
                 <th>Тип</th><th>Тип материала</th><th>Название</th><th>Цена за ед.</th><th>Кол-во</th><th>Сумма</th><th></th>
+            </tr>
+            <tr class="table-filter">
+                <th>
+                    <select data-col="0" class="tf-input">
+                        <option value="">Все</option>
+                        <option value="материал">Материал</option>
+                        <option value="модуль">Модуль</option>
+                    </select>
+                </th>
+                <th><input type="text" data-col="1" placeholder="Фильтр..." class="tf-input"></th>
+                <th><input type="text" data-col="2" placeholder="Фильтр..." class="tf-input"></th>
+                <th><input type="text" data-col="3" data-num placeholder="Фильтр..." class="tf-input"></th>
+                <th></th>
+                <th><input type="text" data-col="5" data-num placeholder="Фильтр..." class="tf-input"></th>
+                <th></th>
             </tr>
         </thead>
         <tbody>
@@ -208,6 +232,22 @@ function updateItemSelect() {
     });
 }
 
+// Фильтры состава модуля; в числовых столбцах пробелы (разделители тысяч) не учитываются
+function normFilter(str, num) {
+    str = String(str).toLowerCase();
+    return num ? str.replace(/\s/g, '').replace(/,/g, '.') : str.trim();
+}
+function applyItemFilters() {
+    const filters = [...document.querySelectorAll('#itemsTable .tf-input')]
+        .map(i => ({col: parseInt(i.dataset.col), num: 'num' in i.dataset, val: normFilter(i.value, 'num' in i.dataset)}))
+        .filter(f => f.val);
+    document.querySelectorAll('#itemsTable tbody tr:not(.empty-row)').forEach(row => {
+        const ok = filters.every(f => row.cells[f.col] && normFilter(row.cells[f.col].textContent, f.num).includes(f.val));
+        row.style.display = ok ? '' : 'none';
+    });
+}
+document.querySelectorAll('#itemsTable .tf-input').forEach(i => i.addEventListener(i.tagName === 'SELECT' ? 'change' : 'input', applyItemFilters));
+
 async function addItem() {
     const type = document.getElementById('itemType').value;
     const id = parseInt(document.getElementById('itemId').value);
@@ -253,7 +293,7 @@ async function deleteItem(itemId, btn) {
 document.getElementById('editModForm').addEventListener('submit', async function(e) {
     e.preventDefault();
     const fd = new FormData(this);
-    const data = { id: parseInt(fd.get('id')), name: fd.get('name') };
+    const data = { id: parseInt(fd.get('id')), name: fd.get('name'), material_type_id: parseInt(fd.get('material_type_id')) || null };
     // Ном ток отправляем только если изменён — иначе модуль останется на автоматическом расчёте
     const nomTok = parseInt(fd.get('nom_tok')) || 0;
     if (nomTok !== {{ mod.nom_tok or 0 }}) data.nom_tok = nomTok;

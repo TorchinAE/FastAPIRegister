@@ -1,0 +1,207 @@
+{% extends "base.html" %}
+{% block title %}Обязательные строки{% endblock %}
+{% block content %}
+<style>
+.slot-tabs { display: flex; gap: 0.4rem; flex-wrap: wrap; margin-bottom: 1rem; }
+.slot-types { position: relative; }
+.slot-types > summary { list-style: none; cursor: pointer; padding: 0.45rem 0.6rem; border: 1.5px solid var(--border); border-radius: 6px; background: #fff; min-width: 220px; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; max-width: 360px; }
+.slot-types > summary::-webkit-details-marker { display: none; }
+.slot-types[open] > summary { border-color: var(--primary); }
+.slot-types-list { position: absolute; z-index: 20; top: calc(100% + 4px); left: 0; background: #fff; border: 1px solid var(--border); border-radius: 6px; box-shadow: var(--shadow); padding: 0.4rem; max-height: 300px; overflow-y: auto; min-width: 260px; }
+.slot-types-list label { display: flex; gap: 0.5rem; align-items: center; padding: 0.25rem 0.4rem; border-radius: 4px; cursor: pointer; font-weight: normal; margin: 0; }
+.slot-types-list label:hover { background: #f1f5f9; }
+.slot-muted { color: var(--text-muted); }
+.slot-row-hidden td { background: #f8fafc; }
+</style>
+
+<div class="page-header">
+    <div>
+        <h1>Обязательные строки</h1>
+        <div class="subtitle">Строки подставляются в модули по умолчанию и расчёт. В строку можно выбрать только модуль выбранных типов.</div>
+    </div>
+    {% if mt %}
+    <div style="display:flex;gap:0.5rem;flex-wrap:wrap;">
+        <a href="/reg/module-types-calc/{{ mt.id }}/defaults" class="btn btn-ghost">Модули по умолчанию: {{ mt.name }}</a>
+    </div>
+    {% endif %}
+</div>
+
+<div class="slot-tabs">
+    {% for t in types %}
+    <a href="/reg/module-type-slots?type={{ t.slug }}" class="btn {{ 'btn-primary' if mt and t.id == mt.id else 'btn-ghost' }}">{{ t.name }}</a>
+    {% endfor %}
+</div>
+
+{% if mt %}
+<div class="card" style="margin-bottom:1rem;">
+    <form id="addForm" style="display:flex;gap:0.75rem;align-items:flex-end;flex-wrap:wrap;">
+        <div class="form-group" style="flex:1;min-width:220px;margin-bottom:0;">
+            <label>Название строки</label>
+            <input type="text" id="newName" required maxlength="200" style="width:100%;">
+        </div>
+        <label style="display:flex;gap:0.4rem;align-items:center;height:38px;margin:0;">
+            <input type="checkbox" id="newHidden"> Не отображать в расчёте
+        </label>
+        <button type="submit" class="btn btn-success" style="height:38px;">Добавить строку</button>
+    </form>
+</div>
+
+<div class="table-wrap" style="overflow:visible;">
+    <table>
+        <thead>
+            <tr>
+                <th style="width:40px">№</th>
+                <th>Название строки</th>
+                <th>Типы модулей</th>
+                <th title="Не отображать в расчёте, но учитывать в стоимости">Не отображать</th>
+                <th style="width:90px">Порядок</th>
+                <th style="width:50px"></th>
+            </tr>
+        </thead>
+        <tbody id="slotsBody"></tbody>
+    </table>
+</div>
+<div style="margin-top:0.75rem;font-size:0.85rem;color:var(--text-muted);">
+    Тип модуля задаётся на странице модуля. Если типы не выбраны — в строку подходит любой модуль.
+    Скрытая строка не показывается в расчёте, её модуль всегда берётся из модулей по умолчанию и учитывается в стоимости.
+</div>
+{% else %}
+<div class="card slot-muted">Нет разделов расчёта с модулями</div>
+{% endif %}
+
+<div id="toast" class="toast" style="display:none"></div>
+{% endblock %}
+
+{% block scripts %}
+{% if mt %}
+<script>
+const typeId = {{ mt.id }};
+const materialTypes = {{ material_types | tojson }};
+let slots = {{ slots | tojson }};
+
+function esc(s) {
+    return String(s ?? '').replace(/[&<>"']/g, c => ({'&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;'}[c]));
+}
+
+function typesSummary(slot) {
+    return slot.type_names.length ? esc(slot.type_names.join(', ')) : '<span class="slot-muted">любые</span>';
+}
+
+function render() {
+    const body = document.getElementById('slotsBody');
+    if (!slots.length) {
+        body.innerHTML = '<tr><td colspan="6" style="text-align:center;color:var(--text-muted);padding:1.5rem;">Нет обязательных строк</td></tr>';
+        return;
+    }
+    body.innerHTML = '';
+    slots.forEach((slot, i) => {
+        const tr = document.createElement('tr');
+        tr.className = slot.hidden ? 'slot-row-hidden' : '';
+        tr.innerHTML = `
+            <td>${i + 1}</td>
+            <td><input type="text" class="f-name" value="${esc(slot.name)}" maxlength="200" style="width:100%;min-width:180px;"></td>
+            <td>
+                <details class="slot-types">
+                    <summary title="${esc(slot.type_names.join(', '))}">${typesSummary(slot)}</summary>
+                    <div class="slot-types-list">
+                        ${materialTypes.map(t => `
+                        <label><input type="checkbox" value="${t.id}" ${slot.type_ids.includes(t.id) ? 'checked' : ''}> ${esc(t.name)}</label>`).join('')}
+                    </div>
+                </details>
+            </td>
+            <td style="text-align:center"><input type="checkbox" class="f-hidden" ${slot.hidden ? 'checked' : ''}></td>
+            <td>
+                <button type="button" class="btn btn-ghost btn-sm f-up" title="Выше" ${i === 0 ? 'disabled' : ''}>&uarr;</button>
+                <button type="button" class="btn btn-ghost btn-sm f-down" title="Ниже" ${i === slots.length - 1 ? 'disabled' : ''}>&darr;</button>
+            </td>
+            <td><button type="button" class="btn btn-danger btn-sm btn-icon f-del" title="Удалить">&#10005;</button></td>`;
+        tr.querySelector('.f-name').addEventListener('change', e => {
+            const name = e.target.value.trim();
+            if (!name) { e.target.value = slot.name; showToast('Название не может быть пустым'); return; }
+            patch(slot, {name});
+        });
+        tr.querySelector('.f-hidden').addEventListener('change', e => patch(slot, {hidden: e.target.checked}));
+        const details = tr.querySelector('.slot-types');
+        details.addEventListener('toggle', () => {
+            if (details.open) return;
+            const ids = [...details.querySelectorAll('input:checked')].map(c => parseInt(c.value));
+            const same = ids.length === slot.type_ids.length && ids.every(id => slot.type_ids.includes(id));
+            if (!same) patch(slot, {material_type_ids: ids});
+        });
+        tr.querySelector('.f-up').addEventListener('click', () => move(slot, -1));
+        tr.querySelector('.f-down').addEventListener('click', () => move(slot, 1));
+        tr.querySelector('.f-del').addEventListener('click', () => removeSlot(slot));
+        body.appendChild(tr);
+    });
+}
+
+// Закрыть список типов кликом вне его — изменения сохраняются при закрытии
+document.addEventListener('click', e => {
+    document.querySelectorAll('.slot-types[open]').forEach(d => { if (!d.contains(e.target)) d.open = false; });
+});
+
+async function reload() {
+    const resp = await fetch('/reg/api/module-types/' + typeId + '/slots');
+    if (resp.ok) { slots = await resp.json(); render(); }
+}
+
+async function patch(slot, data) {
+    const resp = await fetch('/reg/api/module-type-slots/' + slot.id, {
+        method: 'PATCH',
+        headers: {'Content-Type': 'application/json'},
+        body: JSON.stringify(data),
+    });
+    if (resp.ok) {
+        Object.assign(slot, await resp.json());
+        render();
+        showToast('Сохранено');
+    } else {
+        showToast('Ошибка сохранения');
+    }
+}
+
+async function move(slot, direction) {
+    const resp = await fetch('/reg/api/module-type-slots/' + slot.id + '/move', {
+        method: 'POST',
+        headers: {'Content-Type': 'application/json'},
+        body: JSON.stringify({direction}),
+    });
+    if (resp.ok) reload(); else showToast('Ошибка');
+}
+
+async function removeSlot(slot) {
+    if (!confirm(`Удалить строку «${slot.name}»? Её модули в расчётах останутся обычными строками.`)) return;
+    const resp = await fetch('/reg/api/module-type-slots/' + slot.id, {method: 'DELETE'});
+    if (resp.ok) { showToast('Удалено'); reload(); } else showToast('Ошибка удаления');
+}
+
+document.getElementById('addForm').addEventListener('submit', async e => {
+    e.preventDefault();
+    const name = document.getElementById('newName').value.trim();
+    if (!name) return;
+    const resp = await fetch('/reg/api/module-types/' + typeId + '/slots', {
+        method: 'POST',
+        headers: {'Content-Type': 'application/json'},
+        body: JSON.stringify({module_type_id: typeId, name, hidden: document.getElementById('newHidden').checked}),
+    });
+    if (resp.ok) {
+        document.getElementById('newName').value = '';
+        document.getElementById('newHidden').checked = false;
+        reload();
+        showToast('Строка добавлена');
+    } else {
+        showToast('Ошибка добавления');
+    }
+});
+
+function showToast(msg) {
+    const t = document.getElementById('toast');
+    t.textContent = msg;
+    t.style.display = 'block';
+    setTimeout(() => t.style.display = 'none', 2500);
+}
+
+render();
+</script>
+{% endif %}
+{% endblock %}

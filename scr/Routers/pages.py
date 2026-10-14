@@ -955,6 +955,10 @@ async def invoices_page(
     )
 
 
+# Разделы, у которых на странице расчёта показывается сумма блоков
+BLOCK_TOTAL_SECTIONS = ("corpusa", "kso", "kru", "sho")
+
+
 @pages_router.get("/requests/{req_id}/calc", response_class=HTMLResponse)
 async def request_calc_page(
     req_id: int,
@@ -1008,13 +1012,35 @@ async def request_calc_page(
             pass
 
     # Поле «ТКП» — итого без НДС по сводной таблице
+    from scr.dbase.crud_module_slots import sync_hidden_slots
     from scr.dbase.crud_tkp import build_tkp_summary
 
+    if await sync_hidden_slots(session, req.id):
+        await session.commit()
     summary = await build_tkp_summary(session, req)
     tkp_total = round(summary["totals"]["final"], 2)
     if float(req.tkp_calc_cost or 0) != tkp_total:
         req.tkp_calc_cost = tkp_total
         await session.commit()
+
+    # Корпуса, КСО, КРУ, ЩО — сумма по блокам расчёта (стоимость × кол-во) и количество блоков
+    block_totals = {
+        r["slug"]: {"final": r["final"], "qty": r["quantity"]}
+        for r in summary["rows"]
+        if r["slug"] in BLOCK_TOTAL_SECTIONS
+    }
+    if "corpusa" in block_totals:
+        from sqlalchemy import func as sa_func
+        from sqlalchemy import select as sa_select
+
+        from scr.dbase.models import ModuleType, RequestCalc
+
+        qty_stmt = (
+            sa_select(sa_func.coalesce(sa_func.sum(RequestCalc.quantity), 0))
+            .join(ModuleType, ModuleType.id == RequestCalc.module_type_id)
+            .where(RequestCalc.request_id == req.id, ModuleType.slug == "corpusa")
+        )
+        block_totals["corpusa"]["qty"] = (await session.execute(qty_stmt)).scalar() or 0
 
     return templates.TemplateResponse(
         "requests/calc.html",
@@ -1025,6 +1051,7 @@ async def request_calc_page(
             "folder_path": folder_path or "",
             "totals": summary["totals"],
             "nds_percent": summary["nds_percent"],
+            "block_totals": block_totals,
             "active_page": "requests",
         },
     )
@@ -1049,8 +1076,11 @@ async def request_calc_tkp_page(
 
 
 async def _render_tkp_page(request, user, req, session):
+    from scr.dbase.crud_module_slots import sync_hidden_slots
     from scr.dbase.crud_tkp import build_tkp_summary
 
+    if await sync_hidden_slots(session, req.id):
+        await session.commit()
     summary = await build_tkp_summary(session, req)
     return templates.TemplateResponse(
         "requests/calc_tkp.html",
@@ -1127,12 +1157,16 @@ async def request_calc_page_by_section(
     mt = await crud_module_types.get_module_type_by_slug(session, section)
     if not mt:
         return HTMLResponse("Раздел не найден", status_code=404)
+    from scr.dbase import crud_module_slots
+
+    await crud_module_slots.sync_hidden_slots(session, req_id)
     calcs = await crud_module_types.get_or_create_calcs(session, req_id, mt.id)
     await session.commit()
     modules_list, _ = await crud_modules.get_modules(session, per_page=10000)
     prices = await crud_modules.get_module_prices(session)
     default_profit = await crud_module_types.default_profitability(session, req_id)
-    blocks = [crud_module_types.calc_block_data(c, prices, default_profit) for c in calcs]
+    slots = await crud_module_slots.get_slots(session, mt.id)
+    blocks = [crud_module_types.calc_block_data(c, prices, default_profit, slots) for c in calcs]
     return templates.TemplateResponse(
         "requests/calc_module.html",
         {
@@ -1142,12 +1176,22 @@ async def request_calc_page_by_section(
             "mt": mt,
             "blocks": blocks,
             "modules": modules_list,
+            "modules_data": _modules_data(modules_list, prices),
+            "slots": [crud_module_slots.slot_json(sl) for sl in slots if not sl.hidden],
             "prices": prices,
             "multi": section in crud_module_types.MULTI_BLOCK_SECTIONS,
             "works": section in crud_module_types.WORKS_SECTIONS,
             "active_page": "requests",
         },
     )
+
+
+def _modules_data(modules_list, prices: dict[int, float]) -> list[dict]:
+    """Модули для выбора в обязательные строки (фильтр по типу на странице)."""
+    return [
+        {"id": m.id, "name": m.name, "type_id": m.material_type_id, "price": prices.get(m.id, 0.0)}
+        for m in modules_list
+    ]
 
 
 # --- Nominal Currents ---
@@ -1183,6 +1227,37 @@ async def nominal_currents_page(
     )
 
 
+# --- Units ---
+@pages_router.get("/units", response_class=HTMLResponse)
+async def units_page(
+    request: Request,
+    session: AsyncSession = Depends(db_helper.session_dependency),
+):
+    user = await get_current_user(request, session)
+    if not user:
+        return RedirectResponse("/reg/", status_code=302)
+    from sqlalchemy import func, select
+
+    from scr.dbase import crud_units
+    from scr.dbase.models import DEFAULT_UNIT, Material
+
+    items = await crud_units.get_all(session)
+    stmt = select(Material.unit, func.count(Material.id)).group_by(Material.unit)
+    usage = dict((await session.execute(stmt)).all())
+    return templates.TemplateResponse(
+        "units/list.html",
+        {
+            "request": request,
+            "user": user,
+            "items": items,
+            "usage": usage,
+            "default_unit": DEFAULT_UNIT,
+            "total": len(items),
+            "active_page": "units",
+        },
+    )
+
+
 # --- Module Types Calc ---
 @pages_router.get("/module-types-calc", response_class=HTMLResponse)
 async def module_types_calc_page(
@@ -1201,6 +1276,37 @@ async def module_types_calc_page(
             "items": items,
             "total": len(items),
             "active_page": "module_types_calc",
+        },
+    )
+
+
+@pages_router.get("/module-type-slots", response_class=HTMLResponse)
+async def module_type_slots_page(
+    request: Request,
+    type: str | None = None,
+    session: AsyncSession = Depends(db_helper.session_dependency),
+):
+    """Обязательные строки разделов расчёта с модулями (без доставки и работ)."""
+    user = await get_current_user(request, session)
+    if not user:
+        return RedirectResponse("/reg/", status_code=302)
+    from scr.dbase import crud_material_types, crud_module_slots
+
+    excluded = crud_module_types.WORKS_SECTIONS | {"delivery"}
+    types = [t for t in await crud_module_types.get_module_types(session) if t.slug not in excluded]
+    mt = next((t for t in types if t.slug == type), types[0] if types else None)
+    slots = await crud_module_slots.get_slots(session, mt.id) if mt else []
+    material_types, _ = await crud_material_types.get_all_types(session, per_page=10000)
+    return templates.TemplateResponse(
+        "module_types_calc/slots.html",
+        {
+            "request": request,
+            "user": user,
+            "types": types,
+            "mt": mt,
+            "slots": [crud_module_slots.slot_json(sl) for sl in slots],
+            "material_types": [{"id": t.id, "name": t.name} for t in material_types],
+            "active_page": "module_type_slots",
         },
     )
 
@@ -1291,10 +1397,14 @@ async def module_types_defaults_page(
     mt = await crud_module_types.get_module_type_by_id(session, type_id)
     if not mt:
         return HTMLResponse("Тип модуля не найден", status_code=404)
+    from scr.dbase import crud_finance, crud_module_slots
+
     defaults = await crud_module_types.get_defaults(session, type_id)
+    slots = await crud_module_slots.get_slots(session, type_id)
+    slot_ids = {sl.id for sl in slots}
+    slot_defaults = {d.slot_id: d for d in defaults if d.slot_id is not None}
     modules_list, _ = await crud_modules.get_modules(session, per_page=10000)
     prices = await crud_modules.get_module_prices(session)
-    from scr.dbase import crud_finance
 
     payroll_items = await crud_finance.get_all_payroll_items(session)
     invoice_items = await crud_finance.get_all_invoice_items(session)
@@ -1304,8 +1414,17 @@ async def module_types_defaults_page(
             "request": request,
             "user": user,
             "mt": mt,
-            "defaults": defaults,
+            "defaults": [d for d in defaults if d.slot_id not in slot_ids],
+            "slots": [
+                {
+                    **crud_module_slots.slot_json(sl),
+                    "module_id": slot_defaults[sl.id].module_id if sl.id in slot_defaults else None,
+                    "quantity": slot_defaults[sl.id].quantity if sl.id in slot_defaults else 1,
+                }
+                for sl in slots
+            ],
             "modules": modules_list,
+            "modules_data": _modules_data(modules_list, prices),
             "prices": prices,
             "payroll_items": payroll_items,
             "invoice_items": invoice_items,
@@ -1359,6 +1478,9 @@ async def materials_page(
     nom_tok_values = await crud_nominal_currents.get_values(session)
 
     await session.commit()
+    from scr.dbase import crud_units
+
+    units = await crud_units.get_names(session)
     return templates.TemplateResponse(
         "materials/list.html",
         {
@@ -1370,6 +1492,7 @@ async def materials_page(
             "per_page": per_page,
             "module_names": module_names,
             "nom_tok_values": nom_tok_values,
+            "units": units,
             "active_page": "materials",
         },
     )
@@ -1398,6 +1521,7 @@ async def materials_create_submit(
             "url_agent": form.get("url_agent") or None,
             "nom_tok": int(form.get("nom_tok", 0)),
             "voltage": form.get("voltage") or None,
+            "unit": (form.get("unit") or "").strip() or "шт",
             "stats": form.get("stats") == "on",
             "vtych": form.get("vtych") == "on",
             "vykat": form.get("vykat") == "on",
@@ -1418,6 +1542,9 @@ async def materials_create_submit(
         from scr.dbase import crud_nominal_currents
 
         await crud_nominal_currents.ensure_value(session, data["nom_tok"])
+        from scr.dbase import crud_units
+
+        await crud_units.ensure_name(session, data["unit"])
         await session.commit()
     return RedirectResponse("/reg/materials", status_code=302)
 
@@ -1439,6 +1566,9 @@ async def materials_detail_page(
     from scr.dbase import crud_nominal_currents
 
     nom_tok_values = await crud_nominal_currents.get_values(session)
+    from scr.dbase import crud_units
+
+    units = await crud_units.get_names(session)
     return templates.TemplateResponse(
         "materials/detail.html",
         {
@@ -1447,6 +1577,7 @@ async def materials_detail_page(
             "mat": mat,
             "types": types,
             "nom_tok_values": nom_tok_values,
+            "units": units,
             "back_to": back_to,
             "active_page": "materials",
         },
@@ -1622,6 +1753,9 @@ async def modules_detail_page(
     from scr.dbase import crud_nominal_currents
 
     nom_tok_values = await crud_nominal_currents.get_values(session)
+    from scr.dbase import crud_material_types
+
+    material_types, _ = await crud_material_types.get_all_types(session, per_page=10000)
 
     materials_json = json.dumps(
         [
@@ -1653,6 +1787,7 @@ async def modules_detail_page(
             "bom_total": bom_total,
             "prices": prices,
             "nom_tok_values": nom_tok_values,
+            "material_types": material_types,
             "back_to": back_to,
             "active_page": "modules",
         },

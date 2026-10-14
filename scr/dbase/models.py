@@ -334,6 +334,8 @@ class Material(BaseID):
     type_id: Mapped[int | None] = mapped_column(ForeignKey("material_types.id", ondelete="SET NULL"), nullable=True)
     nom_tok: Mapped[int] = mapped_column(Integer, default=0, nullable=False)
     voltage: Mapped[str | None] = mapped_column(String(50), nullable=True)
+    # Единица измерения — значение из справочника единиц (units)
+    unit: Mapped[str] = mapped_column(String(20), default="шт", server_default="шт", nullable=False)
     stats: Mapped[bool] = mapped_column(default=True, nullable=False)
     vtych: Mapped[bool] = mapped_column(default=False, nullable=False)
     vykat: Mapped[bool] = mapped_column(default=False, nullable=False)
@@ -362,13 +364,34 @@ class NominalCurrent(Base):
 DEFAULT_NOMINAL_CURRENTS = [16, 25, 40, 63, 100, 160, 250, 400, 630, 800, 1000, 1250, 1600, 2000, 2500, 3150, 4000]
 
 
+class Unit(Base):
+    """Справочник единиц измерения материалов"""
+
+    __tablename__ = "units"
+
+    id: Mapped[int] = mapped_column(primary_key=True)
+    name: Mapped[str] = mapped_column(String(20), unique=True, nullable=False)
+
+    def __repr__(self) -> str:
+        return f"Unit(id={self.id}, name='{self.name}')"
+
+
+DEFAULT_UNIT = "шт"
+DEFAULT_UNITS = [DEFAULT_UNIT, "кг", "м2", "пог.м."]
+
+
 class Module(BaseID):
     __tablename__ = "modules"
     name: Mapped[str] = mapped_column(String(200), unique=True, nullable=False)
     # Ном ток: по умолчанию — максимальный из материалов состава; nom_tok_manual=True — задан вручную
     nom_tok: Mapped[int] = mapped_column(Integer, default=0, server_default="0", nullable=False)
     nom_tok_manual: Mapped[bool] = mapped_column(default=False, server_default="0", nullable=False)
+    # Тип модуля (из справочника типов материалов) — по нему модуль подбирается в обязательные строки
+    material_type_id: Mapped[int | None] = mapped_column(
+        ForeignKey("material_types.id", ondelete="SET NULL"), nullable=True
+    )
 
+    material_type: Mapped[Optional["MaterialType"]] = relationship(foreign_keys=[material_type_id])
     items: Mapped[list["ModuleItem"]] = relationship(
         back_populates="module", cascade="all, delete-orphan", foreign_keys="ModuleItem.module_id"
     )
@@ -455,21 +478,54 @@ class ModuleType(BaseID):
     defaults: Mapped[list["ModuleTypeDefault"]] = relationship(
         back_populates="module_type", cascade="all, delete-orphan"
     )
+    slots: Mapped[list["ModuleTypeSlot"]] = relationship(
+        back_populates="module_type", cascade="all, delete-orphan", order_by="ModuleTypeSlot.sort_order"
+    )
     fot_item: Mapped[Optional["PayrollItem"]] = relationship(foreign_keys=[fot_item_id])
     overhead_item: Mapped[Optional["InvoiceItem"]] = relationship(foreign_keys=[overhead_item_id])
 
 
+class ModuleTypeSlotMaterialType(Base):
+    """Типы материалов, модули которых можно подставить в обязательную строку"""
+
+    __tablename__ = "module_type_slot_material_types"
+
+    slot_id: Mapped[int] = mapped_column(ForeignKey("module_type_slots.id", ondelete="CASCADE"), primary_key=True)
+    material_type_id: Mapped[int] = mapped_column(ForeignKey("material_types.id", ondelete="CASCADE"), primary_key=True)
+
+
+class ModuleTypeSlot(Base):
+    """Обязательная строка раздела расчёта (КСО, КРУ, ...): одна строка — один модуль"""
+
+    __tablename__ = "module_type_slots"
+
+    id: Mapped[int] = mapped_column(primary_key=True)
+    module_type_id: Mapped[int] = mapped_column(ForeignKey("module_types_calc.id", ondelete="CASCADE"), nullable=False)
+    name: Mapped[str] = mapped_column(String(200), nullable=False)
+    sort_order: Mapped[int] = mapped_column(Integer, default=0, nullable=False)
+    # Не отображать в расчёте (модуль всегда берётся из «по умолчанию»), но учитывать в стоимости
+    hidden: Mapped[bool] = mapped_column(default=False, server_default="0", nullable=False)
+
+    module_type: Mapped["ModuleType"] = relationship(back_populates="slots")
+    material_types: Mapped[list["MaterialType"]] = relationship(
+        secondary="module_type_slot_material_types", order_by="MaterialType.name"
+    )
+
+
 class ModuleTypeDefault(Base):
     __tablename__ = "module_type_defaults"
-    __table_args__ = (UniqueConstraint("module_type_id", "module_id", name="uq_modtype_default_module"),)
+    __table_args__ = (UniqueConstraint("slot_id", name="uq_modtype_default_slot"),)
 
     id: Mapped[int] = mapped_column(primary_key=True)
     module_type_id: Mapped[int] = mapped_column(ForeignKey("module_types_calc.id", ondelete="CASCADE"), nullable=False)
     module_id: Mapped[int] = mapped_column(ForeignKey("modules.id", ondelete="CASCADE"), nullable=False)
     quantity: Mapped[int] = mapped_column(Integer, default=1, nullable=False)
+    # Обязательная строка; None — обычный модуль по умолчанию
+    slot_id: Mapped[int | None] = mapped_column(ForeignKey("module_type_slots.id", ondelete="SET NULL"), nullable=True)
 
     module_type: Mapped["ModuleType"] = relationship(back_populates="defaults")
     module: Mapped["Module"] = relationship(foreign_keys=[module_id])
+    slot: Mapped[Optional["ModuleTypeSlot"]] = relationship(foreign_keys=[slot_id])
 
 
 class RequestCalc(BaseID):
@@ -488,17 +544,22 @@ class RequestCalc(BaseID):
 
     request: Mapped["Request"] = relationship(foreign_keys=[request_id])
     module_type: Mapped["ModuleType"] = relationship(foreign_keys=[module_type_id])
-    items: Mapped[list["RequestCalcItem"]] = relationship(back_populates="calc", cascade="all, delete-orphan")
+    items: Mapped[list["RequestCalcItem"]] = relationship(
+        back_populates="calc", cascade="all, delete-orphan", order_by="RequestCalcItem.id"
+    )
 
 
 class RequestCalcItem(Base):
     __tablename__ = "request_calc_items"
-    __table_args__ = (UniqueConstraint("calc_id", "module_id", name="uq_calc_item_module"),)
+    __table_args__ = (UniqueConstraint("calc_id", "slot_id", name="uq_calc_item_slot"),)
 
     id: Mapped[int] = mapped_column(primary_key=True)
     calc_id: Mapped[int] = mapped_column(ForeignKey("request_calcs.id", ondelete="CASCADE"), nullable=False)
     module_id: Mapped[int] = mapped_column(ForeignKey("modules.id"), nullable=False)
     quantity: Mapped[int] = mapped_column(Integer, default=1, nullable=False)
+    # Обязательная строка; None — модуль, добавленный вручную
+    slot_id: Mapped[int | None] = mapped_column(ForeignKey("module_type_slots.id", ondelete="SET NULL"), nullable=True)
 
     calc: Mapped["RequestCalc"] = relationship(back_populates="items")
     module: Mapped["Module"] = relationship(foreign_keys=[module_id])
+    slot: Mapped[Optional["ModuleTypeSlot"]] = relationship(foreign_keys=[slot_id])

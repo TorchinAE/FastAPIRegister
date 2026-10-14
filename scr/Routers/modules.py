@@ -29,6 +29,7 @@ def _module_to_response(mod) -> ModuleResponseSchema:
         total_price=mod.total_price,
         nom_tok=mod.nom_tok or 0,
         nom_tok_manual=bool(mod.nom_tok_manual),
+        material_type_id=mod.material_type_id,
         created_by=mod.created_by,
     )
 
@@ -506,6 +507,7 @@ async def duplicate_module(mod_id: int, session: AsyncSession = Depends(db_helpe
         raise HTTPException(status_code=404, detail="Модуль не найден")
     new_name = f"{mod.name} - копия"
     new_mod = await crud_modules.add_module(session=session, in_mod=ModuleCreateSchema(name=new_name))
+    new_mod.material_type_id = mod.material_type_id
     await session.flush()
     for item in mod.items:
         await crud_modules.add_module_item(

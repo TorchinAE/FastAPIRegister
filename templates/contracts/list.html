@@ -23,20 +23,13 @@
                 <th style="width:40px;"></th>
             </tr>
             <tr class="table-filter">
-                <th>
-                    <select data-col="0" class="tf-select" style="width:100%;">
-                        <option value="">Все</option>
-                        {% for c in companies %}
-                        <option value="{{ c.name }}">{{ c.name }}</option>
-                        {% endfor %}
-                    </select>
-                </th>
+                <th><input type="text" data-col="0" placeholder="Название..." class="tf-input"></th>
                 <th><input type="text" data-col="1" placeholder="Фильтр..." class="tf-input"></th>
                 <th><input type="text" data-col="2" placeholder="Фильтр..." class="tf-input"></th>
                 <th><input type="text" data-col="3" placeholder="Фильтр..." class="tf-input"></th>
                 <th><input type="text" data-col="4" placeholder="Фильтр..." class="tf-input"></th>
                 <th><input type="text" data-col="5" placeholder="Фильтр..." class="tf-input"></th>
-                <th><input type="text" data-col="6" placeholder="Фильтр..." class="tf-input"></th>
+                <th><input type="text" data-col="6" data-num placeholder="Фильтр..." class="tf-input"></th>
                 <th></th>
             </tr>
         </thead>
@@ -76,28 +69,21 @@
 <script src="https://cdnjs.cloudflare.com/ajax/libs/exceljs/4.4.0/exceljs.min.js"></script>
 <script src="https://cdnjs.cloudflare.com/ajax/libs/FileSaver.js/2.0.5/FileSaver.min.js"></script>
 <script>
-document.querySelectorAll('.tf-input').forEach(input => {
-    input.addEventListener('input', function() {
-        const col = parseInt(this.dataset.col);
-        const val = this.value.toLowerCase();
-        document.querySelectorAll('#contractsTable tbody tr:not(.empty-row)').forEach(row => {
-            if (val.length < 1) { row.style.display = ''; return; }
-            const cell = row.cells[col];
-            row.style.display = cell && cell.textContent.toLowerCase().includes(val) ? '' : 'none';
-        });
+// Фильтры по всем столбцам сразу; в числовых столбцах пробелы (разделители тысяч) не учитываются
+function normFilter(str, num) {
+    str = String(str).toLowerCase();
+    return num ? str.replace(/\s/g, '').replace(/,/g, '.') : str.trim();
+}
+function applyFilters() {
+    const filters = [...document.querySelectorAll('.tf-input')]
+        .map(i => ({col: parseInt(i.dataset.col), num: 'num' in i.dataset, val: normFilter(i.value, 'num' in i.dataset)}))
+        .filter(f => f.val);
+    document.querySelectorAll('#contractsTable tbody tr:not(.empty-row)').forEach(row => {
+        const ok = filters.every(f => row.cells[f.col] && normFilter(row.cells[f.col].textContent, f.num).includes(f.val));
+        row.style.display = ok ? '' : 'none';
     });
-});
-document.querySelectorAll('.tf-select').forEach(sel => {
-    sel.addEventListener('change', function() {
-        const col = parseInt(this.dataset.col);
-        const val = this.value;
-        document.querySelectorAll('#contractsTable tbody tr:not(.empty-row)').forEach(row => {
-            if (!val) { row.style.display = ''; return; }
-            const cell = row.cells[col];
-            row.style.display = cell && cell.textContent.trim() === val ? '' : 'none';
-        });
-    });
-});
+}
+document.querySelectorAll('.tf-input').forEach(input => input.addEventListener('input', applyFilters));
 
 async function deleteSpec(specId, btn) {
     if (!confirm('Удалить спецификацию?')) return;

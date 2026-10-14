@@ -109,10 +109,13 @@ async def get_defaults(session: AsyncSession, module_type_id: int) -> list[Modul
 
 
 async def add_default(session: AsyncSession, data: ModuleTypeDefaultCreateSchema) -> ModuleTypeDefault:
+    # Обычный модуль по умолчанию (не обязательная строка) уже есть — увеличиваем количество
     stmt = select(ModuleTypeDefault).where(
-        ModuleTypeDefault.module_type_id == data.module_type_id, ModuleTypeDefault.module_id == data.module_id
+        ModuleTypeDefault.module_type_id == data.module_type_id,
+        ModuleTypeDefault.module_id == data.module_id,
+        ModuleTypeDefault.slot_id.is_(None),
     )
-    existing = (await session.execute(stmt)).scalar_one_or_none()
+    existing = (await session.execute(stmt)).scalars().first()
     if existing:
         existing.quantity += data.quantity
         await session.flush()
@@ -184,7 +187,7 @@ async def create_calc(session: AsyncSession, request_id: int, module_type_id: in
 
     if mod_type and mod_type.slug not in WORKS_SECTIONS:
         for d in await get_defaults(session, module_type_id):
-            session.add(RequestCalcItem(calc_id=calc.id, module_id=d.module_id, quantity=d.quantity))
+            session.add(RequestCalcItem(calc_id=calc.id, module_id=d.module_id, quantity=d.quantity, slot_id=d.slot_id))
         await session.flush()
 
     calc = await get_calc_by_id(session, calc.id)
@@ -219,9 +222,28 @@ def calc_base_cost(calc: RequestCalc, prices: dict[int, float], works: bool) -> 
     return base + float(calc.fot or 0) + float(calc.overhead or 0)
 
 
-def calc_block_data(calc: RequestCalc, prices: dict[int, float], default_profit: float) -> dict:
-    """Данные блока расчёта для страницы."""
+def _item_data(it: RequestCalcItem, prices: dict[int, float]) -> dict:
+    return {
+        "id": it.id,
+        "module_id": it.module_id,
+        "module_name": it.module.name if it.module else "?",
+        "quantity": it.quantity,
+        "module_price": prices.get(it.module_id, 0.0),
+    }
+
+
+def calc_block_data(calc: RequestCalc, prices: dict[int, float], default_profit: float, slots: list) -> dict:
+    """Данные блока расчёта для страницы.
+
+    slots — обязательные строки раздела: видимые выводятся строками с выбором модуля,
+    скрытые не выводятся, их сумма идёт в hidden_total. items — модули, добавленные вручную.
+    """
     profit = float(calc.profitability_percent or 0)
+    by_slot = {it.slot_id: it for it in calc.items if it.slot_id is not None}
+    known = {s.id for s in slots}
+    hidden_total = sum(
+        prices.get(by_slot[s.id].module_id, 0.0) * by_slot[s.id].quantity for s in slots if s.hidden and s.id in by_slot
+    )
     return {
         "id": calc.id,
         "fot": float(calc.fot or 0),
@@ -231,16 +253,13 @@ def calc_block_data(calc: RequestCalc, prices: dict[int, float], default_profit:
         "works_cost": float(calc.works_cost or 0),
         "total_cost": float(calc.total_cost or 0),
         "final_price": float(calc.final_price or 0),
-        "items": [
-            {
-                "id": it.id,
-                "module_id": it.module_id,
-                "module_name": it.module.name if it.module else "?",
-                "quantity": it.quantity,
-                "module_price": prices.get(it.module_id, 0.0),
-            }
-            for it in calc.items
+        "slots": [
+            {"slot_id": s.id, "item": _item_data(by_slot[s.id], prices) if s.id in by_slot else None}
+            for s in slots
+            if not s.hidden
         ],
+        "hidden_total": hidden_total,
+        "items": [_item_data(it, prices) for it in calc.items if it.slot_id not in known],
     }
 
 
@@ -309,11 +328,13 @@ async def update_calc(session: AsyncSession, data: RequestCalcUpdateSchema) -> R
 
 
 async def add_calc_item(session: AsyncSession, data: RequestCalcItemCreateSchema) -> RequestCalcItem:
-    # Модуль уже есть в блоке — увеличиваем количество (уникальность calc_id + module_id)
+    # Модуль уже добавлен в блок вручную (не обязательной строкой) — увеличиваем количество
     stmt = select(RequestCalcItem).where(
-        RequestCalcItem.calc_id == data.calc_id, RequestCalcItem.module_id == data.module_id
+        RequestCalcItem.calc_id == data.calc_id,
+        RequestCalcItem.module_id == data.module_id,
+        RequestCalcItem.slot_id.is_(None),
     )
-    existing = (await session.execute(stmt)).scalar_one_or_none()
+    existing = (await session.execute(stmt)).scalars().first()
     if existing:
         existing.quantity += data.quantity
         await session.flush()

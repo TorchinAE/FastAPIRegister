@@ -125,9 +125,13 @@ async def build_kit(session: AsyncSession, req: Request) -> dict:
             elif sub_module_id is not None:
                 expand(sub_module_id, qty * mult, stack | {module_id})
 
+    from scr.dbase.crud_module_slots import get_slots, order_by_slots
+
+    slots_by_type = {t: await get_slots(session, t) for t in {c.module_type_id for c in calcs}}
     for calc in calcs:
         block_qty = calc.quantity if calc.quantity is not None else 1
-        for item in calc.items:
+        # Общий порядок: обязательные строки (и скрытые) по порядку, затем остальные модули
+        for item in order_by_slots(calc.items, slots_by_type[calc.module_type_id]):
             qty = item.quantity * block_qty
             if not qty:
                 continue

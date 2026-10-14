@@ -220,6 +220,7 @@ class MaterialCreateSchema(BaseModel):
     type_id: int | None = None
     nom_tok: int = Field(0, ge=0, le=7000)
     voltage: str | None = None
+    unit: str = Field("шт", min_length=1, max_length=20)
     stats: bool = True
     vtych: bool = False
     vykat: bool = False
@@ -240,6 +241,7 @@ class MaterialUpdateSchema(BaseModel):
     type_id: int | None = None
     nom_tok: int | None = Field(None, ge=0, le=7000)
     voltage: str | None = None
+    unit: str | None = Field(None, min_length=1, max_length=20)
     stats: bool | None = None
     vtych: bool | None = None
     vykat: bool | None = None
@@ -261,6 +263,7 @@ class MaterialResponseSchema(BaseModel):
     type_name: str | None = None
     nom_tok: int = 0
     voltage: str | None = None
+    unit: str = "шт"
     stats: bool = True
     vtych: bool = False
     vykat: bool = False
@@ -309,6 +312,7 @@ class ModuleUpdateSchema(BaseModel):
     name: str | None = None
     nom_tok: int | None = Field(None, ge=0, le=7000)
     nom_tok_manual: bool | None = None
+    material_type_id: int | None = None
 
 
 class ModuleResponseSchema(BaseModel):
@@ -320,6 +324,7 @@ class ModuleResponseSchema(BaseModel):
     total_price: float = 0
     nom_tok: int = 0
     nom_tok_manual: bool = False
+    material_type_id: int | None = None
     created_by: str | None = None
 
 
@@ -785,6 +790,34 @@ class ModuleTypeDefaultResponseSchema(BaseModel):
     quantity: int = 1
     module_name: str | None = None
     module_price: float = 0
+    slot_id: int | None = None
+
+
+# --- ModuleTypeSlot (обязательные строки) ---
+
+
+class ModuleTypeSlotCreateSchema(BaseModel):
+    model_config = ConfigDict(from_attributes=True)
+
+    module_type_id: int
+    name: str = Field(..., min_length=1, max_length=200)
+    hidden: bool = False
+    material_type_ids: list[int] = []
+
+
+class ModuleTypeSlotUpdateSchema(BaseModel):
+    model_config = ConfigDict(from_attributes=True)
+
+    name: str | None = Field(None, max_length=200)
+    hidden: bool | None = None
+    material_type_ids: list[int] | None = None
+
+
+class SlotModuleSchema(BaseModel):
+    """Модуль обязательной строки; module_id=None — строка пустая"""
+
+    module_id: int | None = None
+    quantity: int = Field(1, ge=1)
 
 
 # --- RequestCalc ---

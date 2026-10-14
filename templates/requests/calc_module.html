@@ -50,6 +50,9 @@ const moduleTypeId = {{ mt.id }};
 const MULTI = {{ 'true' if multi else 'false' }};
 const WORKS = {{ 'true' if works else 'false' }};
 const initialBlocks = {{ blocks | tojson }};
+// Обязательные строки раздела (видимые) и модули для выбора в них
+const SLOTS = Object.fromEntries({{ slots | tojson }}.map(s => [s.id, s]));
+const modulesData = {{ modules_data | tojson }};
 const SAVE_DELAY = 700;
 
 const blocksEl = document.getElementById('blocks');
@@ -87,6 +90,7 @@ function renderBlock(data, index) {
             <label>Себестоимость работ</label>
             ${moneyInput('f-works', data.works_cost)}
         </div>` : `
+        <div class="calc-items f-slots"></div>
         <div class="calc-add-row">
             <select class="f-module"></select>
             <div class="calc-add-row-bottom">
@@ -149,6 +153,8 @@ function renderBlock(data, index) {
     const changed = mode => { recalc(el, mode); scheduleSave(el); };
     if (!WORKS) {
         el.querySelector('.f-module').innerHTML = document.getElementById('moduleOptions').innerHTML;
+        el.dataset.hiddenTotal = data.hidden_total || 0;
+        data.slots.forEach(s => appendSlot(el, SLOTS[s.slot_id], s.item));
         data.items.forEach(item => appendItem(el, item));
         el.querySelector('.f-add-module').addEventListener('click', () => addModule(el));
     } else {
@@ -197,9 +203,64 @@ function appendItem(el, item) {
     row.querySelector('.calc-item-price').textContent = formatFinancial(item.module_price);
 }
 
+// Обязательная строка: название, выбор модуля подходящего типа, количество
+function appendSlot(el, slot, item) {
+    const row = document.createElement('div');
+    row.className = 'calc-item calc-slot';
+    row.dataset.slotId = slot.id;
+    row.innerHTML = `
+        <div class="calc-item-main">
+            <div class="calc-slot-name" title="${esc(slot.type_names.join(', '))}">${esc(slot.name)}</div>
+            <select class="f-slot-module"><option value="">— не выбран —</option></select>
+            <div class="calc-item-qty"><input type="number" class="f-item-qty" min="1" value="1"> шт.</div>
+        </div>
+        <div class="calc-item-side">
+            <div class="calc-item-price"></div>
+            <div class="calc-item-sum"></div>
+        </div>`;
+    const select = row.querySelector('.f-slot-module');
+    const currentId = item ? item.module_id : null;
+    modulesData
+        .filter(m => !slot.type_ids.length || slot.type_ids.includes(m.type_id) || m.id === currentId)
+        .forEach(m => select.add(new Option(`${m.name} (${formatFinancial(m.price)})`, m.id)));
+    select.addEventListener('change', () => saveSlot(el, row));
+    row.querySelector('.f-item-qty').addEventListener('change', () => { if (select.value) saveSlot(el, row); });
+    el.querySelector('.f-slots').appendChild(row);
+    setSlotItem(row, item);
+}
+
+function setSlotItem(row, item) {
+    row.dataset.price = item ? item.module_price : 0;
+    row.dataset.moduleId = item ? item.module_id : '';
+    row.querySelector('.f-slot-module').value = item ? item.module_id : '';
+    row.querySelector('.f-item-qty').value = item ? item.quantity : 1;
+    row.querySelector('.calc-item-price').textContent = item ? formatFinancial(item.module_price) : '';
+    row.classList.toggle('empty', !item);
+}
+
+async function saveSlot(el, row, moduleId) {
+    if (moduleId === undefined) moduleId = parseInt(row.querySelector('.f-slot-module').value) || null;
+    const quantity = Math.max(1, parseInt(row.querySelector('.f-item-qty').value) || 1);
+    const resp = await fetch(`/reg/api/request-calcs/${el.dataset.id}/slots/${row.dataset.slotId}`, {
+        method: 'PUT',
+        headers: {'Content-Type': 'application/json'},
+        body: JSON.stringify({module_id: moduleId, quantity}),
+    });
+    if (resp.ok) {
+        setSlotItem(row, (await resp.json()).item);
+    } else {
+        const data = await resp.json().catch(() => ({}));
+        row.querySelector('.f-slot-module').value = row.dataset.moduleId;
+        showToast('Ошибка: ' + (data.detail || resp.status));
+    }
+    recalc(el);
+    scheduleSave(el);
+}
+
 function modulesSum(el) {
     if (WORKS) return moneyVal(el.querySelector('.f-works'));
-    let total = 0;
+    // Скрытые строки не выводятся, но входят в стоимость
+    let total = parseFloat(el.dataset.hiddenTotal) || 0;
     el.querySelectorAll('.calc-item').forEach(row => {
         const sum = (parseFloat(row.dataset.price) || 0) * (parseInt(row.querySelector('.f-item-qty').value) || 0);
         row.querySelector('.calc-item-sum').textContent = '= ' + formatFinancial(sum);
@@ -387,9 +448,12 @@ async function removeItem(el, row) {
 
 async function clearBlock(el) {
     if (!confirm('Очистить данные блока?')) return;
-    for (const row of el.querySelectorAll('.calc-item')) {
+    for (const row of el.querySelectorAll('.f-items .calc-item')) {
         await fetch('/reg/api/request-calcs/items/' + row.dataset.itemId, {method: 'DELETE'});
         row.remove();
+    }
+    for (const row of el.querySelectorAll('.calc-slot')) {
+        if (row.dataset.moduleId) await saveSlot(el, row, null);
     }
     el.querySelector('.f-fot').value = formatFinancial(0);
     el.querySelector('.f-overhead').value = formatFinancial(0);

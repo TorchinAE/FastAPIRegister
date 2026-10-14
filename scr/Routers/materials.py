@@ -5,7 +5,7 @@ from fastapi.responses import StreamingResponse
 from openpyxl import Workbook, load_workbook
 from sqlalchemy.ext.asyncio import AsyncSession
 
-from scr.dbase import crud_material_types, crud_materials, crud_modules, crud_nominal_currents
+from scr.dbase import crud_material_types, crud_materials, crud_modules, crud_nominal_currents, crud_units
 from scr.dbase.database import db_helper
 from scr.dbase.schemas.schemas import (
     MaterialCreateSchema,
@@ -31,6 +31,7 @@ def _mat_response(mat) -> MaterialResponseSchema:
         created_by=mat.created_by,
         date=mat.date,
         voltage=mat.voltage,
+        unit=mat.unit or "шт",
     )
 
 
@@ -41,6 +42,7 @@ async def add_material(
 ):
     new_mat = await crud_materials.add_material(session=session, in_mat=data)
     await crud_nominal_currents.ensure_value(session, data.nom_tok)
+    await crud_units.ensure_name(session, data.unit)
     await session.commit()
     await session.refresh(new_mat, ["type"])
     return _mat_response(new_mat)
@@ -99,6 +101,7 @@ async def export_materials_excel(
         "Тип",
         "Название",
         "Цена",
+        "Ед. изм.",
         "Дата",
         "Ном Ток",
         "Напряжение",
@@ -131,6 +134,7 @@ async def export_materials_excel(
                 item.type.name if item.type else "",
                 item.name,
                 float(item.price),
+                item.unit or "шт",
                 item.date.strftime("%d.%m.%Y") if item.date else "",
                 item.nom_tok,
                 item.voltage or "",
@@ -296,6 +300,13 @@ _HEADER_ALIASES = {
     "напряжение": "voltage",
     "вольтаж": "voltage",
     "voltage": "voltage",
+    "ед. изм.": "unit",
+    "ед изм": "unit",
+    "ед.изм.": "unit",
+    "ед. изм": "unit",
+    "единица измерения": "unit",
+    "единицы измерения": "unit",
+    "unit": "unit",
 }
 
 
@@ -380,6 +391,7 @@ def _parse_by_header(row, col_map: dict) -> dict | None:
         "code_agent": str(_get(row, col_map, "code_agent", "")).strip() or None,
         "url_agent": str(_get(row, col_map, "url_agent", "")).strip() or None,
         "voltage": str(_get(row, col_map, "voltage", "")).strip() or None,
+        "unit": str(_get(row, col_map, "unit", "")).strip()[:20] or None,
     }
 
 
@@ -543,6 +555,8 @@ async def _do_import(session: AsyncSession, rows: list) -> int:
                 existing.url_agent = parsed["url_agent"]
             if parsed.get("voltage") and not existing.voltage:
                 existing.voltage = parsed["voltage"]
+            if parsed.get("unit"):
+                existing.unit = parsed["unit"]
         else:
             # Create new material
             schema = MaterialCreateSchema(
@@ -559,9 +573,11 @@ async def _do_import(session: AsyncSession, rows: list) -> int:
                 ruchn=parsed.get("ruchn", True),
                 el_priv=parsed.get("el_priv", False),
                 voltage=parsed.get("voltage"),
+                unit=parsed.get("unit") or "шт",
                 date=date_val,
             )
             await crud_materials.add_material(session, schema)
+        await crud_units.ensure_name(session, parsed.get("unit"))
         imported += 1
     return imported
 
@@ -585,6 +601,8 @@ async def update_material(
     if data.nom_tok is not None:
         await crud_nominal_currents.ensure_value(session, data.nom_tok)
         await crud_modules.recalc_nom_tok(session)
+    if data.unit is not None:
+        await crud_units.ensure_name(session, data.unit)
     await session.commit()
     await session.refresh(result, ["type"])
     return _mat_response(result)

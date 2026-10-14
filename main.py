@@ -30,6 +30,7 @@ from scr.Routers.requests import req_router
 from scr.Routers.router import router
 from scr.Routers.service_calcs import sc_router
 from scr.Routers.settings import settings_router
+from scr.Routers.units import units_router
 from scr.Routers.users import users_router
 
 
@@ -109,6 +110,16 @@ async def lifespan(_: FastAPI):
                 await crud_nominal_currents.ensure_value(session, value)
         await crud_nominal_currents.sync_from_materials(session)
         await session.commit()
+    # Seed units of measure: defaults + units already used in materials
+    from scr.dbase import crud_units
+    from scr.dbase.models import DEFAULT_UNITS
+
+    async with db_helper.session_factory() as session:
+        if not await crud_units.get_names(session):
+            for name in DEFAULT_UNITS:
+                await crud_units.ensure_name(session, name)
+        await crud_units.sync_from_materials(session)
+        await session.commit()
     yield
 
 
@@ -164,6 +175,7 @@ app.include_router(mt_router, prefix="/reg")
 app.include_router(mt_calc_router, prefix="/reg")
 app.include_router(mod_router, prefix="/reg")
 app.include_router(nc_router, prefix="/reg")
+app.include_router(units_router, prefix="/reg")
 app.include_router(del_router, prefix="/reg")
 app.include_router(cs_router, prefix="/reg")
 app.include_router(sc_router, prefix="/reg")

@@ -14,6 +14,7 @@ async def get_modules(
         .options(
             selectinload(Module.items).selectinload(ModuleItem.material),
             selectinload(Module.items).selectinload(ModuleItem.sub_module),
+            selectinload(Module.material_type),
         )
         .order_by(Module.name)
     )
@@ -36,6 +37,7 @@ async def get_all_modules(session: AsyncSession) -> list[Module]:
         .options(
             selectinload(Module.items).selectinload(ModuleItem.material),
             selectinload(Module.items).selectinload(ModuleItem.sub_module),
+            selectinload(Module.material_type),
         )
         .order_by(Module.name)
     )
@@ -50,6 +52,7 @@ async def get_module_by_id(session: AsyncSession, mod_id: int) -> Module | None:
         .options(
             selectinload(Module.items).selectinload(ModuleItem.material),
             selectinload(Module.items).selectinload(ModuleItem.sub_module),
+            selectinload(Module.material_type),
         )
     )
     result = await session.execute(stmt)
@@ -79,6 +82,8 @@ async def update_module(session: AsyncSession, upd_mod: ModuleUpdateSchema) -> M
         return None
     if upd_mod.name is not None:
         check_mod.name = upd_mod.name
+    if "material_type_id" in upd_mod.model_fields_set:
+        check_mod.material_type_id = upd_mod.material_type_id or None
     if upd_mod.nom_tok_manual is False:
         # Вернуть автоматический расчёт ном. тока
         check_mod.nom_tok_manual = False
@@ -211,4 +216,25 @@ async def recalc_nom_tok(session: AsyncSession) -> None:
             value = tok_of(mod.id, frozenset())
             if mod.nom_tok != value:
                 mod.nom_tok = value
+    await session.flush()
+    await fill_material_types(session)
+
+
+async def fill_material_types(session: AsyncSession) -> None:
+    """Модулям без типа ставит тип материалов состава, если у всех материалов он один."""
+    from scr.dbase.models import Material
+
+    stmt = (
+        select(ModuleItem.module_id, Material.type_id)
+        .join(Material, Material.id == ModuleItem.material_id)
+        .where(Material.type_id.is_not(None))
+    )
+    types: dict[int, set[int]] = {}
+    for module_id, type_id in (await session.execute(stmt)).all():
+        types.setdefault(module_id, set()).add(type_id)
+    modules = (await session.execute(select(Module).where(Module.material_type_id.is_(None)))).scalars().all()
+    for mod in modules:
+        found = types.get(mod.id, set())
+        if len(found) == 1:
+            mod.material_type_id = next(iter(found))
     await session.flush()

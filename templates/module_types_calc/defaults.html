@@ -14,6 +14,22 @@
     </div>
 </div>
 
+{% if slots %}
+<h3 style="margin-bottom:0.5rem;">Обязательные строки</h3>
+<div class="table-wrap" style="margin-bottom:1.25rem;">
+    <table>
+        <thead>
+            <tr><th>Строка</th><th>Модуль</th><th>Кол-во</th><th>Цена за ед.</th><th>Сумма</th></tr>
+        </thead>
+        <tbody id="slotsBody"></tbody>
+    </table>
+</div>
+{% endif %}
+<div style="margin:-0.75rem 0 1rem;font-size:0.85rem;">
+    <a href="/reg/module-type-slots?type={{ mt.slug }}">Настроить обязательные строки</a>
+</div>
+
+<h3 style="margin-bottom:0.5rem;">Другие модули</h3>
 <div class="card" style="margin-bottom:1rem;">
     <form id="defaultsForm" style="display:flex;gap:0.75rem;align-items:flex-end;flex-wrap:wrap;">
         <div class="form-group" style="flex:2;min-width:200px;margin-bottom:0;">
@@ -41,9 +57,9 @@
         <tbody id="defaultsBody">
             {% for d in defaults %}
             <tr data-id="{{ d.id }}">
-                <td>{{ d.module.name if d.module else '?' }}</td>
+                <td>{% if d.module %}<a href="/reg/modules/{{ d.module_id }}" title="Редактировать модуль">{{ d.module.name }}</a>{% else %}?{% endif %}</td>
                 <td>
-                    <input type="number" value="{{ d.quantity }}" min="1" style="width:70px;" onchange="updateQty({{ d.id }}, this.value)">
+                    <input type="number" class="cell-input" value="{{ d.quantity }}" min="1" onchange="updateQty({{ d.id }}, this.value)">
                 </td>
                 <td>{{ prices.get(d.module_id, 0)|money }}</td>
                 <td>{{ (prices.get(d.module_id, 0) * d.quantity)|money }}</td>
@@ -95,6 +111,67 @@
 {% block scripts %}
 <script>
 const typeId = {{ mt.id }};
+const slots = {{ slots | tojson }};
+const modulesData = {{ modules_data | tojson }};
+
+function esc(s) {
+    return String(s ?? '').replace(/[&<>"']/g, c => ({'&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;'}[c]));
+}
+
+// Модули, подходящие в строку по типу (типы не выбраны — любые)
+function slotModules(slot) {
+    return modulesData.filter(m => !slot.type_ids.length || slot.type_ids.includes(m.type_id) || m.id === slot.module_id);
+}
+
+function renderSlots() {
+    const body = document.getElementById('slotsBody');
+    if (!body) return;
+    body.innerHTML = '';
+    slots.forEach(slot => {
+        const tr = document.createElement('tr');
+        const options = slotModules(slot).map(m =>
+            `<option value="${m.id}" ${m.id === slot.module_id ? 'selected' : ''}>${esc(m.name)} (${formatFinancial(m.price)})</option>`).join('');
+        tr.innerHTML = `
+            <td><strong>${esc(slot.name)}</strong>${slot.hidden ? ' <span class="badge" style="background:#e2e8f0;color:#475569;" title="Не отображается в расчёте, но учитывается в стоимости">скрыта</span>' : ''}
+                ${slot.type_names.length ? `<div style="font-size:0.8rem;color:var(--text-muted);">${esc(slot.type_names.join(', '))}</div>` : ''}</td>
+            <td><select class="f-module" style="width:100%;min-width:220px;"><option value="">— не выбран —</option>${options}</select></td>
+            <td><input type="number" class="f-qty" value="${slot.quantity}" min="1" style="width:70px;"></td>
+            <td class="f-price"></td>
+            <td class="f-sum"></td>`;
+        const update = () => {
+            const mod = modulesData.find(m => m.id === slot.module_id);
+            tr.querySelector('.f-price').textContent = mod ? formatFinancial(mod.price) : '';
+            tr.querySelector('.f-sum').textContent = mod ? formatFinancial(mod.price * slot.quantity) : '';
+        };
+        const save = async () => {
+            const select = tr.querySelector('.f-module');
+            const qtyEl = tr.querySelector('.f-qty');
+            const moduleId = parseInt(select.value) || null;
+            const quantity = Math.max(1, parseInt(qtyEl.value) || 1);
+            const resp = await fetch('/reg/api/module-type-slots/' + slot.id + '/default', {
+                method: 'PUT',
+                headers: {'Content-Type': 'application/json'},
+                body: JSON.stringify({module_id: moduleId, quantity}),
+            });
+            if (resp.ok) {
+                slot.module_id = moduleId;
+                slot.quantity = quantity;
+                showToast('Сохранено');
+            } else {
+                const data = await resp.json().catch(() => ({}));
+                select.value = slot.module_id ?? '';
+                showToast('Ошибка: ' + (data.detail || resp.status));
+            }
+            qtyEl.value = slot.quantity;
+            update();
+        };
+        tr.querySelector('.f-module').addEventListener('change', save);
+        tr.querySelector('.f-qty').addEventListener('change', save);
+        update();
+        body.appendChild(tr);
+    });
+}
+renderSlots();
 
 async function addDefault() {
     const modId = document.getElementById('moduleSelect').value;
