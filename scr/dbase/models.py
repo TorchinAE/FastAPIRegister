@@ -556,6 +556,9 @@ class RequestCalc(BaseID):
     final_price: Mapped[float] = mapped_column(Numeric(12, 2), default=0)
     # Количество одинаковых блоков (КСО, КРУ, ЩО); стоимость раздела = final_price * quantity
     quantity: Mapped[int] = mapped_column(Integer, default=1, server_default="1", nullable=False)
+    # КСО: количество на 1-й и 2-й секции шин; quantity = qty_1sh + qty_2sh
+    qty_1sh: Mapped[int] = mapped_column(Integer, default=0, server_default="0", nullable=False)
+    qty_2sh: Mapped[int] = mapped_column(Integer, default=0, server_default="0", nullable=False)
     # Себестоимость работ (Шеф-инженер, СМР, ПНР) — вместо модулей
     works_cost: Mapped[float] = mapped_column(Numeric(12, 2), default=0, server_default="0", nullable=False)
 

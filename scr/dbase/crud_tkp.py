@@ -173,3 +173,45 @@ async def build_kit(session: AsyncSession, req: Request) -> dict:
             )
         material_rows.sort(key=lambda r: (r["type"], r["name"]))
     return {"modules": module_rows, "materials": material_rows}
+
+
+async def build_calc_materials(session: AsyncSession, calcs: list[RequestCalc]) -> tuple[list[dict], list[dict]]:
+    """Материалы блоков расчёта одного раздела (подмодули раскрыты).
+
+    Возвращает (материалы [{id, name, price, date, type}], по блокам [{material_id: кол-во на один блок}]).
+    """
+    tree, _ = await crud_modules.load_tree(session)
+
+    def expand(module_id: int, mult: float, acc: dict[int, float], stack: frozenset) -> None:
+        if module_id in stack:
+            return
+        for material_id, sub_module_id, qty in tree.get(module_id, []):
+            if material_id is not None:
+                acc[material_id] = acc.get(material_id, 0) + qty * mult
+            elif sub_module_id is not None:
+                expand(sub_module_id, qty * mult, acc, stack | {module_id})
+
+    per_calc: list[dict[int, float]] = []
+    for calc in calcs:
+        acc: dict[int, float] = {}
+        for item in calc.items:
+            if item.quantity:
+                expand(item.module_id, item.quantity, acc, frozenset())
+        per_calc.append(acc)
+
+    ids = {mid for acc in per_calc for mid in acc}
+    materials: list[dict] = []
+    if ids:
+        mat_stmt = select(Material).where(Material.id.in_(ids)).options(selectinload(Material.type))
+        for mat in (await session.execute(mat_stmt)).scalars().all():
+            materials.append(
+                {
+                    "id": mat.id,
+                    "name": mat.name,
+                    "price": float(mat.price or 0),
+                    "date": mat.date,
+                    "type": mat.type.name if mat.type else "",
+                }
+            )
+        materials.sort(key=lambda r: (r["type"], r["name"]))
+    return materials, per_calc

@@ -1183,6 +1183,7 @@ async def request_calc_page_by_section(
             "slots": [crud_module_slots.slot_json(sl) for sl in slots if not sl.hidden],
             "prices": prices,
             "multi": section in crud_module_types.MULTI_BLOCK_SECTIONS,
+            "split_qty": section in crud_module_types.SPLIT_QTY_SECTIONS,
             "works": section in crud_module_types.WORKS_SECTIONS,
             "active_page": "requests",
         },

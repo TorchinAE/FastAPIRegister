@@ -28,23 +28,23 @@ def _xlsx(rows):
     return {"file": ("f.xlsx", buf, "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet")}
 
 
-async def _setup(s):
+async def _setup(s, sfx: str = ""):
     """Заявка, материал 100 ₽ / 630 А, подмодуль (2 материала) и модуль (3 подмодуля) — 600 ₽."""
-    user = User(name="Calc", email="calc@test.ru", hashed_password="x")
-    pos = Positions(name="Calc position")
+    user = User(name=f"Calc{sfx}", email=f"calc@test.ru{sfx}", hashed_password="x")
+    pos = Positions(name=f"Calc position{sfx}")
     s.add_all([user, pos])
     await s.flush()
-    director = Directors(name="Calc Director", position_id=pos.id)
+    director = Directors(name=f"Calc Director{sfx}", position_id=pos.id)
     s.add(director)
     await s.flush()
-    org = Organization(name="Calc Org", director_id=director.id, profitability=10)
+    org = Organization(name=f"Calc Org{sfx}", director_id=director.id, profitability=10)
     s.add(org)
     await s.flush()
     req = Request(manager_id=user.id, company_id=org.id)
-    mat = Material(name="CalcMat", price=100, nom_tok=630, code_1c="CALC-1C")
-    sub = Module(name="CalcSub")
-    top = Module(name="CalcTop")
-    mt = ModuleType(name="Calc KSO", slug="calc-kso")
+    mat = Material(name=f"CalcMat{sfx}", price=100, nom_tok=630, code_1c=f"CALC-1C{sfx}")
+    sub = Module(name=f"CalcSub{sfx}")
+    top = Module(name=f"CalcTop{sfx}")
+    mt = ModuleType(name=f"Calc KSO{sfx}", slug=f"calc-kso{sfx}")
     s.add_all([req, mat, sub, top, mt])
     await s.flush()
     slot = ModuleTypeSlot(module_type_id=mt.id, name="Шкаф", sort_order=1)
@@ -179,3 +179,40 @@ async def test_defaults_import_creates_material_and_module(client, db_session):
     assert defaults["Новый шкаф"]["module_price"] == 250.0
     mats = (await client.get("/reg/api/materials/?search=Новый шкаф")).json()["items"]
     assert [(m["name"], m["type_name"]) for m in mats] == [("Новый шкаф", "Производство")]
+
+
+async def test_kso_split_qty_and_calc_excel(client, db_session):
+    ids = await _setup(db_session, "2")
+    mt = await db_session.get(ModuleType, ids["mt"])
+    mt.slug = "kso"
+    await db_session.commit()
+
+    # КСО: новый блок — 1 шт. на 1СШ; общее количество = 1СШ + 2СШ
+    resp = await client.post("/reg/api/request-calcs/", json={"request_id": ids["req"], "module_type_id": ids["mt"]})
+    block = resp.json()["block"]
+    assert (block["qty_1sh"], block["qty_2sh"], block["quantity"]) == (1, 0, 1)
+    resp = await client.put(
+        f"/reg/api/request-calcs/{block['id']}", json={"id": block["id"], "qty_1sh": 2, "qty_2sh": 3}
+    )
+    assert resp.json()["quantity"] == 5
+
+    # Сводная по материалам: блок — кол-во на один блок, итого — с учётом кол-ва блоков
+    resp = await client.get(f"/reg/api/requests/{ids['req']}/calc/kso/export-excel")
+    assert resp.status_code == 200
+    ws = load_workbook(io.BytesIO(resp.content)).active
+    assert "Calc Org2" in ws.cell(1, 1).value and "Calc KSO2" in ws.cell(1, 1).value
+    assert ws.cell(2, 5).value == "Calc KSO2 1 (1СШ: 2, 2СШ: 3)"
+    rows = {r[1]: r for r in ws.iter_rows(min_row=4, values_only=True)}
+    assert rows["CalcMat2"][:3] == (ids["mat"], "CalcMat2", 100)
+    assert rows["CalcMat2"][4:8] == (6, 600, 30, 3000)
+    assert rows["Итого материалы"][5] == 600 and rows["Итого материалы"][7] == 3000
+    assert rows["Конечная цена за блок"][5] == 660
+    assert rows["Количество блоков"][4] == 5
+    assert rows["Конечная цена × кол-во"][7] == 3300
+
+    # Модули по умолчанию: ID — первая колонка, внизу общая стоимость
+    resp = await client.get(f"/reg/api/module-types/{ids['mt']}/defaults/export-excel")
+    ws = load_workbook(io.BytesIO(resp.content)).active
+    assert [c.value for c in ws[2]] == ["ID", "Строка", "Модуль", "Кол-во", "Цена за ед.", "Сумма"]
+    assert ws.cell(3, 1).value == ids["top"]
+    assert ws.cell(4, 2).value == "Общая стоимость" and ws.cell(4, 6).value == "=SUM(F3:F3)"

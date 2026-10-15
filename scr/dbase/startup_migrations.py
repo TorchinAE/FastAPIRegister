@@ -20,7 +20,15 @@ ADD_COLUMNS = [
     ("request_calc_items", "slot_id", "INTEGER REFERENCES module_type_slots(id) ON DELETE SET NULL"),
     ("materials", "unit", "VARCHAR(20) NOT NULL DEFAULT 'шт'"),
     ("materials", "accuracy_class", "VARCHAR(20)"),
+    ("request_calcs", "qty_1sh", "INTEGER NOT NULL DEFAULT 0"),
+    ("request_calcs", "qty_2sh", "INTEGER NOT NULL DEFAULT 0"),
 ]
+
+# Существующие блоки КСО: всё количество — на 1СШ
+FILL_KSO_QTY_1SH = """
+UPDATE request_calcs SET qty_1sh = quantity
+WHERE module_type_id IN (SELECT id FROM module_types_calc WHERE slug = 'kso')
+"""
 
 # Таблицы с устаревшими UNIQUE-ограничениями: SQLite не умеет их удалять — таблица пересоздаётся по модели
 REBUILD_IF_CONSTRAINT = [
@@ -80,6 +88,8 @@ async def run_startup_migrations(conn: AsyncConnection) -> None:
             logger.info("Добавлена колонка %s.%s", table, column)
             if (table, column) == ("modules", "material_type_id"):
                 await conn.execute(text(FILL_MODULE_MATERIAL_TYPE))
+            if (table, column) == ("request_calcs", "qty_1sh"):
+                await conn.execute(text(FILL_KSO_QTY_1SH))
     for table, column in DROP_COLUMNS:
         if column in await _columns(conn, table):
             try:

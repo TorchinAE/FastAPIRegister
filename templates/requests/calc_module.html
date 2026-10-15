@@ -11,6 +11,7 @@
         {% if not works %}
         <a href="/reg/module-types-calc/{{ mt.id }}/defaults" class="btn btn-ghost">По умолчанию</a>
         {% endif %}
+        <a href="/reg/api/requests/{{ req.id }}/calc/{{ mt.slug }}/export-excel" class="btn btn-ghost">Скачать Excel</a>
         <a href="/reg/requests/{{ req.id }}/calc" class="btn btn-ghost">&larr; Назад к расчёту</a>
     </div>
 </div>
@@ -49,6 +50,8 @@ const reqId = {{ req.id }};
 const moduleTypeId = {{ mt.id }};
 const MULTI = {{ 'true' if multi else 'false' }};
 const WORKS = {{ 'true' if works else 'false' }};
+// КСО: количество блоков по секциям шин (1СШ + 2СШ)
+const SPLIT = {{ 'true' if split_qty else 'false' }};
 const initialBlocks = {{ blocks | tojson }};
 // Обязательные строки раздела (видимые) и модули для выбора в них
 const SLOTS = Object.fromEntries({{ slots | tojson }}.map(s => [s.id, s]));
@@ -134,10 +137,19 @@ function renderBlock(data, index) {
                     <label>Общая стоимость</label>
                     ${moneyInput('f-final calc-strong', 0)}
                 </div>
+                ${SPLIT ? `
+                <div class="form-group calc-qty-group">
+                    <label>1СШ</label>
+                    <input type="number" class="f-qty-1sh" value="${data.qty_1sh}" min="0" step="1">
+                </div>
+                <div class="form-group calc-qty-group">
+                    <label>2СШ</label>
+                    <input type="number" class="f-qty-2sh" value="${data.qty_2sh}" min="0" step="1">
+                </div>` : ''}
                 ${MULTI ? `
                 <div class="form-group calc-qty-group">
-                    <label>Кол-во</label>
-                    <input type="number" class="f-qty" value="${data.quantity}" min="0" step="1">
+                    <label>${SPLIT ? 'Всего' : 'Кол-во'}</label>
+                    <input type="number" class="f-qty" value="${data.quantity}" min="0" step="1" ${SPLIT ? 'readonly tabindex="-1"' : ''}>
                 </div>` : ''}
             </div>
             ${MULTI ? `
@@ -165,6 +177,11 @@ function renderBlock(data, index) {
     bindMoney(el.querySelector('.f-profit-rub'), () => changed('rub'));
     bindMoney(el.querySelector('.f-final'), () => changed('final'));
     el.querySelector('.f-profit-pct').addEventListener('input', () => changed());
+    if (SPLIT) {
+        for (const cls of ['.f-qty-1sh', '.f-qty-2sh']) {
+            el.querySelector(cls).addEventListener('input', () => { syncSplitQty(el); changed(); });
+        }
+    }
     if (MULTI) {
         el.querySelector('.f-qty').addEventListener('input', () => changed());
         el.querySelector('.f-delete-block').addEventListener('click', () => deleteBlock(el));
@@ -299,6 +316,12 @@ function recalc(el, mode = 'pct') {
     updateSectionTotal();
 }
 
+function syncSplitQty(el) {
+    const q1 = Math.max(0, parseInt(el.querySelector('.f-qty-1sh').value) || 0);
+    const q2 = Math.max(0, parseInt(el.querySelector('.f-qty-2sh').value) || 0);
+    el.querySelector('.f-qty').value = q1 + q2;
+}
+
 function updateSectionTotal() {
     const totalEl = document.getElementById('sectionTotal');
     if (!totalEl) return;
@@ -333,6 +356,10 @@ function blockPayload(el) {
     };
     if (WORKS) payload.works_cost = Math.max(0, moneyVal(el.querySelector('.f-works')));
     if (MULTI) payload.quantity = Math.max(0, parseInt(el.querySelector('.f-qty').value) || 0);
+    if (SPLIT) {
+        payload.qty_1sh = Math.max(0, parseInt(el.querySelector('.f-qty-1sh').value) || 0);
+        payload.qty_2sh = Math.max(0, parseInt(el.querySelector('.f-qty-2sh').value) || 0);
+    }
     return payload;
 }
 
@@ -460,6 +487,10 @@ async function clearBlock(el) {
     el.querySelector('.f-profit-pct').value = '0';
     if (WORKS) el.querySelector('.f-works').value = formatFinancial(0);
     if (MULTI) el.querySelector('.f-qty').value = '1';
+    if (SPLIT) {
+        el.querySelector('.f-qty-1sh').value = '1';
+        el.querySelector('.f-qty-2sh').value = '0';
+    }
     recalc(el);
     await saveNow(el);
 }

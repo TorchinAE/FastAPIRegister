@@ -843,6 +843,8 @@ class RequestCalcUpdateSchema(BaseModel):
     total_cost: float | None = Field(None, ge=0)
     final_price: float | None = Field(None, ge=0)
     quantity: int | None = Field(None, ge=0)
+    qty_1sh: int | None = Field(None, ge=0)
+    qty_2sh: int | None = Field(None, ge=0)
     works_cost: float | None = Field(None, ge=0)
 
 
@@ -884,6 +886,8 @@ class RequestCalcResponseSchema(BaseModel):
     total_cost: float = 0
     final_price: float = 0
     quantity: int = 1
+    qty_1sh: int = 0
+    qty_2sh: int = 0
     works_cost: float = 0
 
 

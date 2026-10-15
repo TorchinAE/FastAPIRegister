@@ -184,18 +184,19 @@ async def export_defaults_excel(
     wb = Workbook()
     ws = wb.active
     ws.title = "Модули по умолчанию"
-    headers = ["Строка", "ID", "Модуль", "Кол-во", "Цена за ед.", "Сумма"]
+    headers = ["ID", "Строка", "Модуль", "Кол-во", "Цена за ед.", "Сумма"]
     ws.append([f"{mt.name} — модули по умолчанию"])
     ws.merge_cells(start_row=1, start_column=1, end_row=1, end_column=len(headers))
     ws.cell(1, 1).font = Font(bold=True, size=14)
     write_header(ws, headers)
+    first_row = ws.max_row + 1
     # Обязательные строки (включая скрытые) по порядку
     rows = [(s.name, by_slot.get(s.id)) for s in slots]
     for slot_name, d in rows:
         if d is None:
-            ws.append([slot_name])
+            ws.append([None, slot_name])
         else:
-            values = [slot_name, d.module_id, d.module.name if d.module else "", d.quantity]
+            values = [d.module_id, slot_name, d.module.name if d.module else "", d.quantity]
             ws.append([*values, prices.get(d.module_id, 0.0)])
         row_num = ws.max_row
         if d is not None:
@@ -203,6 +204,14 @@ async def export_defaults_excel(
         ws.cell(row_num, 5).number_format = MONEY_FMT
         ws.cell(row_num, 6).number_format = MONEY_FMT
         border_row(ws, row_num, len(headers))
+    # Общая стоимость — в колонке «Строка»: при импорте строка без ID и модуля пропускается
+    last_row = ws.max_row
+    ws.append([None, "Общая стоимость", None, None, None, f"=SUM(F{first_row}:F{last_row})" if rows else 0])
+    total_row = ws.max_row
+    ws.cell(total_row, 6).number_format = MONEY_FMT
+    for col in range(1, len(headers) + 1):
+        ws.cell(total_row, col).font = Font(bold=True)
+    border_row(ws, total_row, len(headers))
     auto_fit_columns(ws)
     return xlsx_response(wb, f"defaults_{safe_filename(mt.slug)}_{dt.now().strftime('%Y%m%d')}.xlsx")
 
@@ -640,3 +649,158 @@ async def export_kit_excel(req_id: int, session: AsyncSession = Depends(db_helpe
     auto_fit_columns(ws)
 
     return xlsx_response(wb, f"komplektaciya_tkp_{req.id}_{dt.now().strftime('%Y%m%d')}.xlsx")
+
+
+@mt_calc_router.get("/api/requests/{req_id}/calc/{section}/export-excel")
+async def export_calc_excel(req_id: int, section: str, session: AsyncSession = Depends(db_helper.session_dependency)):
+    """Сводная по материалам расчёта раздела: по столбцам — блоки (кол-во и сумма), справа — итого,
+    внизу — итоги по столбцам, ФОТ, накладные, рентабельность и конечная цена."""
+    from datetime import datetime as dt
+
+    from openpyxl.styles import Alignment, Font
+
+    from scr.dbase import crud_requests
+    from scr.dbase.crud_tkp import build_calc_materials
+    from scr.utils.excel import MONEY_FMT, auto_fit_columns, border_row, safe_filename, xlsx_response
+
+    req = await crud_requests.get_request_by_id(session, req_id)
+    if not req:
+        raise HTTPException(status_code=404, detail="ТКП не найдена")
+    mt = await crud_module_types.get_module_type_by_slug(session, section)
+    if not mt:
+        raise HTTPException(status_code=404, detail="Раздел не найден")
+    if await crud_module_slots.sync_hidden_slots(session, req_id):
+        await session.commit()
+    calcs = await crud_module_types.get_calcs(session, req_id, mt.id)
+    materials, per_calc = await build_calc_materials(session, calcs)
+    multi = section in crud_module_types.MULTI_BLOCK_SECTIONS
+    split = section in crud_module_types.SPLIT_QTY_SECTIONS
+    works = section in crud_module_types.WORKS_SECTIONS
+    block_qty = [(c.quantity if c.quantity is not None else 1) if multi else 1 for c in calcs]
+
+    bold = Font(bold=True)
+    center = Alignment(horizontal="center", vertical="center", wrap_text=True)
+    fixed = 4  # ID, Материал, Цена за ед., Дата цены
+    total_col = fixed + 2 * len(calcs) + 1
+    cols = total_col + 1
+
+    wb = Workbook()
+    ws = wb.active
+    ws.title = safe_filename(mt.name)[:31] or "Расчёт"
+    org = req.company.name if req.company else ""
+    title = f"Расчёт: {mt.name} · ТКП № {req.tkp_num or req.id}" + (f" · {org}" if org else "")
+    ws.append([title])
+    ws.merge_cells(start_row=1, start_column=1, end_row=1, end_column=cols)
+    ws.cell(1, 1).font = Font(bold=True, size=14)
+
+    # Двухуровневая шапка: блок → Кол-во / Сумма
+    ws.append([])
+    ws.append([])
+    for col, name in enumerate(["ID", "Материал", "Цена за ед.", "Дата цены"], start=1):
+        ws.cell(2, col, name)
+        ws.merge_cells(start_row=2, start_column=col, end_row=3, end_column=col)
+    for i, calc in enumerate(calcs):
+        label = f"{mt.name} {i + 1}" if multi else mt.name
+        if split:
+            label += f" (1СШ: {calc.qty_1sh or 0}, 2СШ: {calc.qty_2sh or 0})"
+        elif multi:
+            label += f" × {block_qty[i]}"
+        col = fixed + 1 + 2 * i
+        ws.cell(2, col, label)
+        ws.merge_cells(start_row=2, start_column=col, end_row=2, end_column=col + 1)
+        ws.cell(3, col, "Кол-во")
+        ws.cell(3, col + 1, "Сумма")
+    ws.cell(2, total_col, "Итого" + (" (с учётом кол-ва блоков)" if multi else ""))
+    ws.merge_cells(start_row=2, start_column=total_col, end_row=2, end_column=total_col + 1)
+    ws.cell(3, total_col, "Кол-во")
+    ws.cell(3, total_col + 1, "Сумма")
+    from scr.utils.excel import HEADER_FILL
+
+    for row in (2, 3):
+        for col in range(1, cols + 1):
+            c = ws.cell(row, col)
+            c.font = bold
+            c.fill = HEADER_FILL
+            c.alignment = center
+        border_row(ws, row, cols)
+
+    money_cols = [3] + [fixed + 2 + 2 * i for i in range(len(calcs))] + [total_col + 1]
+
+    def add_row(values: dict[int, object], is_total: bool = False) -> int:
+        ws.append([values.get(col) for col in range(1, cols + 1)])
+        row_num = ws.max_row
+        for col in money_cols:
+            ws.cell(row_num, col).number_format = MONEY_FMT
+        border_row(ws, row_num, cols)
+        if is_total:
+            for col in range(1, cols + 1):
+                ws.cell(row_num, col).font = bold
+        return row_num
+
+    # Материалы
+    block_sums = [0.0] * len(calcs)
+    for mat in materials:
+        values: dict[int, object] = {1: mat["id"], 2: mat["name"], 3: mat["price"], 4: mat["date"]}
+        total_qty = 0.0
+        for i, acc in enumerate(per_calc):
+            qty = acc.get(mat["id"], 0)
+            if qty:
+                values[fixed + 1 + 2 * i] = qty
+                values[fixed + 2 + 2 * i] = qty * mat["price"]
+                block_sums[i] += qty * mat["price"]
+            total_qty += qty * block_qty[i]
+        values[total_col] = total_qty
+        values[total_col + 1] = total_qty * mat["price"]
+        row_num = add_row(values)
+        ws.cell(row_num, 4).number_format = "DD.MM.YYYY"
+
+    def footer(label: str, per_block: list[float], qty_values: list | None = None, qty_total=None) -> None:
+        """Строка итогов: значение по блоку — в колонку «Сумма», итого — с учётом кол-ва блоков."""
+        values: dict[int, object] = {2: label}
+        for i, value in enumerate(per_block):
+            values[fixed + 2 + 2 * i] = value
+            if qty_values is not None:
+                values[fixed + 1 + 2 * i] = qty_values[i]
+        values[total_col + 1] = sum(v * q for v, q in zip(per_block, block_qty, strict=True))
+        if qty_total is not None:
+            values[total_col] = qty_total
+        add_row(values, is_total=True)
+
+    fots = [float(c.fot or 0) for c in calcs]
+    overheads = [float(c.overhead or 0) for c in calcs]
+    costs = [float(c.total_cost or 0) for c in calcs]
+    finals = [float(c.final_price or 0) for c in calcs]
+    profits = [f - c for f, c in zip(finals, costs, strict=True)]
+    pcts = [round(p / c * 100, 2) if c else 0.0 for p, c in zip(profits, costs, strict=True)]
+    total_cost = sum(c * q for c, q in zip(costs, block_qty, strict=True))
+    total_profit = sum(p * q for p, q in zip(profits, block_qty, strict=True))
+
+    footer("Итого материалы", block_sums)
+    if works:
+        footer("Себестоимость работ", [float(c.works_cost or 0) for c in calcs])
+    footer("ФОТ", fots)
+    footer("Накладные", overheads)
+    footer("Себестоимость", costs)
+    total_pct = round(total_profit / total_cost * 100, 2) if total_cost else 0.0
+    footer("Рентабельность (% / сумма)", profits, pcts, total_pct)
+    footer("Конечная цена" + (" за блок" if multi else ""), finals)
+    if multi:
+        values = {2: "Количество блоков", total_col: sum(block_qty)}
+        for i, q in enumerate(block_qty):
+            values[fixed + 1 + 2 * i] = q
+        add_row(values, is_total=True)
+        values = {2: "Конечная цена × кол-во"}
+        for i, (f, q) in enumerate(zip(finals, block_qty, strict=True)):
+            values[fixed + 2 + 2 * i] = f * q
+        values[total_col + 1] = sum(f * q for f, q in zip(finals, block_qty, strict=True))
+        add_row(values, is_total=True)
+
+    auto_fit_columns(ws)
+    ws.column_dimensions["A"].width = 8
+    for i in range(len(calcs) + 1):
+        ws.column_dimensions[ws.cell(3, fixed + 1 + 2 * i).column_letter].width = 10
+        ws.column_dimensions[ws.cell(3, fixed + 2 + 2 * i).column_letter].width = 16
+    ws.row_dimensions[2].height = 32
+    ws.freeze_panes = ws.cell(4, fixed + 1)
+    name = f"raschet_{safe_filename(mt.slug)}_tkp_{req.id}_{dt.now().strftime('%Y%m%d')}.xlsx"
+    return xlsx_response(wb, name)

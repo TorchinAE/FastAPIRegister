@@ -154,6 +154,8 @@ SECTION_COST_FIELDS = {
 MULTI_BLOCK_SECTIONS = {"kso", "kru", "sho"}
 # Разделы работ: вместо модулей — себестоимость работ
 WORKS_SECTIONS = {"chief-engineer", "smr", "pnr"}
+# Разделы, где количество блоков разбито по секциям шин: 1СШ + 2СШ
+SPLIT_QTY_SECTIONS = {"kso"}
 
 
 def _calc_options():
@@ -180,6 +182,7 @@ async def create_calc(session: AsyncSession, request_id: int, module_type_id: in
         fot=float(mod_type.fot_item.cost) if mod_type and mod_type.fot_item else 0,
         overhead=float(mod_type.overhead_item.cost) if mod_type and mod_type.overhead_item else 0,
         quantity=1,
+        qty_1sh=1 if mod_type and mod_type.slug in SPLIT_QTY_SECTIONS else 0,
         works_cost=0,
     )
     session.add(calc)
@@ -253,6 +256,8 @@ def calc_block_data(calc: RequestCalc, prices: dict[int, float], default_profit:
         "overhead": float(calc.overhead or 0),
         "profitability_percent": profit if profit > 0 else default_profit,
         "quantity": calc.quantity if calc.quantity is not None else 1,
+        "qty_1sh": calc.qty_1sh or 0,
+        "qty_2sh": calc.qty_2sh or 0,
         "works_cost": float(calc.works_cost or 0),
         "total_cost": float(calc.total_cost or 0),
         "final_price": float(calc.final_price or 0),
@@ -323,6 +328,9 @@ async def update_calc(session: AsyncSession, data: RequestCalcUpdateSchema) -> R
     for field, value in data.model_dump(exclude_unset=True).items():
         if field != "id" and hasattr(calc, field):
             setattr(calc, field, value)
+    # Количество по секциям шин задано — общее количество = их сумма
+    if data.qty_1sh is not None or data.qty_2sh is not None:
+        calc.quantity = (calc.qty_1sh or 0) + (calc.qty_2sh or 0)
     await session.flush()
     return calc
 
