@@ -87,11 +87,11 @@ async def payment_registry_excel(
     ws = wb.active
     ws.title = "Реестр оплат"
     headers = [
-        "№ ТКП", "Номер заказа", "Организация", "Стоимость с НДС", "Вид платежа", "%", "Сумма",
+        "№ ТКП", "Номер заказа", "Организация", "Вид платежа", "%", "Сумма",
         "Оплатить до", "Оплачено", "Дата оплаты", "Остаток",
     ]  # fmt: skip
     start_sheet(ws, headers)
-    money_cols = (4, 7, 9, 11)
+    money_cols = (6, 8, 10)
     by_type = {pt: [0.0, 0.0] for pt in PAYMENT_TYPES}
     per_request = []
     grand = [0.0, 0.0]
@@ -112,12 +112,12 @@ async def payment_registry_excel(
             row_num = add_row(
                 ws,
                 [
-                    req.tkp_num or str(req.id), req.factory_order_num or "", org, money(req.cost), pi.payment_type,
+                    req.tkp_num or str(req.id), req.factory_order_num or "", org, pi.payment_type,
                     money(pi.percent), amount, pi.due_date, paid, pi.paid_date, rest,
                 ],
                 money_cols,
             )  # fmt: skip
-            for col in (8, 10):
+            for col in (7, 9):
                 ws.cell(row_num, col).number_format = "DD.MM.YYYY"
             req_total[0] += amount
             req_total[1] += paid
@@ -127,11 +127,12 @@ async def payment_registry_excel(
             totals[0] += amount
             totals[1] += paid
         rest_total = round(req_total[0] - req_total[1], 2)
+        # В строке «Итого по ТКП» в столбце «Организация» — стоимость ТКП с НДС
         add_row(
             ws,
-            [f"Итого по ТКП {req.tkp_num or req.id}", req.factory_order_num or "", None, None, None, None,
+            [f"Итого по ТКП {req.tkp_num or req.id}", req.factory_order_num or "", money(req.cost), None, None,
              req_total[0], None, req_total[1], None, rest_total],
-            money_cols,
+            (3, *money_cols),
             is_total=True,
         )  # fmt: skip
         per_request.append((req, org, req_total, rest_total, overdue))
@@ -139,7 +140,7 @@ async def payment_registry_excel(
         grand[1] += req_total[1]
     add_row(
         ws,
-        ["Итого", None, None, None, None, None, grand[0], None, grand[1], None, round(grand[0] - grand[1], 2)],
+        ["Итого", None, None, None, None, grand[0], None, grand[1], None, round(grand[0] - grand[1], 2)],
         money_cols,
         is_total=True,
     )

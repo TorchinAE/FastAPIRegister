@@ -74,10 +74,12 @@ async def test_payment_registry_excel(client, db_session):
     ws = wb["Реестр оплат"]
     assert "фильтр: ТКП: reg" in ws["A1"].value
     rows = list(ws.iter_rows(min_row=3, values_only=True))
-    assert [r[4] for r in rows[:2]] == ["предоплата", "доплата-1"]
+    assert "Стоимость с НДС" not in [c.value for c in ws[2]]
+    assert [r[3] for r in rows[:2]] == ["предоплата", "доплата-1"]
     assert rows[0][1] == "26-reg"  # номер заказа
     subtotal = rows[2]
-    assert subtotal[0].startswith("Итого по ТКП") and subtotal[6] == 100000 and subtotal[8] == 70000
-    assert subtotal[10] == 30000
+    assert subtotal[0].startswith("Итого по ТКП") and subtotal[5] == 100000 and subtotal[7] == 70000
+    assert subtotal[2] == 100000  # стоимость с НДС — в столбце «Организация»
+    assert subtotal[9] == 30000
     per_tkp = list(wb["По ТКП"].iter_rows(min_row=3, values_only=True))
     assert per_tkp[0][1] == "26-reg" and per_tkp[0][6] == 30000
