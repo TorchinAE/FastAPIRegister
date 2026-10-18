@@ -1,7 +1,9 @@
 from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
+from sqlalchemy.orm import selectinload
 
-from scr.dbase.models import PAYMENT_TYPES, PaymentItem
+from scr.constants import PAYMENT_TYPES
+from scr.dbase.models import PaymentItem, Request
 from scr.dbase.schemas.schemas import PaymentItemUpdateSchema
 
 
@@ -31,3 +33,22 @@ async def update_payment_item(session: AsyncSession, data: PaymentItemUpdateSche
             setattr(item, field, value)
     await session.flush()
     return item
+
+
+async def get_requests_with_payments(session: AsyncSession, request_ids: list[int]) -> list[Request]:
+    """ТКП с порядком оплаты в порядке переданных id."""
+    if not request_ids:
+        return []
+    stmt = (
+        select(Request)
+        .where(Request.id.in_(request_ids))
+        .options(selectinload(Request.company), selectinload(Request.payment_items))
+    )
+    by_id = {r.id: r for r in (await session.execute(stmt)).scalars().all()}
+    return [by_id[rid] for rid in dict.fromkeys(request_ids) if rid in by_id]
+
+
+def sorted_payment_items(items: list[PaymentItem]) -> list[PaymentItem]:
+    """Строки порядка оплаты в порядке видов платежей (предоплата, доплаты, отсрочка)."""
+    order = {pt: i for i, pt in enumerate(PAYMENT_TYPES)}
+    return sorted(items, key=lambda pi: (order.get(pi.payment_type, len(order)), pi.id))

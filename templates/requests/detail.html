@@ -4,17 +4,17 @@
 <div class="page-header">
     <div>
         <h1>Редактирование запроса ТКП</h1>
-        <div class="subtitle">Код: {{ req.id }} &middot; {{ req.tkp_num or '' }}</div>
+        <div class="subtitle">Код: {{ req.id }} &middot; <span id="tkp-num-subtitle">{{ req.tkp_num or '' }}</span></div>
     </div>
 </div>
 <form id="main-form" method="post" action="/reg/requests/{{ req.id }}" class="edit-form" style="padding:1rem;" data-is-new="{{ '1' if is_new else '' }}">
 <div style="display:flex;gap:0.5rem;margin-bottom:0.75rem;flex-wrap:wrap;">
     <a href="/reg/requests" class="btn btn-ghost">← Назад к списку</a>
     <a href="/reg/requests/create" class="btn btn-success">+ Новое ТКП</a>
-    <button type="button" class="btn btn-ghost" onclick="openFolderTKP()">Открыть папку ТКП</button>
-    <button type="button" id="btn-open-zz" class="btn btn-ghost" onclick="openFolderZZ()" style="display:none;">Открыть папку ЗЗ</button>
-    <a href="/reg/requests/{{ req.id }}/calc" class="btn btn-ghost">Расчет ТКП</a>
-    <a href="/reg/requests/{{ req.id }}/contracts" class="btn btn-ghost">Договоры</a>
+    <button type="button" class="btn btn-primary" onclick="openFolderTKP()">Открыть папку ТКП</button>
+    <button type="button" id="btn-open-zz" class="btn btn-primary" onclick="openFolderZZ()" style="display:none;">Открыть папку ЗЗ</button>
+    <a href="/reg/requests/{{ req.id }}/calc" class="btn btn-primary">Расчет ТКП</a>
+    <a href="/reg/requests/{{ req.id }}/contracts" class="btn btn-primary">Договоры</a>
 </div>
 <div class="edit-compact">
 
@@ -28,7 +28,8 @@
                 <div class="fg-h"><label>Входящий № письма</label><input type="text" name="incoming_letter_num" value="{{ req.incoming_letter_num or '' }}" style="width:35ch;"></div>
                 <div class="fg-h"><label>Дата заявки</label><input type="date" name="request_date" value="{{ req.request_date.strftime('%Y-%m-%d') if req.request_date else '' }}" style="width:35ch;"></div>
                 <div class="fg-h"><label>Повтор ТКП</label><input type="text" name="repeat_tkp" value="{{ req.repeat_tkp or '' }}" style="width:35ch;"></div>
-                <div class="fg-h"><label>№ ТКП</label><input type="text" value="{{ req.tkp_num or '-' }}" disabled style="width:35ch;"></div>
+                <div class="fg-h"><label>№ ТКП</label><div class="tkp-num-wrap" style="width:35ch;"><input type="text" id="tkp-num-field" value="{{ req.tkp_num or '-' }}" disabled><button type="button" class="btn btn-success btn-sm" onclick="addVariant()" title="Сохранить текущий расчёт КСО в файл и перейти к следующему варианту ТКП">+Вариант</button></div></div>
+                <div class="fg-h" id="variants-row" style="display:none;"><label>Варианты</label><div id="variant-buttons" class="variant-buttons" style="width:35ch;"></div></div>
                 <div class="fg-h"><label>Дата выдачи ТКП</label><input type="date" name="issue_date" value="{{ req.issue_date.strftime('%Y-%m-%d') if req.issue_date else '' }}" style="width:35ch;"></div>
                 <div class="fg-h"><label>Оборудование</label><select name="equipment_id" id="equipment-select" data-search-select data-add-url="/equipment" data-add-label="Добавить оборудование" style="width:35ch;"><option value="">-- Не выбрано --</option>{% for eq in equipment %}<option value="{{ eq.id }}" {{ 'selected' if req.equipment_id == eq.id else '' }}>{{ eq.name }}</option>{% endfor %}</select></div>
                 <div class="fg-h"><label>Стоимость с НДС</label><input type="text" name="cost" id="cost-field" value="{{ req.cost or 0 }}" inputmode="decimal" style="width:35ch;"></div>
@@ -475,18 +476,24 @@ async function savePayment(row) {
     const id = row.dataset.id;
     const data = {id: parseInt(id)};
     row.querySelectorAll('input[data-field]').forEach(inp => {
-        if (inp.dataset.field === 'amount') data.amount = parseNum(inp.value);
-        else if (inp.dataset.field === 'percent') data.percent = parseNum(inp.value);
+        if (inp.dataset.field === 'amount') data.amount = Math.max(0, parseNum(inp.value));
+        else if (inp.dataset.field === 'percent') data.percent = Math.min(100, Math.max(0, parseNum(inp.value)));
         else if (inp.dataset.field === 'due_date') data.due_date = inp.value || null;
         else if (inp.dataset.field === 'paid_amount') data.paid_amount = parseNum(inp.value);
         else if (inp.dataset.field === 'paid_date') data.paid_date = inp.value || null;
     });
     highlightPaymentRow(row);
-    await fetch(`/reg/api/payments/${id}`, {
-        method: 'PUT',
-        headers: {'Content-Type': 'application/json'},
-        body: JSON.stringify(data)
-    });
+    let ok = false;
+    try {
+        const resp = await fetch(`/reg/api/payments/${id}`, {
+            method: 'PUT',
+            headers: {'Content-Type': 'application/json'},
+            body: JSON.stringify(data)
+        });
+        ok = resp.ok;
+    } catch (e) { /* сеть недоступна */ }
+    row.classList.toggle('save-error', !ok);
+    row.title = ok ? '' : 'Не удалось сохранить — обновите страницу';
 }
 
 function clearPaymentRow(btn) {
@@ -642,6 +649,73 @@ async function saveInvoice(row) {
         headers: {'Content-Type': 'application/json'},
         body: JSON.stringify(data)
     });
+}
+
+// === Варианты расчёта: файлы КСО204 этой ТКП ===
+let currentVariant = null;
+
+function setTkpNum(num) {
+    document.getElementById('tkp-num-field').value = num;
+    document.getElementById('tkp-num-subtitle').textContent = num;
+}
+
+async function loadVariants() {
+    const resp = await fetch(`/reg/api/requests/${REQ_ID}/variants`);
+    if (!resp.ok) return;  // номер ТКП не в формате «id-город» — варианты недоступны
+    const data = await resp.json();
+    currentVariant = data.current;
+    const box = document.getElementById('variant-buttons');
+    box.innerHTML = '';
+    data.variants.forEach(v => {
+        const btn = document.createElement('button');
+        btn.type = 'button';
+        btn.className = 'btn btn-sm ' + (v.n === data.current ? 'btn-primary' : 'btn-ghost');
+        btn.textContent = v.n;
+        btn.title = v.tkp_num + (v.saved ? ' — ' + v.file : ' — текущий, ещё не сохранён в файл');
+        if (v.saved) btn.addEventListener('click', () => goVariant(v.n, v.tkp_num));
+        else btn.disabled = v.n !== data.current;
+        box.appendChild(btn);
+    });
+    document.getElementById('variants-row').style.display = data.variants.length > 1 ? '' : 'none';
+}
+loadVariants();
+
+function showWarnings(data) {
+    if (data.warnings && data.warnings.length) alert('Обратите внимание:
+' + data.warnings.join('
+'));
+}
+
+async function addVariant() {
+    if (!confirm('Сохранить текущий расчёт КСО в файл и перейти к новому варианту ТКП?')) return;
+    hasUserChanges = true;
+    const resp = await fetch(`/reg/api/requests/${REQ_ID}/variants`, {method: 'POST'});
+    const data = await resp.json().catch(() => ({}));
+    if (!resp.ok) { alert('Ошибка: ' + (data.detail || resp.status)); return; }
+    setTkpNum(data.tkp_num);
+    showWarnings(data);
+    await loadVariants();
+}
+
+async function goVariant(n, tkpNum) {
+    const reloadCurrent = n === currentVariant;
+    const question = reloadCurrent
+        ? `Загрузить расчёт КСО заново из файла варианта ${n} (${tkpNum})? Несохранённые изменения расчёта будут потеряны.`
+        : `Перейти к варианту ${n} (${tkpNum})? Расчёт КСО будет загружен из файла варианта.`;
+    if (!confirm(question)) return;
+    const saveCurrent = !reloadCurrent && confirm(`Сохранить текущий вариант ${currentVariant} в файл перед переходом?
+(Отмена — перейти без сохранения)`);
+    hasUserChanges = true;
+    const resp = await fetch(`/reg/api/requests/${REQ_ID}/variants/${n}/load`, {
+        method: 'POST',
+        headers: {'Content-Type': 'application/json'},
+        body: JSON.stringify({save_current: saveCurrent}),
+    });
+    const data = await resp.json().catch(() => ({}));
+    if (!resp.ok) { alert('Ошибка: ' + (data.detail || resp.status)); return; }
+    setTkpNum(data.tkp_num);
+    showWarnings(data);
+    await loadVariants();
 }
 
 // === Auto-save main form ===

@@ -12,6 +12,10 @@
         <a href="/reg/module-types-calc/{{ mt.id }}/defaults" class="btn btn-ghost">По умолчанию</a>
         {% endif %}
         <a href="/reg/api/requests/{{ req.id }}/calc/{{ mt.slug }}/export-excel" class="btn btn-ghost">Скачать Excel</a>
+        {% if mt.slug == 'kso' %}
+        <button type="button" class="btn btn-primary" id="saveKsoBtn" onclick="saveKso204()" title="Выгрузка расчёта в КСО204-ткп{{ req.tkp_num or req.id }}.xlsx в папку ТКП">Сохранить на диск</button>
+        <a href="/reg/api/requests/{{ req.id }}/kso204/export-excel" class="btn btn-ghost" title="Скачать КСО204 без сохранения в папку ТКП">Скачать КСО204</a>
+        {% endif %}
         <a href="/reg/requests/{{ req.id }}/calc" class="btn btn-ghost">&larr; Назад к расчёту</a>
     </div>
 </div>
@@ -52,6 +56,8 @@ const MULTI = {{ 'true' if multi else 'false' }};
 const WORKS = {{ 'true' if works else 'false' }};
 // КСО: количество блоков по секциям шин (1СШ + 2СШ)
 const SPLIT = {{ 'true' if split_qty else 'false' }};
+// КСО: назначение камеры для опросного листа КСО204
+const PURPOSES = {{ purposes | tojson }};
 const initialBlocks = {{ blocks | tojson }};
 // Обязательные строки раздела (видимые) и модули для выбора в них
 const SLOTS = Object.fromEntries({{ slots | tojson }}.map(s => [s.id, s]));
@@ -110,6 +116,14 @@ function renderBlock(data, index) {
             <span class="calc-save-status f-status" title="Автосохранение"></span>
             ${MULTI ? '<button type="button" class="calc-block-del f-delete-block" title="Удалить блок">&#10005;</button>' : ''}
         </div>
+        ${SPLIT ? `
+        <div class="form-group calc-purpose">
+            <label>Назначение</label>
+            <select class="f-purpose">
+                <option value="">— не выбрано —</option>
+                ${PURPOSES.map(p => `<option value="${esc(p)}" ${p === data.purpose ? 'selected' : ''}>${esc(p)}</option>`).join('')}
+            </select>
+        </div>` : ''}
         ${modulesPart}
         <div class="calc-fields">
             <div class="form-group">
@@ -178,6 +192,7 @@ function renderBlock(data, index) {
     bindMoney(el.querySelector('.f-final'), () => changed('final'));
     el.querySelector('.f-profit-pct').addEventListener('input', () => changed());
     if (SPLIT) {
+        el.querySelector('.f-purpose').addEventListener('change', () => scheduleSave(el));
         for (const cls of ['.f-qty-1sh', '.f-qty-2sh']) {
             el.querySelector(cls).addEventListener('input', () => { syncSplitQty(el); changed(); });
         }
@@ -359,6 +374,7 @@ function blockPayload(el) {
     if (SPLIT) {
         payload.qty_1sh = Math.max(0, parseInt(el.querySelector('.f-qty-1sh').value) || 0);
         payload.qty_2sh = Math.max(0, parseInt(el.querySelector('.f-qty-2sh').value) || 0);
+        payload.purpose = el.querySelector('.f-purpose').value || null;
     }
     return payload;
 }
@@ -495,11 +511,35 @@ async function clearBlock(el) {
     await saveNow(el);
 }
 
-function showToast(msg) {
+function showToast(msg, ms = 2500) {
     const t = document.getElementById('toast');
     t.textContent = msg;
     t.style.display = 'block';
-    setTimeout(() => t.style.display = 'none', 2500);
+    clearTimeout(showToast.timer);
+    showToast.timer = setTimeout(() => t.style.display = 'none', ms);
+}
+
+// Несохранённые изменения блоков — отправить сразу
+async function flushSaves() {
+    await Promise.all([...saveTimers.keys()].map(el => saveNow(el)));
+}
+
+async function saveKso204() {
+    const btn = document.getElementById('saveKsoBtn');
+    btn.disabled = true;
+    try {
+        await flushSaves();
+        const resp = await fetch(`/reg/api/requests/${reqId}/kso204/save`, {method: 'POST'});
+        const data = await resp.json().catch(() => ({}));
+        if (!resp.ok) { showToast('Ошибка: ' + (data.detail || resp.status), 5000); return; }
+        let msg = 'Сохранено: ' + data.path;
+        if (data.warnings.length) msg += '
+' + data.warnings.join('
+');
+        showToast(msg, data.warnings.length ? 8000 : 4000);
+    } finally {
+        btn.disabled = false;
+    }
 }
 
 initialBlocks.forEach((b, i) => renderBlock(b, i + 1));

@@ -22,6 +22,7 @@ ADD_COLUMNS = [
     ("materials", "accuracy_class", "VARCHAR(20)"),
     ("request_calcs", "qty_1sh", "INTEGER NOT NULL DEFAULT 0"),
     ("request_calcs", "qty_2sh", "INTEGER NOT NULL DEFAULT 0"),
+    ("request_calcs", "purpose", "VARCHAR(20)"),
 ]
 
 # Существующие блоки КСО: всё количество — на 1СШ

@@ -1,7 +1,8 @@
 from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
 
-from scr.dbase.models import DEFAULT_UNIT, Material, Unit
+from scr.constants import DEFAULT_UNIT
+from scr.dbase.models import Material, Unit
 
 
 async def get_all(session: AsyncSession) -> list[Unit]:

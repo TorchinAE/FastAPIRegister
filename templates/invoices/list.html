@@ -6,14 +6,19 @@
         <h1>Счета</h1>
         <span class="subtitle">Всего: {{ total }}</span>
     </div>
+    <div style="display:flex;gap:0.5rem;">
+        <button type="button" class="btn btn-ghost" onclick="resetFilters()">Сбросить фильтры</button>
+        <button type="button" class="btn btn-primary" onclick="exportInvoicesExcel()" title="Выгружаются счета, видимые с учётом фильтров">Скачать отчёт</button>
+    </div>
 </div>
 
 <div class="table-wrap">
-    <table>
+    <table id="invoicesTable">
         <thead>
             <tr>
                 <th>ID</th>
                 <th>№ ТКП</th>
+                <th>Номер заказа</th>
                 <th>№ счёта</th>
                 <th>Дата счёта</th>
                 <th>Сумма</th>
@@ -25,13 +30,14 @@
             <tr class="table-filter">
                 <th><input type="text" class="tf-input" data-col="0" placeholder="ID"></th>
                 <th><input type="text" class="tf-input" data-col="1" placeholder="ТКП"></th>
-                <th><input type="text" class="tf-input" data-col="2" placeholder="№ счёта"></th>
-                <th><input type="text" class="tf-input" data-col="3" placeholder="дата"></th>
-                <th><input type="text" class="tf-input" data-col="4" placeholder="сумма"></th>
-                <th><input type="text" class="tf-input" data-col="5" placeholder="%"></th>
-                <th><input type="text" class="tf-input" data-col="6" placeholder="организация"></th>
-                <th><input type="text" class="tf-input" data-col="7" placeholder="менеджер"></th>
-                <th><input type="text" class="tf-input" data-col="8" placeholder="оборудование"></th>
+                <th><input type="text" class="tf-input" data-col="2" placeholder="заказ"></th>
+                <th><input type="text" class="tf-input" data-col="3" placeholder="№ счёта"></th>
+                <th><input type="text" class="tf-input" data-col="4" placeholder="дата"></th>
+                <th><input type="text" class="tf-input" data-col="5" placeholder="сумма"></th>
+                <th><input type="text" class="tf-input" data-col="6" placeholder="%"></th>
+                <th><input type="text" class="tf-input" data-col="7" placeholder="организация"></th>
+                <th><input type="text" class="tf-input" data-col="8" placeholder="менеджер"></th>
+                <th><input type="text" class="tf-input" data-col="9" placeholder="оборудование"></th>
             </tr>
         </thead>
         <tbody>
@@ -39,6 +45,7 @@
             <tr class="clickable-row" onclick="window.location='/reg/requests/{{ inv.request_id }}'">
                 <td>{{ inv.id }}</td>
                 <td><strong>{{ inv.request.tkp_num if inv.request else '-' }}</strong></td>
+                <td>{{ inv.request.factory_order_num if inv.request and inv.request.factory_order_num else '-' }}</td>
                 <td>{{ inv.invoice_num or '-' }}</td>
                 <td>{{ inv.invoice_date.strftime('%d.%m.%Y') if inv.invoice_date else '-' }}</td>
                 <td style="text-align:right;white-space:nowrap;">{{ inv.amount|money if inv.amount else '0.00' }}</td>
@@ -49,7 +56,7 @@
             </tr>
             {% endfor %}
             {% if not items %}
-            <tr class="empty-row"><td colspan="9">Нет счетов</td></tr>
+            <tr class="empty-row"><td colspan="10">Нет счетов</td></tr>
             {% endif %}
         </tbody>
     </table>
@@ -63,17 +70,106 @@
 </div>
 {% endif %}
 
+<script src="https://cdnjs.cloudflare.com/ajax/libs/exceljs/4.4.0/exceljs.min.js"></script>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/FileSaver.js/2.0.5/FileSaver.min.js"></script>
 <script>
-document.querySelectorAll('.table-filter .tf-input').forEach(input => {
-    input.addEventListener('input', function() {
-        const col = parseInt(this.dataset.col);
-        const val = this.value.toLowerCase();
-        document.querySelectorAll('tbody tr:not(.empty-row)').forEach(row => {
-            const cell = row.cells[col];
-            if (!cell) return;
-            row.style.display = cell.textContent.toLowerCase().includes(val) ? '' : 'none';
+const filterInputs = document.querySelectorAll('#invoicesTable .table-filter .tf-input');
+
+// Строка видна, если подходит под все фильтры
+function applyFilters() {
+    const filters = [];
+    filterInputs.forEach(inp => {
+        const val = inp.value.toLowerCase().trim();
+        if (val) filters.push({col: parseInt(inp.dataset.col), val});
+    });
+    document.querySelectorAll('#invoicesTable tbody tr:not(.empty-row)').forEach(row => {
+        const show = filters.every(f => {
+            const cell = row.cells[f.col];
+            return cell && cell.textContent.toLowerCase().includes(f.val);
+        });
+        row.style.display = show ? '' : 'none';
+    });
+}
+filterInputs.forEach(input => input.addEventListener('input', applyFilters));
+
+function resetFilters() {
+    filterInputs.forEach(inp => { inp.value = ''; });
+    applyFilters();
+}
+
+function activeFiltersText() {
+    const names = document.querySelectorAll('#invoicesTable thead tr:first-child th');
+    const parts = [];
+    filterInputs.forEach(inp => {
+        if (inp.value.trim()) parts.push(names[parseInt(inp.dataset.col)].textContent.trim() + ': ' + inp.value.trim());
+    });
+    return parts.join(', ');
+}
+
+async function exportInvoicesExcel() {
+    const headers = Array.from(document.querySelectorAll('#invoicesTable thead tr:first-child th')).map(th => th.textContent.trim());
+    const rows = [];
+    document.querySelectorAll('#invoicesTable tbody tr:not(.empty-row)').forEach(tr => {
+        if (tr.style.display === 'none') return;
+        rows.push(Array.from(tr.cells).map(td => {
+            const v = td.textContent.trim().replace(/\s+/g, ' ');
+            return v === '-' ? '' : v;
+        }));
+    });
+    if (!rows.length) { alert('Нет видимых строк для отчёта'); return; }
+
+    const wb = new ExcelJS.Workbook();
+    const ws = wb.addWorksheet('Счета');
+    const filterText = activeFiltersText();
+    ws.addRow(['Отчёт по счетам' + (filterText ? ' — фильтр: ' + filterText : '')]);
+    ws.mergeCells(1, 1, 1, headers.length);
+    ws.getCell('A1').font = {bold: true, size: 14};
+    const border = {top: {style: 'thin'}, bottom: {style: 'thin'}, left: {style: 'thin'}, right: {style: 'thin'}};
+    const headerRow = ws.addRow(headers);
+    headerRow.eachCell(cell => {
+        cell.font = {bold: true};
+        cell.fill = {type: 'pattern', pattern: 'solid', fgColor: {argb: 'FFD9D9D9'}};
+        cell.border = border;
+    });
+
+    const idCol = 0, amountCol = 5, pctCol = 6, dateCol = 4;
+    const toNum = v => parseFloat(String(v).replace(/\s/g, '').replace(',', '.'));
+    let total = 0;
+    rows.forEach(r => {
+        const row = ws.addRow(r);
+        row.eachCell({includeEmpty: true}, (cell, colNumber) => {
+            const ci = colNumber - 1;
+            cell.border = border;
+            if (ci === idCol || ci === pctCol || ci === amountCol) {
+                const n = toNum(cell.value);
+                if (!isNaN(n)) {
+                    cell.value = n;
+                    if (ci === amountCol) { cell.numFmt = '#,##0.00'; total += n; }
+                }
+            } else if (ci === dateCol && /^\d{2}\.\d{2}\.\d{4}$/.test(cell.value)) {
+                const [d, m, y] = cell.value.split('.').map(Number);
+                cell.value = new Date(Date.UTC(y, m - 1, d));
+                cell.numFmt = 'DD.MM.YYYY';
+            }
         });
     });
-});
+    const totalRow = ws.addRow(headers.map((_, i) => i === 0 ? 'Итого' : (i === amountCol ? total : '')));
+    totalRow.eachCell({includeEmpty: true}, (cell, colNumber) => {
+        cell.font = {bold: true};
+        cell.border = border;
+        if (colNumber - 1 === amountCol) cell.numFmt = '#,##0.00';
+    });
+
+    ws.columns.forEach((col, i) => {
+        let maxLen = headers[i].length;
+        rows.forEach(r => { maxLen = Math.max(maxLen, String(r[i] || '').length); });
+        col.width = Math.min(maxLen + 3, 50);
+    });
+
+    const now = new Date();
+    const dateStr = now.getFullYear() + String(now.getMonth() + 1).padStart(2, '0') + String(now.getDate()).padStart(2, '0');
+    const buf = await wb.xlsx.writeBuffer();
+    saveAs(new Blob([buf], {type: 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet'}), 'scheta_' + dateStr + '.xlsx');
+}
 </script>
 {% endblock %}

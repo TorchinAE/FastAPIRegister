@@ -15,3 +15,9 @@ coverage.xml
 .mimocode/
 .claude/
 *.md
+*.xlsx
+!xlsx_templates/*.xlsx
+
+# Файлы расчётов ТКП, если не задан adres_server
+tkp_files/
+

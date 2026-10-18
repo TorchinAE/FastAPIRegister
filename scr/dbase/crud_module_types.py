@@ -258,6 +258,7 @@ def calc_block_data(calc: RequestCalc, prices: dict[int, float], default_profit:
         "quantity": calc.quantity if calc.quantity is not None else 1,
         "qty_1sh": calc.qty_1sh or 0,
         "qty_2sh": calc.qty_2sh or 0,
+        "purpose": calc.purpose or "",
         "works_cost": float(calc.works_cost or 0),
         "total_cost": float(calc.total_cost or 0),
         "final_price": float(calc.final_price or 0),

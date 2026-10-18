@@ -175,15 +175,6 @@ class Probability(Base):
         return f"Probability(id={self.id}, name='{self.name}', value={self.value})"
 
 
-DEFAULT_PROBABILITIES = [
-    (1, "30%", 30),
-    (2, "50%", 50),
-    (3, "80%", 80),
-    (4, "95%", 95),
-    (5, "100%", 100),
-]
-
-
 class Request(BaseID):
     __tablename__ = "requests"
     counterparty_id: Mapped[int | None] = mapped_column(ForeignKey("counterparties.id"), nullable=True)
@@ -255,9 +246,6 @@ class Invoice(BaseID):
     paid_date: Mapped[datetime | None] = mapped_column(DateTime, nullable=True)
 
     request: Mapped["Request"] = relationship(back_populates="invoices")
-
-
-PAYMENT_TYPES = ["предоплата", "доплата-1", "доплата-2", "доплата-3", "отсрочка"]
 
 
 class PaymentItem(BaseID):
@@ -363,9 +351,6 @@ class NominalCurrent(Base):
         return f"NominalCurrent(id={self.id}, value={self.value})"
 
 
-DEFAULT_NOMINAL_CURRENTS = [16, 25, 40, 63, 100, 160, 250, 400, 630, 800, 1000, 1250, 1600, 2000, 2500, 3150, 4000]
-
-
 class Unit(Base):
     """Справочник единиц измерения материалов"""
 
@@ -378,10 +363,6 @@ class Unit(Base):
         return f"Unit(id={self.id}, name='{self.name}')"
 
 
-DEFAULT_UNIT = "шт"
-DEFAULT_UNITS = [DEFAULT_UNIT, "кг", "м2", "пог.м."]
-
-
 class AccuracyClass(Base):
     """Справочник классов точности материалов"""
 
@@ -392,9 +373,6 @@ class AccuracyClass(Base):
 
     def __repr__(self) -> str:
         return f"AccuracyClass(id={self.id}, name='{self.name}')"
-
-
-DEFAULT_ACCURACY_CLASSES = ["0.2", "0.2S", "0.5", "0.5S", "1", "3", "5P", "10P"]
 
 
 class Module(BaseID):
@@ -559,6 +537,8 @@ class RequestCalc(BaseID):
     # КСО: количество на 1-й и 2-й секции шин; quantity = qty_1sh + qty_2sh
     qty_1sh: Mapped[int] = mapped_column(Integer, default=0, server_default="0", nullable=False)
     qty_2sh: Mapped[int] = mapped_column(Integer, default=0, server_default="0", nullable=False)
+    # КСО: назначение камеры (Линия, Ввод, ТСН, ТН, СВ, СР) — в опросный лист КСО204
+    purpose: Mapped[str | None] = mapped_column(String(20), nullable=True)
     # Себестоимость работ (Шеф-инженер, СМР, ПНР) — вместо модулей
     works_cost: Mapped[float] = mapped_column(Numeric(12, 2), default=0, server_default="0", nullable=False)
 

@@ -6,6 +6,7 @@
         <a href="/reg/requests/create" class="btn btn-success">+ Создать ТКП</a>
         <button type="button" class="btn btn-ghost" onclick="resetFilters()">Сбросить фильтры</button>
         <button type="button" class="btn btn-primary" onclick="exportFilteredExcel()">Скачать Excel</button>
+        <button type="button" class="btn btn-primary" onclick="exportPaymentRegistry()" title="Порядок оплаты по видимым ТКП (с учётом фильтров)">Реестр оплат</button>
         <h1>Реестр ТКП</h1>
     </div>
     <span class="subtitle">Всего: {{ total }}</span>
@@ -85,7 +86,7 @@
         </thead>
         <tbody>
             {% for req in items %}
-            <tr class="clickable-row" onclick="window.location='/reg/requests/{{ req.id }}'">
+            <tr class="clickable-row" data-id="{{ req.id }}" onclick="window.location='/reg/requests/{{ req.id }}'">
                 <td><strong>#{{ req.id }}</strong></td>
                 <td>{{ req.tkp_num or '-' }}</td>
                 <td data-sort="{{ req.request_date.strftime('%Y%m%d') if req.request_date else '' }}">{{ req.request_date.strftime('%d.%m.%Y') if req.request_date else '-' }}</td>
@@ -214,6 +215,24 @@ function getActiveFilters() {
         }
     });
     return parts.join(', ');
+}
+
+// Реестр оплат: «Порядок оплаты» видимых ТКП с разбивкой по номерам ТКП
+async function exportPaymentRegistry() {
+    const ids = [];
+    document.querySelectorAll('#dataTable tbody tr[data-id]').forEach(tr => {
+        if (tr.style.display !== 'none') ids.push(parseInt(tr.dataset.id));
+    });
+    if (!ids.length) { alert('Нет видимых строк для реестра'); return; }
+    const resp = await fetch('/reg/api/payments/registry-excel', {
+        method: 'POST',
+        headers: {'Content-Type': 'application/json'},
+        body: JSON.stringify({ids, filter_text: getActiveFilters()}),
+    });
+    if (!resp.ok) { alert('Ошибка формирования реестра'); return; }
+    const now = new Date();
+    const dateStr = now.getFullYear() + String(now.getMonth() + 1).padStart(2, '0') + String(now.getDate()).padStart(2, '0');
+    saveAs(await resp.blob(), 'reestr_oplat_' + dateStr + '.xlsx');
 }
 
 async function exportFilteredExcel() {

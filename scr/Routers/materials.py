@@ -16,6 +16,7 @@ from scr.dbase import (
 from scr.dbase.database import db_helper
 from scr.dbase.schemas.schemas import (
     MaterialCreateSchema,
+    MaterialIdsSchema,
     MaterialResponseSchema,
     MaterialTypeCreateSchema,
     MaterialUpdateSchema,
@@ -86,11 +87,25 @@ async def read_all_materials(
 async def export_materials_excel(
     session: AsyncSession = Depends(db_helper.session_dependency),
 ):
+    items = await crud_materials.get_all_materials(session=session)
+    return _materials_excel(items)
+
+
+@mat_router.post("/export-excel")
+async def export_materials_excel_filtered(
+    data: MaterialIdsSchema,
+    session: AsyncSession = Depends(db_helper.session_dependency),
+):
+    """Выгрузка только переданных материалов (видимых с учётом фильтров), в том же порядке."""
+    by_id = {m.id: m for m in await crud_materials.get_all_materials(session=session)}
+    return _materials_excel([by_id[i] for i in data.ids if i in by_id])
+
+
+def _materials_excel(items: list) -> StreamingResponse:
     from datetime import datetime as dt
 
     from openpyxl.styles import Alignment, Border, Font, PatternFill, Side
 
-    items = await crud_materials.get_all_materials(session=session)
     wb = Workbook()
     ws = wb.active
     ws.title = "Материалы"
@@ -251,11 +266,14 @@ def _parse_rows(rows: list) -> list[dict]:
     if not rows:
         return parsed_list
 
-    # Try to detect header row
-    col_map = _detect_header(rows[0])
+    # Заголовок ищем в первых строках: в выгрузке сверху строка-название «Материалы»
+    col_map = None
     data_start = 0
-    if col_map is not None:
-        data_start = 1  # skip header row
+    for idx, row in enumerate(rows[:10]):
+        col_map = _detect_header(row)
+        if col_map is not None:
+            data_start = idx + 1  # skip header row
+            break
 
     for row in rows[data_start:]:
         if not row:
@@ -397,11 +415,7 @@ def _parse_by_header(row, col_map: dict) -> dict | None:
         "date": _parse_date(_get(row, col_map, "date")),
         "nom_tok": nom_tok,
         "has_bool_cols": _has_col(col_map, "stats") or _has_col(col_map, "ruchn"),
-        "stats": bool(_get(row, col_map, "stats")) if _has_col(col_map, "stats") else None,
-        "vtych": bool(_get(row, col_map, "vtych")) if _has_col(col_map, "vtych") else None,
-        "vykat": bool(_get(row, col_map, "vykat")) if _has_col(col_map, "vykat") else None,
-        "ruchn": bool(_get(row, col_map, "ruchn")) if _has_col(col_map, "ruchn") else None,
-        "el_priv": bool(_get(row, col_map, "el_priv")) if _has_col(col_map, "el_priv") else None,
+        **{key: _parse_bool(_get(row, col_map, key)) for key in BOOL_FIELDS},
         "code_1c": str(_get(row, col_map, "code_1c", "")).strip() or None,
         "code_agent": str(_get(row, col_map, "code_agent", "")).strip() or None,
         "url_agent": str(_get(row, col_map, "url_agent", "")).strip() or None,
@@ -467,6 +481,27 @@ def _parse_fixed(row) -> dict | None:
     }
 
 
+BOOL_FIELDS = ("stats", "vtych", "vykat", "ruchn", "el_priv")
+_TRUE_VALUES = {"1", "+", "да", "true", "yes", "✓", "v"}
+_FALSE_VALUES = {"0", "-", "−", "нет", "false", "no", "✗"}
+
+
+def _parse_bool(val) -> bool | None:
+    """1 / + → True, 0 / - → False; пусто или непонятное значение → None (не задано)."""
+    if val is None:
+        return None
+    if isinstance(val, bool):
+        return val
+    if isinstance(val, int | float):
+        return bool(val) if val in (0, 1) else None
+    text = str(val).strip().lower()
+    if text in _TRUE_VALUES:
+        return True
+    if text in _FALSE_VALUES:
+        return False
+    return None
+
+
 def _parse_date(val):
     from datetime import date
     from datetime import datetime as dt
@@ -518,22 +553,14 @@ async def _do_import(session: AsyncSession, rows: list) -> int:
     for parsed in _parse_rows(rows):
         nom_tok = parsed.get("nom_tok", 0)
         has_bool = parsed.get("has_bool_cols", False)
+        # Значения из файла (1/+ или 0/-); None — в ячейке ничего нет
+        explicit = {key: parsed.get(key) for key in BOOL_FIELDS}
 
-        if not nom_tok:
-            # No tok specified → stats and ruchn are False
-            parsed["stats"] = False
-            parsed["ruchn"] = False
-        elif not has_bool:
-            # Tok specified but no boolean columns in table → stats and ruchn default True
-            parsed["stats"] = True
-            parsed["ruchn"] = True
-        else:
-            # Tok specified and boolean columns exist → use values, default False if empty
-            if parsed["stats"] is None:
-                parsed["stats"] = False
-            if parsed["ruchn"] is None:
-                parsed["ruchn"] = False
-
+        # Не заданные в файле стац/ручн: без ном. тока — нет; с током и без колонок признаков — да
+        default_sr = bool(nom_tok) and not has_bool
+        for key in ("stats", "ruchn"):
+            if parsed.get(key) is None:
+                parsed[key] = default_sr
         # Other booleans default False if not specified
         for key in ("vtych", "vykat", "el_priv"):
             if parsed.get(key) is None:
@@ -575,6 +602,9 @@ async def _do_import(session: AsyncSession, rows: list) -> int:
                 existing.unit = parsed["unit"]
             if parsed.get("accuracy_class"):
                 existing.accuracy_class = parsed["accuracy_class"]
+            for key, value in explicit.items():
+                if value is not None:
+                    setattr(existing, key, value)
         else:
             # Create new material
             schema = MaterialCreateSchema(
@@ -600,6 +630,38 @@ async def _do_import(session: AsyncSession, rows: list) -> int:
         await crud_accuracy_classes.ensure_name(session, parsed.get("accuracy_class"))
         imported += 1
     return imported
+
+
+@mat_router.post("/modules-bulk")
+async def bulk_modules_for_materials(
+    data: MaterialIdsSchema,
+    create: bool = Query(...),
+    session: AsyncSession = Depends(db_helper.session_dependency),
+):
+    """Галка «мод.» для набора материалов: create=true — создать модули, false — удалить.
+
+    Модули, которые используются в других модулях или в расчётах ТКП, не удаляются.
+    """
+    from scr.dbase.schemas.schemas import ModuleCreateSchema, ModuleItemCreateSchema
+
+    changed, skipped = [], []
+    for mat_id in data.ids:
+        mat = await crud_materials.get_material_by_id(session, mat_id)
+        if not mat:
+            continue
+        existing_module = await crud_modules.get_module_by_name(session, mat.name)
+        if create and not existing_module:
+            mod = await crud_modules.add_module(session, ModuleCreateSchema(name=mat.name))
+            await crud_modules.add_module_item(session, mod.id, ModuleItemCreateSchema(material_id=mat.id, quantity=1))
+            changed.append(mat.id)
+        elif not create and existing_module:
+            if await crud_modules.module_usage(session, existing_module.id):
+                skipped.append(mat.id)
+                continue
+            await crud_modules.delete_module(session, existing_module.id)
+            changed.append(mat.id)
+    await session.commit()
+    return {"changed": changed, "skipped": skipped}
 
 
 @mat_router.get("/{mat_id}", response_model=MaterialResponseSchema)

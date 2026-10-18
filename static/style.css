@@ -170,7 +170,7 @@ form { background: var(--surface); padding: 1.5rem; border-radius: var(--radius)
 .auth-box .auth-link a:hover { text-decoration: underline; }
 
 /* Toast */
-.toast { position: fixed; bottom: 1.5rem; right: 1.5rem; background: var(--sidebar-bg); color: #fff; padding: 0.75rem 1.25rem; border-radius: 8px; font-size: 0.85rem; box-shadow: var(--shadow-md); z-index: 1000; animation: slideUp 0.3s ease; }
+.toast { position: fixed; bottom: 1.5rem; right: 1.5rem; background: var(--sidebar-bg); color: #fff; padding: 0.75rem 1.25rem; border-radius: 8px; font-size: 0.85rem; box-shadow: var(--shadow-md); z-index: 1000; animation: slideUp 0.3s ease; white-space: pre-line; max-width: 60ch; }
 @keyframes slideUp { from { opacity: 0; transform: translateY(20px); } to { opacity: 1; transform: translateY(0); } }
 
 /* Modal */
@@ -217,6 +217,7 @@ form { background: var(--surface); padding: 1.5rem; border-radius: var(--radius)
 /* Payment rows */
 .payment-row { display: flex; gap: 0.4rem; align-items: end; padding: 0.35rem 0; border-bottom: 1px solid var(--border); flex-wrap: nowrap; }
 .payment-row:last-child { border-bottom: none; }
+.payment-row.save-error { outline: 2px solid var(--danger); outline-offset: -2px; }
 .payment-row > .fg-h:first-child { flex: 0 0 110px; align-self: center; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
 .payment-row > .fg-h:first-child label { font-size: 0.75rem; font-weight: 400; color: var(--text); text-align: left; width: auto; }
 .payment-row .fg-h { gap: 0.2rem; flex: 0 0 auto; align-items: center; }
@@ -355,3 +356,10 @@ form { background: var(--surface); padding: 1.5rem; border-radius: var(--radius)
 .tkp-total.strong { border-color: var(--sidebar-active); background: rgba(79, 70, 229, 0.05); }
 .tkp-total.strong .tkp-total-value { color: var(--sidebar-active); }
 .tkp-totals-hint { font-size: 0.75rem; color: var(--text-muted); }
+
+/* № ТКП с кнопкой «+Вариант» и кнопки вариантов */
+.tkp-num-wrap { display: flex; gap: 0.35rem; align-items: center; }
+.tkp-num-wrap input { flex: 1; min-width: 0; }
+.tkp-num-wrap .btn { flex-shrink: 0; white-space: nowrap; }
+.variant-buttons { display: flex; gap: 0.3rem; flex-wrap: wrap; }
+.variant-buttons .btn { min-width: 2.2em; justify-content: center; }

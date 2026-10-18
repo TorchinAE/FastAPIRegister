@@ -3,9 +3,10 @@ from pydantic import BaseModel, Field
 from sqlalchemy import func, select
 from sqlalchemy.ext.asyncio import AsyncSession
 
+from scr.constants import DEFAULT_UNIT
 from scr.dbase import crud_units
 from scr.dbase.database import db_helper
-from scr.dbase.models import DEFAULT_UNIT, Material, Unit
+from scr.dbase.models import Material, Unit
 
 units_router = APIRouter(prefix="/api/units", tags=["Units"])
 

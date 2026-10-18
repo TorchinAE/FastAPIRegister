@@ -7,7 +7,7 @@
         <span class="subtitle">Всего: {{ total }}</span>
     </div>
     <div style="display:flex;gap:0.5rem;">
-        <a href="/reg/api/materials/export-excel" class="btn btn-primary" download>Скачать Excel</a>
+        <button type="button" class="btn btn-primary" onclick="exportFilteredExcel()" title="Выгружаются материалы, видимые с учётом фильтров">Скачать Excel</button>
         <label class="btn btn-primary" style="cursor:pointer;">
             Загрузить Excel
             <input type="file" accept=".xlsx,.xls" style="display:none" id="excelInput" onchange="importExcel(this)">
@@ -92,7 +92,13 @@
     <table id="dataTable">
         <thead>
             <tr>
-                <th>ID</th><th>Тип</th><th>Название</th><th>Цена</th><th>Ед. изм.</th><th>Дата</th><th>Ном Ток</th><th>Напряж.</th><th>Кл. точн.</th><th>стац</th><th>втыч</th><th>выкат</th><th>ручн</th><th>эл.прив</th><th>Код 1С</th><th>Код агент</th><th>URL агент</th><th>мод.</th><th></th>
+                <th>ID</th><th>Тип</th><th>Название</th><th>Цена</th><th>Ед. изм.</th><th>Дата</th><th>Ном Ток</th><th>Напряж.</th><th>Кл. точн.</th><th>стац</th><th>втыч</th><th>выкат</th><th>ручн</th><th>эл.прив</th><th>Код 1С</th><th>Код агент</th><th>URL агент</th>
+                <th style="text-align:center;">мод.
+                    <div class="mod-bulk">
+                        <button type="button" class="btn btn-success btn-sm" onclick="bulkModules(true)" title="Поставить галку «мод.» всем материалам с учётом фильтров">✓ все</button>
+                        <button type="button" class="btn btn-danger btn-sm" onclick="bulkModules(false)" title="Снять галку «мод.» у всех материалов с учётом фильтров">✗ все</button>
+                    </div>
+                </th><th></th>
             </tr>
             <tr class="table-filter">
                 <th><input type="text" data-col="0" data-min="1" placeholder="Фильтр..." class="tf-input"></th>
@@ -112,7 +118,7 @@
                 <th><input type="text" data-col="14" placeholder="Фильтр..." class="tf-input"></th>
                 <th><input type="text" data-col="15" placeholder="Фильтр..." class="tf-input"></th>
                 <th><input type="text" data-col="16" placeholder="Фильтр..." class="tf-input"></th>
-                <th></th>
+                <th><select data-col="17" class="tf-select"><option value="">—</option><option value="✓">✓</option><option value="✗">✗</option></select></th>
                 <th></th>
             </tr>
         </thead>
@@ -142,6 +148,10 @@
 {% endblock %}
 
 {% block scripts %}
+<style>
+.mod-bulk { display:flex; gap:2px; justify-content:center; margin-top:2px; }
+.mod-bulk .btn { padding:0.1rem 0.35rem; font-size:0.7rem; white-space:nowrap; }
+</style>
 <script>
 const PER_PAGE = {{ per_page }};
 const moduleNames = new Set({{ module_names | list | tojson }});
@@ -362,6 +372,47 @@ async function toggleModule(matId, cb) {
         cb.checked = !cb.checked;
         showToast('Ошибка');
     }
+}
+
+async function exportFilteredExcel() {
+    if (!filteredData.length) { showToast('Нет материалов для выгрузки'); return; }
+    const resp = await fetch('/reg/api/materials/export-excel', {
+        method: 'POST',
+        headers: {'Content-Type': 'application/json'},
+        body: JSON.stringify({ids: filteredData.map(m => m.id)}),
+    });
+    if (!resp.ok) { showToast('Ошибка выгрузки'); return; }
+    const blob = await resp.blob();
+    const d = new Date();
+    const stamp = d.getFullYear() + String(d.getMonth() + 1).padStart(2, '0') + String(d.getDate()).padStart(2, '0');
+    const a = document.createElement('a');
+    a.href = URL.createObjectURL(blob);
+    a.download = 'materials_' + stamp + '.xlsx';
+    a.click();
+    URL.revokeObjectURL(a.href);
+}
+
+// Галка «мод.» для всех материалов, видимых с учётом фильтров
+async function bulkModules(create) {
+    const targets = filteredData.filter(m => m.isModule !== create);
+    if (!targets.length) { showToast(create ? 'У всех уже стоит галка' : 'Галок нет'); return; }
+    const question = create
+        ? `Создать модули для ${targets.length} материалов?`
+        : `Удалить модули у ${targets.length} материалов? Модули, используемые в других модулях или расчётах, останутся.`;
+    if (!confirm(question)) return;
+    const resp = await fetch('/reg/api/materials/modules-bulk?create=' + create, {
+        method: 'POST',
+        headers: {'Content-Type': 'application/json'},
+        body: JSON.stringify({ids: targets.map(m => m.id)}),
+    });
+    if (!resp.ok) { showToast('Ошибка'); return; }
+    const data = await resp.json();
+    const changed = new Set(data.changed);
+    allData.forEach(m => { if (changed.has(m.id)) m.isModule = create; });
+    applyFilters();
+    let msg = (create ? 'Модулей создано: ' : 'Модулей удалено: ') + data.changed.length;
+    if (data.skipped.length) msg += ', используются в расчётах/модулях: ' + data.skipped.length;
+    showToast(msg);
 }
 
 function showToast(msg) {

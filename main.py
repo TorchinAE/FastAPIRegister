@@ -19,6 +19,7 @@ from scr.Routers.directors import dir_router
 from scr.Routers.equipment import eq_router
 from scr.Routers.finance import fin_router
 from scr.Routers.invoices import inv_router
+from scr.Routers.kso204 import kso_router
 from scr.Routers.material_types import mt_router
 from scr.Routers.materials import mat_router
 from scr.Routers.module_types import mt_calc_router
@@ -47,7 +48,8 @@ async def lifespan(_: FastAPI):
     # Seed default probabilities
     from sqlalchemy import select
 
-    from scr.dbase.models import DEFAULT_PROBABILITIES, Probability
+    from scr.constants import DEFAULT_PROBABILITIES
+    from scr.dbase.models import Probability
 
     async with db_helper.session_factory() as session:
         for id_, name, value in DEFAULT_PROBABILITIES:
@@ -56,6 +58,7 @@ async def lifespan(_: FastAPI):
                 session.add(Probability(id=id_, name=name, value=value))
         await session.commit()
     # Seed default settings
+    from scr.constants import DEFAULT_K_FOT, DEFAULT_K_NAKL, SETTING_K_FOT, SETTING_K_NAKL
     from scr.dbase.models import Setting
 
     DEFAULT_SETTINGS = [
@@ -68,6 +71,9 @@ async def lifespan(_: FastAPI):
         ("tkp_template_folder", ""),
         ("materials_per_page", "30"),
         ("nds_percent", "20"),
+        # Коэффициенты ФОТ и накладных для расчёта КСО204 (лист «расчет», строки 41 и 40)
+        (SETTING_K_FOT, str(DEFAULT_K_FOT)),
+        (SETTING_K_NAKL, str(DEFAULT_K_NAKL)),
     ]
     async with db_helper.session_factory() as session:
         for key, value in DEFAULT_SETTINGS:
@@ -102,8 +108,8 @@ async def lifespan(_: FastAPI):
                 session.add(ModuleType(name=name, slug=slug))
             await session.commit()
     # Seed nominal currents: standard values + values already used in materials
+    from scr.constants import DEFAULT_NOMINAL_CURRENTS
     from scr.dbase import crud_nominal_currents
-    from scr.dbase.models import DEFAULT_NOMINAL_CURRENTS
 
     async with db_helper.session_factory() as session:
         if not await crud_nominal_currents.get_values(session):
@@ -112,8 +118,8 @@ async def lifespan(_: FastAPI):
         await crud_nominal_currents.sync_from_materials(session)
         await session.commit()
     # Seed units of measure: defaults + units already used in materials
+    from scr.constants import DEFAULT_UNITS
     from scr.dbase import crud_units
-    from scr.dbase.models import DEFAULT_UNITS
 
     async with db_helper.session_factory() as session:
         if not await crud_units.get_names(session):
@@ -122,8 +128,8 @@ async def lifespan(_: FastAPI):
         await crud_units.sync_from_materials(session)
         await session.commit()
     # Seed accuracy classes: defaults + classes already used in materials
+    from scr.constants import DEFAULT_ACCURACY_CLASSES
     from scr.dbase import crud_accuracy_classes
-    from scr.dbase.models import DEFAULT_ACCURACY_CLASSES
 
     async with db_helper.session_factory() as session:
         if not await crud_accuracy_classes.get_names(session):
@@ -192,6 +198,7 @@ app.include_router(del_router, prefix="/reg")
 app.include_router(cs_router, prefix="/reg")
 app.include_router(sc_router, prefix="/reg")
 app.include_router(fin_router, prefix="/reg")
+app.include_router(kso_router, prefix="/reg")
 app.include_router(pages_router, prefix="/reg")
 
 

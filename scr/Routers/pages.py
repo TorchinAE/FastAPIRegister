@@ -5,6 +5,7 @@ from fastapi.responses import HTMLResponse, JSONResponse, RedirectResponse
 from fastapi.templating import Jinja2Templates
 from sqlalchemy.ext.asyncio import AsyncSession
 
+from scr.constants import KSO_PURPOSES
 from scr.dbase import (
     crud_counterparties,
     crud_directors,
@@ -277,6 +278,9 @@ async def request_detail_page(
     )
     invoices = await crud_invoices.get_invoices_by_request(session, req_id)
     payment_items = await crud_payments.ensure_payment_items(session, req_id)
+    # Строки порядка оплаты создаются при первом открытии — без commit они откатываются,
+    # и сохранение по их id возвращает 404
+    await session.commit()
     all_settings = await crud_settings.get_all_settings(session)
     settings_dict = {s.key: s.value for s in all_settings}
     probs_result = await session.execute(sa_select(Probability).order_by(Probability.id))
@@ -983,20 +987,10 @@ async def request_calc_page(
     adres_server = await crud_settings.get_setting(session, "adres_server") or ""
     tkp_template_folder = await crud_settings.get_setting(session, "tkp_template_folder") or ""
 
-    if adres_server and req.company:
-        year = req.request_date.year if req.request_date else 2025
-        slug = req.company.server_address_slug or "default"
-        org_name = (
-            (req.company.name or "Unknown")
-            .replace(" ", "_")
-            .replace('"', "")
-            .replace("'", "")
-            .replace("/", "_")
-            .replace("\\", "_")
-        )
-        folder_path = os.path.join(
-            adres_server, "01_\u0422\u041a\u041f", f"01_\u0422\u041a\u041f_{year}", slug, f"{req.id}_{org_name}"
-        )
+    from scr.dbase.crud_kso204 import tkp_folder_path
+
+    folder_path = tkp_folder_path(adres_server, req)
+    if folder_path:
         try:
             os.makedirs(folder_path, exist_ok=True)
             os.makedirs(
@@ -1184,6 +1178,7 @@ async def request_calc_page_by_section(
             "prices": prices,
             "multi": section in crud_module_types.MULTI_BLOCK_SECTIONS,
             "split_qty": section in crud_module_types.SPLIT_QTY_SECTIONS,
+            "purposes": KSO_PURPOSES,
             "works": section in crud_module_types.WORKS_SECTIONS,
             "active_page": "requests",
         },
@@ -1242,8 +1237,9 @@ async def units_page(
         return RedirectResponse("/reg/", status_code=302)
     from sqlalchemy import func, select
 
+    from scr.constants import DEFAULT_UNIT
     from scr.dbase import crud_units
-    from scr.dbase.models import DEFAULT_UNIT, Material
+    from scr.dbase.models import Material
 
     items = await crud_units.get_all(session)
     stmt = select(Material.unit, func.count(Material.id)).group_by(Material.unit)

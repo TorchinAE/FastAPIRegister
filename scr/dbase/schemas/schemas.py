@@ -230,6 +230,12 @@ class MaterialCreateSchema(BaseModel):
     date: Date | None = None
 
 
+class MaterialIdsSchema(BaseModel):
+    """Набор материалов (видимые на странице с учётом фильтров)"""
+
+    ids: list[int]
+
+
 class MaterialUpdateSchema(BaseModel):
     model_config = ConfigDict(from_attributes=True)
 
@@ -846,6 +852,7 @@ class RequestCalcUpdateSchema(BaseModel):
     qty_1sh: int | None = Field(None, ge=0)
     qty_2sh: int | None = Field(None, ge=0)
     works_cost: float | None = Field(None, ge=0)
+    purpose: str | None = Field(None, max_length=20)
 
 
 class RequestCalcItemCreateSchema(BaseModel):
@@ -889,6 +896,7 @@ class RequestCalcResponseSchema(BaseModel):
     qty_1sh: int = 0
     qty_2sh: int = 0
     works_cost: float = 0
+    purpose: str | None = None
 
 
 # --- Pagination ---

@@ -31,8 +31,10 @@ uv run alembic upgrade head                   # apply migrations
 ```
 main.py                     # App entrypoint, lifespan creates tables + seeds Probability defaults
 config.py                   # pydantic-settings reads .env (NAME_BASE, REG_SECRET_KEY, admin creds)
+xlsx_templates/КСО204.xlsx  # шаблон опросного листа КСО204 (заполняется scr/utils/kso204.py)
 seed.py                     # Standalone script to populate DB with test data
 scr/
+  constants.py              # константы приложения (новые константы — сюда)
   Routers/                  # All API routers mounted at /reg/api/...; page routes at /reg/...
     auth.py                 # /api/auth (register, login, logout, me)
     pages.py                # Jinja2 page routes
@@ -83,4 +85,6 @@ alembic/                    # Migrations
 - Pagination: list endpoints return `PaginatedResponse` with `items`, `total`, `page`, `per_page`, `pages`.
 - pytest `asyncio_mode = "auto"` — no need for `@pytest.mark.asyncio` decorator.
 - Tests use in-memory SQLite with `dependency_overrides` — no real DB needed.
+- Новые константы (списки значений, ключи настроек, коэффициенты по умолчанию) — в `scr/constants.py`.
+- КСО204: значения пишутся прямо в XML листов (`scr/utils/xlsx_patch.py`), не через openpyxl save — иначе теряются сводные, подключения и картинки.
 - Ruff ignores: `B008` (Depends in function args), `F401` (unused imports), `DTZ005` (datetime.utcnow).
