@@ -681,9 +681,7 @@ async function loadVariants() {
 loadVariants();
 
 function showWarnings(data) {
-    if (data.warnings && data.warnings.length) alert('Обратите внимание:
-' + data.warnings.join('
-'));
+    if (data.warnings && data.warnings.length) alert('Обратите внимание:\n' + data.warnings.join('\n'));
 }
 
 async function addVariant() {

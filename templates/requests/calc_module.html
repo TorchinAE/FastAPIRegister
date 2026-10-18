@@ -533,9 +533,7 @@ async function saveKso204() {
         const data = await resp.json().catch(() => ({}));
         if (!resp.ok) { showToast('Ошибка: ' + (data.detail || resp.status), 5000); return; }
         let msg = 'Сохранено: ' + data.path;
-        if (data.warnings.length) msg += '
-' + data.warnings.join('
-');
+        if (data.warnings.length) msg += '\n' + data.warnings.join('\n');
         showToast(msg, data.warnings.length ? 8000 : 4000);
     } finally {
         btn.disabled = false;
