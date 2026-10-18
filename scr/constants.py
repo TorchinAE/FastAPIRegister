@@ -26,3 +26,7 @@ DEFAULT_NOMINAL_CURRENTS = [16, 25, 40, 63, 100, 160, 250, 400, 630, 800, 1000, 
 DEFAULT_UNIT = "шт"
 DEFAULT_UNITS = [DEFAULT_UNIT, "кг", "м2", "пог.м."]
 DEFAULT_ACCURACY_CLASSES = ["0.2", "0.2S", "0.5", "0.5S", "1", "3", "5P", "10P"]
+
+# Ном. ток модуля из названия материала: «{число}A» (латинская или русская «А»), напр. «ВВ/TEL 1000A»
+NOM_TOK_IN_NAME_RE = r"(?<![\d.,])(\d+)\s*[AaАа](?![A-Za-zА-Яа-яЁё\d])"
+NOM_TOK_MAX = 7000

@@ -642,7 +642,6 @@ async def bulk_modules_for_materials(
 
     Модули, которые используются в других модулях или в расчётах ТКП, не удаляются.
     """
-    from scr.dbase.schemas.schemas import ModuleCreateSchema, ModuleItemCreateSchema
 
     changed, skipped = [], []
     for mat_id in data.ids:
@@ -651,8 +650,7 @@ async def bulk_modules_for_materials(
             continue
         existing_module = await crud_modules.get_module_by_name(session, mat.name)
         if create and not existing_module:
-            mod = await crud_modules.add_module(session, ModuleCreateSchema(name=mat.name))
-            await crud_modules.add_module_item(session, mod.id, ModuleItemCreateSchema(material_id=mat.id, quantity=1))
+            await crud_modules.add_module_from_material(session, mat)
             changed.append(mat.id)
         elif not create and existing_module:
             if await crud_modules.module_usage(session, existing_module.id):
@@ -706,7 +704,6 @@ async def toggle_module_for_material(
     session: AsyncSession = Depends(db_helper.session_dependency),
 ):
     from scr.dbase import crud_modules
-    from scr.dbase.schemas.schemas import ModuleCreateSchema, ModuleItemCreateSchema
 
     mat = await crud_materials.get_material_by_id(session, mat_id)
     if not mat:
@@ -718,7 +715,6 @@ async def toggle_module_for_material(
         await session.commit()
         return {"action": "removed", "module_id": None}
 
-    mod = await crud_modules.add_module(session, ModuleCreateSchema(name=mat.name))
-    await crud_modules.add_module_item(session, mod.id, ModuleItemCreateSchema(material_id=mat.id, quantity=1))
+    mod = await crud_modules.add_module_from_material(session, mat)
     await session.commit()
     return {"action": "created", "module_id": mod.id}

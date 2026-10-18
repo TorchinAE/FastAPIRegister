@@ -1,7 +1,10 @@
+import re
+
 from sqlalchemy import Result, delete, func, select
 from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy.orm import selectinload
 
+from scr.constants import NOM_TOK_IN_NAME_RE, NOM_TOK_MAX
 from scr.dbase.models import Module, ModuleItem
 from scr.dbase.schemas.schemas import ModuleCreateSchema, ModuleItemCreateSchema, ModuleUpdateSchema
 
@@ -73,6 +76,31 @@ async def add_module(session: AsyncSession, in_mod: ModuleCreateSchema, created_
     mod.created_by = created_by
     session.add(mod)
     await session.flush()
+    return mod
+
+
+def nom_tok_from_name(name: str) -> int | None:
+    """Ном. ток из названия: «… 1000A …» / «… 630 А …» → 1000 / 630; нет или вне диапазона — None."""
+    m = re.search(NOM_TOK_IN_NAME_RE, name or "")
+    if not m:
+        return None
+    value = int(m.group(1))
+    return value if 0 < value <= NOM_TOK_MAX else None
+
+
+async def add_module_from_material(session: AsyncSession, mat, created_by: str | None = None) -> Module:
+    """Модуль из одного материала: тип модуля — тип материала, ном. ток — из названия («{число}A»)."""
+    existing = await get_module_by_name(session, mat.name)
+    if existing:
+        return existing
+    mod = await add_module(session, ModuleCreateSchema(name=mat.name), created_by=created_by)
+    mod.material_type_id = mat.type_id
+    tok = nom_tok_from_name(mat.name)
+    if tok is not None:
+        mod.nom_tok, mod.nom_tok_manual = tok, True
+    else:
+        mod.nom_tok = mat.nom_tok or 0
+    await add_module_item(session, mod.id, ModuleItemCreateSchema(material_id=mat.id, quantity=1))
     return mod
 
 
