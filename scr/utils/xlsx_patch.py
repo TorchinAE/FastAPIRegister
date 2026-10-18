@@ -31,10 +31,11 @@ def _col_index(col: str) -> int:
 
 
 def _excel_serial(value: date | datetime) -> float:
+    epoch = date(1899, 12, 30)  # эпоха Excel
     if isinstance(value, datetime):
-        delta = value.replace(tzinfo=None) - datetime(1899, 12, 30)  # noqa: DTZ001 — эпоха Excel без пояса
-        return delta.days + delta.seconds / 86400
-    return float((value - date(1899, 12, 30)).days)
+        t = value.time()
+        return (value.date() - epoch).days + (t.hour * 3600 + t.minute * 60 + t.second) / 86400
+    return float((value - epoch).days)
 
 
 def _cell_xml(ref: str, style: str | None, value) -> str:
