@@ -247,3 +247,9 @@ async def test_kso204_export_and_variants(client, db_session, tkp_root):
 
     resp = await client.post(f"/reg/api/requests/{req_id}/variants/5/load", json={"save_current": False})
     assert resp.status_code == 404
+
+
+def test_slot_row_breaker():
+    # «Выключатель тип» — как подпись строки 18 на листе «КСО-204» (B18 + C18)
+    for name in ("Выключатель", "Выключатель тип", "выключатель  тип"):
+        assert kso204.slot_row(name) == 18
