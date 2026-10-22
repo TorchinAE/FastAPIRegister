@@ -763,6 +763,7 @@ async def export_tkp_kit_excel(req_id: int, session: AsyncSession = Depends(db_h
 
     from scr.dbase import crud_requests, crud_settings
     from scr.dbase.crud_tkp import build_tkp_kit
+    from scr.utils.declension import fio_dative, position_dative
     from scr.utils.tkp_excel import TkpData, TkpRow, build_tkp_xlsx
 
     req = await crud_requests.get_request_by_id(session, req_id)
@@ -803,8 +804,8 @@ async def export_tkp_kit_excel(req_id: int, session: AsyncSession = Depends(db_h
         number=f"{req.tkp_num or req.id} от {issued.strftime('%d.%m.%Y')}",
         incoming=req.incoming_letter_num or "",
         company=company.name if company else "",
-        position=director.position.name if director and director.position else "",
-        director=director.name if director else "",
+        position=position_dative(director.position.name) if director and director.position else "",
+        director=fio_dative(director.name) if director else "",
         rows=rows,
         nds_percent=float(nds_val) if nds_val else 20.0,
         payment=payment,

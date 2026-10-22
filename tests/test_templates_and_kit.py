@@ -293,3 +293,16 @@ async def test_mounting_cells(db_session):
     await s.flush()
     assert await crud_module_types.sync_mounting(s, req.id) == 5
     assert float(req.mounting_cost) == 500
+
+
+def test_dative():
+    from scr.utils.declension import fio_dative, position_dative
+
+    assert position_dative("Директор") == "Директору"
+    assert position_dative("Генеральный директор") == "Генеральному директору"
+    assert position_dative("Технический директор") == "Техническому директору"
+    assert position_dative("Управляющий") == "Управляющему"
+    assert position_dative("Руководитель") == "Руководителю"
+    assert position_dative("Директор филиала") == "Директору филиала"
+    assert fio_dative("Чистяков Федор Владимирович") == "Чистякову Федору Владимировичу"
+    assert fio_dative("Иванова Анна Сергеевна") == "Ивановой Анне Сергеевне"
