@@ -17,6 +17,7 @@ from scr.dbase.schemas.schemas import (
     ModuleUpdateSchema,
     PaginatedResponse,
 )
+from scr.utils.excel import MONEY_FMT
 
 mod_router = APIRouter(prefix="/api/modules", tags=["Modules"])
 
@@ -133,7 +134,7 @@ async def export_modules_excel(
     for mod in modules:
         ws1.append([mod.id, mod.name, mod.items_count, float(mod.total_price)])
         _style_row(ws1, ws1.max_row, 4)
-        ws1.cell(ws1.max_row, 4).number_format = "# ##0.00"
+        ws1.cell(ws1.max_row, 4).number_format = MONEY_FMT
     _auto_fit_columns(ws1)
 
     ws2 = wb.create_sheet("Состав")
@@ -247,7 +248,7 @@ async def export_module_excel(mod_id: int, session: AsyncSession = Depends(db_he
 
     from openpyxl.styles import Font
 
-    from scr.utils.excel import MONEY_FMT, auto_fit_columns, border_row, safe_filename, write_header, xlsx_response
+    from scr.utils.excel import auto_fit_columns, border_row, safe_filename, write_header, xlsx_response
 
     mod = await crud_modules.get_module_by_id(session=session, mod_id=mod_id)
     if not mod:

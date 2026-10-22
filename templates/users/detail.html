@@ -34,6 +34,7 @@
         </div>
         <div class="actions">
             <button type="submit" class="btn btn-primary">Сохранить</button>
+            <button type="button" class="btn btn-ghost" id="resetPwdBtn" onclick="resetPassword()" title="Отправить на {{ target.email }} письмо со ссылкой для ввода нового пароля">Сбросить пароль</button>
             <button type="button" class="btn btn-danger" onclick="openDeleteModal()" style="margin-left:auto;">Удалить</button>
         </div>
     </form>
@@ -88,11 +89,25 @@ document.getElementById('editUserForm').addEventListener('submit', async functio
     }
 });
 
-function showToast(msg) {
+async function resetPassword() {
+    if (!confirm('Отправить на {{ target.email }} письмо со ссылкой для сброса пароля?')) return;
+    const btn = document.getElementById('resetPwdBtn');
+    btn.disabled = true;
+    try {
+        const resp = await fetch('/reg/api/users/{{ target.id }}/reset-password', {method: 'POST'});
+        const data = await resp.json().catch(() => ({}));
+        showToast(resp.ok ? data.message : 'Ошибка: ' + (data.detail || resp.status), 5000);
+    } finally {
+        btn.disabled = false;
+    }
+}
+
+function showToast(msg, ms = 2500) {
     const t = document.getElementById('toast');
     t.textContent = msg;
     t.style.display = 'block';
-    setTimeout(() => t.style.display = 'none', 2500);
+    clearTimeout(showToast.timer);
+    showToast.timer = setTimeout(() => t.style.display = 'none', ms);
 }
 
 function openDeleteModal() {

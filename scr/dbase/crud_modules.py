@@ -288,3 +288,77 @@ async def fill_material_types(session: AsyncSession) -> None:
         if len(found) == 1:
             mod.material_type_id = next(iter(found))
     await session.flush()
+
+
+# ── Характеристики модулей (из материалов состава) для фильтров и сортировки ──
+
+MODULE_FLAGS = ("stats", "vtych", "vykat", "ruchn", "el_priv")
+
+
+async def get_module_attrs(session: AsyncSession) -> dict[int, dict]:
+    """{module_id: {voltage, accuracy_class, stats, vtych, vykat, ruchn, el_priv}} по материалам состава.
+
+    Учитываются материалы с подмодулями; если среди них есть материалы типа самого модуля — только они
+    (у выключателя — свойства выключателя, а не крепежа). Напряжение и класс точности — уникальные значения
+    через запятую, признаки — есть хотя бы у одного материала.
+    """
+    from scr.dbase.models import Material
+
+    tree, _ = await load_tree(session)
+    mat_rows = await session.execute(
+        select(
+            Material.id,
+            Material.type_id,
+            Material.voltage,
+            Material.accuracy_class,
+            *(getattr(Material, f) for f in MODULE_FLAGS),
+        )
+    )
+    materials = {row[0]: row for row in mat_rows.all()}
+    module_types = dict((await session.execute(select(Module.id, Module.material_type_id))).all())
+
+    def collect(module_id: int, acc: set[int], stack: frozenset) -> None:
+        if module_id in stack:
+            return
+        for material_id, sub_module_id, _qty in tree.get(module_id, []):
+            if material_id is not None:
+                acc.add(material_id)
+            elif sub_module_id is not None:
+                collect(sub_module_id, acc, stack | {module_id})
+
+    attrs: dict[int, dict] = {}
+    for module_id, type_id in module_types.items():
+        ids: set[int] = set()
+        collect(module_id, ids, frozenset())
+        rows = [materials[i] for i in ids if i in materials]
+        own = [r for r in rows if type_id is not None and r[1] == type_id]
+        rows = own or rows
+        data = {
+            "voltage": ", ".join(sorted({r[2] for r in rows if r[2]})),
+            "accuracy_class": ", ".join(sorted({r[3] for r in rows if r[3]})),
+        }
+        for i, flag in enumerate(MODULE_FLAGS):
+            data[flag] = any(r[4 + i] for r in rows)
+        attrs[module_id] = data
+    return attrs
+
+
+async def sort_modules(session: AsyncSession, modules: list[Module], attrs: dict[int, dict] | None = None) -> list:
+    """Порядок модулей: ном. ток, класс точности (по справочнику), название."""
+    from scr.dbase.models import AccuracyClass
+
+    if attrs is None:
+        attrs = await get_module_attrs(session)
+    order = {
+        name: i
+        for i, name in enumerate(
+            (await session.execute(select(AccuracyClass.name).order_by(AccuracyClass.id))).scalars().all()
+        )
+    }
+
+    def key(m: Module):
+        acc = attrs.get(m.id, {}).get("accuracy_class", "")
+        first = acc.split(", ")[0] if acc else ""
+        return (m.nom_tok or 0, first != "", order.get(first, len(order)), first, m.name.lower())
+
+    return sorted(modules, key=key)

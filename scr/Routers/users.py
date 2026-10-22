@@ -1,4 +1,4 @@
-from fastapi import APIRouter, Depends, HTTPException
+from fastapi import APIRouter, Depends, HTTPException, Request
 from pydantic import BaseModel, ConfigDict
 from sqlalchemy import update
 from sqlalchemy.ext.asyncio import AsyncSession
@@ -18,9 +18,9 @@ from scr.dbase.models import (
     Organization,
     PaymentItem,
     Positions,
-    Request,
     User,
 )
+from scr.dbase.models import Request as RequestModel
 
 users_router = APIRouter(prefix="/api/users", tags=["Users"])
 
@@ -47,6 +47,31 @@ async def update_user(
     return {"ok": True}
 
 
+@users_router.post("/{user_id}/reset-password")
+async def reset_password(
+    user_id: int,
+    request: Request,
+    session: AsyncSession = Depends(db_helper.session_dependency),
+):
+    """Письмо пользователю со ссылкой на страницу ввода нового пароля. Только для вошедших пользователей."""
+    from scr.constants import PASSWORD_RESET_TTL_HOURS
+    from scr.Routers.auth import SESSION_KEY
+    from scr.utils.email import send_password_reset
+
+    email = request.cookies.get(SESSION_KEY)
+    if not email or not await crud_users.get_user_by_email(session, email):
+        raise HTTPException(status_code=401, detail="Не авторизован")
+    target = await crud_users.get_user_by_id(session, user_id)
+    if not target:
+        raise HTTPException(status_code=404, detail="Пользователь не найден")
+    token = crud_users.make_reset_token(target, PASSWORD_RESET_TTL_HOURS)
+    link = f"{str(request.base_url).rstrip('/')}/reg/reset-password?token={token}"
+    error = await send_password_reset(session, target.email, target.name, link, PASSWORD_RESET_TTL_HOURS)
+    if error:
+        raise HTTPException(status_code=502, detail=error)
+    return {"message": f"Письмо со ссылкой для сброса пароля отправлено на {target.email}"}
+
+
 @users_router.delete("/{user_id}")
 async def delete_user(
     user_id: int,
@@ -63,7 +88,7 @@ async def delete_user(
         raise HTTPException(status_code=400, detail="Нельзя переназначить на того же пользователя")
 
     # Reassign Request.manager_id (NOT NULL)
-    await session.execute(update(Request).where(Request.manager_id == user_id).values(manager_id=reassign_to))
+    await session.execute(update(RequestModel).where(RequestModel.manager_id == user_id).values(manager_id=reassign_to))
     # NULL out changed_by_id on all tables that have it
     for model in [
         Organization,

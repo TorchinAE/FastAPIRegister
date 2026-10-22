@@ -21,7 +21,7 @@
     </div>
     {% if mt %}
     <div style="display:flex;gap:0.5rem;flex-wrap:wrap;">
-        <a href="/reg/module-types-calc/{{ mt.id }}/defaults" class="btn btn-ghost">Модули по умолчанию: {{ mt.name }}</a>
+        <a href="/reg/module-types-calc/{{ mt.id }}/defaults" class="btn btn-ghost">Шаблоны по умолчанию: {{ mt.name }}</a>
     </div>
     {% endif %}
 </div>
@@ -39,6 +39,10 @@
             <label>Название строки</label>
             <input type="text" id="newName" required maxlength="200" style="width:100%;">
         </div>
+        <div class="form-group" style="flex:1;min-width:220px;margin-bottom:0;">
+            <label>Назначение (в комплектацию ТКП)</label>
+            <input type="text" id="newPurpose" maxlength="100" placeholder="напр. Вакуумный выключатель" style="width:100%;">
+        </div>
         <label style="display:flex;gap:0.4rem;align-items:center;height:38px;margin:0;">
             <input type="checkbox" id="newHidden"> Не отображать в расчёте
         </label>
@@ -52,6 +56,7 @@
             <tr>
                 <th style="width:40px">№</th>
                 <th>Название строки</th>
+                <th title="Подпись модуля строки в комплектации ТКП: «Назначение: модуль»">Назначение</th>
                 <th>Типы модулей</th>
                 <th title="Не отображать в расчёте, но учитывать в стоимости">Не отображать</th>
                 <th style="width:90px">Порядок</th>
@@ -90,7 +95,7 @@ function typesSummary(slot) {
 function render() {
     const body = document.getElementById('slotsBody');
     if (!slots.length) {
-        body.innerHTML = '<tr><td colspan="6" style="text-align:center;color:var(--text-muted);padding:1.5rem;">Нет обязательных строк</td></tr>';
+        body.innerHTML = '<tr><td colspan="7" style="text-align:center;color:var(--text-muted);padding:1.5rem;">Нет обязательных строк</td></tr>';
         return;
     }
     body.innerHTML = '';
@@ -100,6 +105,7 @@ function render() {
         tr.innerHTML = `
             <td>${i + 1}</td>
             <td><input type="text" class="cell-input f-name" value="${esc(slot.name)}" maxlength="200" style="width:100%;min-width:180px;"></td>
+            <td><input type="text" class="cell-input f-purpose" value="${esc(slot.purpose)}" maxlength="100" style="width:100%;min-width:160px;" placeholder="—"></td>
             <td>
                 <details class="slot-types">
                     <summary title="${esc(slot.type_names.join(', '))}">${typesSummary(slot)}</summary>
@@ -120,6 +126,7 @@ function render() {
             if (!name) { e.target.value = slot.name; showToast('Название не может быть пустым'); return; }
             patch(slot, {name});
         });
+        tr.querySelector('.f-purpose').addEventListener('change', e => patch(slot, {purpose: e.target.value.trim() || null}));
         tr.querySelector('.f-hidden').addEventListener('change', e => patch(slot, {hidden: e.target.checked}));
         const details = tr.querySelector('.slot-types');
         details.addEventListener('toggle', () => {
@@ -182,10 +189,16 @@ document.getElementById('addForm').addEventListener('submit', async e => {
     const resp = await fetch('/reg/api/module-types/' + typeId + '/slots', {
         method: 'POST',
         headers: {'Content-Type': 'application/json'},
-        body: JSON.stringify({module_type_id: typeId, name, hidden: document.getElementById('newHidden').checked}),
+        body: JSON.stringify({
+            module_type_id: typeId,
+            name,
+            hidden: document.getElementById('newHidden').checked,
+            purpose: document.getElementById('newPurpose').value.trim() || null,
+        }),
     });
     if (resp.ok) {
         document.getElementById('newName').value = '';
+        document.getElementById('newPurpose').value = '';
         document.getElementById('newHidden').checked = false;
         reload();
         showToast('Строка добавлена');

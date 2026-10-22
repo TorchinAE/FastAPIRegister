@@ -196,6 +196,8 @@ class MaterialTypeUpdateSchema(BaseModel):
 
     id: int
     name: str | None = None
+    # Только #rrggbb: значение выводится в style
+    color: str | None = Field(None, pattern=r"^#[0-9a-fA-F]{6}$")
 
 
 class MaterialTypeResponseSchema(BaseModel):
@@ -203,6 +205,7 @@ class MaterialTypeResponseSchema(BaseModel):
 
     id: int
     name: str
+    color: str | None = None
     created_by: str | None = None
 
 
@@ -812,6 +815,7 @@ class ModuleTypeSlotCreateSchema(BaseModel):
     name: str = Field(..., min_length=1, max_length=200)
     hidden: bool = False
     material_type_ids: list[int] = []
+    purpose: str | None = Field(None, max_length=100)
 
 
 class ModuleTypeSlotUpdateSchema(BaseModel):
@@ -820,12 +824,32 @@ class ModuleTypeSlotUpdateSchema(BaseModel):
     name: str | None = Field(None, max_length=200)
     hidden: bool | None = None
     material_type_ids: list[int] | None = None
+    purpose: str | None = Field(None, max_length=100)
 
 
 class SlotModuleSchema(BaseModel):
     """Модуль обязательной строки; module_id=None — строка пустая"""
 
     module_id: int | None = None
+    quantity: int = Field(1, ge=1)
+    # Шаблон блока («по умолчанию»); None — основной шаблон раздела
+    template_id: int | None = None
+
+
+class ModuleTypeTemplateCreateSchema(BaseModel):
+    name: str = Field(..., min_length=1, max_length=200)
+    purpose: str | None = Field(None, max_length=20)
+    # Скопировать модули из шаблона
+    copy_from: int | None = None
+
+
+class ModuleTypeTemplateUpdateSchema(BaseModel):
+    name: str | None = Field(None, max_length=200)
+    purpose: str | None = Field(None, max_length=20)
+
+
+class TemplateItemCreateSchema(BaseModel):
+    module_id: int
     quantity: int = Field(1, ge=1)
 
 
@@ -837,6 +861,8 @@ class RequestCalcCreateSchema(BaseModel):
 
     request_id: int
     module_type_id: int
+    # Шаблон нового блока; None — основной шаблон раздела
+    template_id: int | None = None
 
 
 class RequestCalcUpdateSchema(BaseModel):
@@ -853,6 +879,7 @@ class RequestCalcUpdateSchema(BaseModel):
     qty_2sh: int | None = Field(None, ge=0)
     works_cost: float | None = Field(None, ge=0)
     purpose: str | None = Field(None, max_length=20)
+    name: str | None = Field(None, max_length=200)
 
 
 class RequestCalcItemCreateSchema(BaseModel):
@@ -897,6 +924,7 @@ class RequestCalcResponseSchema(BaseModel):
     qty_2sh: int = 0
     works_cost: float = 0
     purpose: str | None = None
+    name: str | None = None
 
 
 # --- Pagination ---

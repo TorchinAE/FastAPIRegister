@@ -363,3 +363,23 @@ form { background: var(--surface); padding: 1.5rem; border-radius: var(--radius)
 .tkp-num-wrap .btn { flex-shrink: 0; white-space: nowrap; }
 .variant-buttons { display: flex; gap: 0.3rem; flex-wrap: wrap; }
 .variant-buttons .btn { min-width: 2.2em; justify-content: center; }
+
+/* Расчёт: цвет типа материала модуля — полоса слева у строки */
+.calc-item { border-left-width: 4px; }
+/* Фильтр модулей в выпадающих списках расчёта */
+.mp-bar { display: flex; flex-wrap: wrap; align-items: flex-end; gap: 0.5rem 0.75rem; padding: 0.6rem 0.9rem; margin-bottom: 0.75rem; }
+.mp-title { font-size: 0.8rem; font-weight: 600; color: var(--text-muted); align-self: center; }
+.mp-filter { display: flex; flex-direction: column; gap: 0.1rem; margin: 0; }
+.mp-filter span { font-size: 0.68rem; font-weight: 600; color: var(--text-muted); }
+.mp-filter select { padding: 0.2rem 0.3rem; font-size: 0.8rem; border: 1px solid var(--border); border-radius: 4px; min-width: 3.5rem; }
+.mp-filter select.active { border-color: var(--sidebar-active); box-shadow: 0 0 0 1px var(--sidebar-active); }
+.mp-legend { display: flex; flex-wrap: wrap; gap: 0.3rem; margin-left: auto; align-self: center; }
+.mp-chip { font-size: 0.7rem; padding: 0.1rem 0.45rem; border-radius: 999px; border: 1px solid rgba(0,0,0,0.12); }
+/* Добавление блока: выбор шаблона */
+.calc-block-add-wrap { position: relative; flex: 0 0 110px; display: flex; }
+.calc-block-add-wrap .calc-block-add { flex: 1; }
+.calc-template-menu { position: fixed; z-index: 50; min-width: 220px; max-height: 60vh; overflow-y: auto; background: var(--surface); border: 1px solid var(--border); border-radius: var(--radius); box-shadow: var(--shadow-md); padding: 0.35rem; display: flex; flex-direction: column; gap: 0.15rem; }
+.calc-template-menu[hidden] { display: none; }
+.calc-template-menu-title { font-size: 0.72rem; font-weight: 600; color: var(--text-muted); padding: 0.2rem 0.4rem; }
+.calc-template-option { text-align: left; border: none; background: transparent; padding: 0.4rem 0.5rem; border-radius: 6px; cursor: pointer; font-size: 0.85rem; color: var(--text); }
+.calc-template-option:hover { background: rgba(79, 70, 229, 0.08); color: var(--sidebar-active); }

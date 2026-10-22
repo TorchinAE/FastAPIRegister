@@ -13,7 +13,7 @@
 </div>
 
 <div class="table-wrap">
-    <table id="invoicesTable">
+    <table id="invoicesTable" data-filter-table data-per-page="{{ per_page }}">
         <thead>
             <tr>
                 <th>ID</th>
@@ -62,39 +62,14 @@
     </table>
 </div>
 
-{% if pages > 1 %}
-<div class="pagination">
-    {% for p in range(1, pages + 1) %}
-    <a href="/reg/invoices?page={{ p }}" class="{{ 'active' if p == page else '' }}">{{ p }}</a>
-    {% endfor %}
-</div>
-{% endif %}
 
 <script src="https://cdnjs.cloudflare.com/ajax/libs/exceljs/4.4.0/exceljs.min.js"></script>
 <script src="https://cdnjs.cloudflare.com/ajax/libs/FileSaver.js/2.0.5/FileSaver.min.js"></script>
 <script>
 const filterInputs = document.querySelectorAll('#invoicesTable .table-filter .tf-input');
 
-// Строка видна, если подходит под все фильтры
-function applyFilters() {
-    const filters = [];
-    filterInputs.forEach(inp => {
-        const val = inp.value.toLowerCase().trim();
-        if (val) filters.push({col: parseInt(inp.dataset.col), val});
-    });
-    document.querySelectorAll('#invoicesTable tbody tr:not(.empty-row)').forEach(row => {
-        const show = filters.every(f => {
-            const cell = row.cells[f.col];
-            return cell && cell.textContent.toLowerCase().includes(f.val);
-        });
-        row.style.display = show ? '' : 'none';
-    });
-}
-filterInputs.forEach(input => input.addEventListener('input', applyFilters));
-
 function resetFilters() {
-    filterInputs.forEach(inp => { inp.value = ''; });
-    applyFilters();
+    document.getElementById('invoicesTable').tableFilter.reset();
 }
 
 function activeFiltersText() {
@@ -110,7 +85,7 @@ async function exportInvoicesExcel() {
     const headers = Array.from(document.querySelectorAll('#invoicesTable thead tr:first-child th')).map(th => th.textContent.trim());
     const rows = [];
     document.querySelectorAll('#invoicesTable tbody tr:not(.empty-row)').forEach(tr => {
-        if (tr.style.display === 'none') return;
+        if (tr.dataset.matched === '0') return;
         rows.push(Array.from(tr.cells).map(td => {
             const v = td.textContent.trim().replace(/\s+/g, ' ');
             return v === '-' ? '' : v;

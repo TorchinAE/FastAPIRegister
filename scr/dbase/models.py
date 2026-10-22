@@ -307,6 +307,8 @@ class Setting(Base):
 class MaterialType(BaseID):
     __tablename__ = "material_types"
     name: Mapped[str] = mapped_column(String(20), nullable=False)
+    # Цвет подсветки модулей этого типа на страницах расчёта (#rrggbb), None — без подсветки
+    color: Mapped[str | None] = mapped_column(String(20), nullable=True)
 
     def __repr__(self) -> str:
         return f"MaterialType(id={self.id}, name='{self.name}')"
@@ -473,6 +475,11 @@ class ModuleType(BaseID):
     defaults: Mapped[list["ModuleTypeDefault"]] = relationship(
         back_populates="module_type", cascade="all, delete-orphan"
     )
+    templates: Mapped[list["ModuleTypeTemplate"]] = relationship(
+        back_populates="module_type",
+        cascade="all, delete-orphan",
+        order_by="(ModuleTypeTemplate.sort_order, ModuleTypeTemplate.id)",
+    )
     slots: Mapped[list["ModuleTypeSlot"]] = relationship(
         back_populates="module_type", cascade="all, delete-orphan", order_by="ModuleTypeSlot.sort_order"
     )
@@ -500,6 +507,8 @@ class ModuleTypeSlot(Base):
     sort_order: Mapped[int] = mapped_column(Integer, default=0, nullable=False)
     # Не отображать в расчёте (модуль всегда берётся из «по умолчанию»), но учитывать в стоимости
     hidden: Mapped[bool] = mapped_column(default=False, server_default="0", nullable=False)
+    # Назначение — подпись модуля строки в комплектации ТКП: «Вакуумный выключатель: ESQ ВВ(F)-12-25/1250»
+    purpose: Mapped[str | None] = mapped_column(String(100), nullable=True)
 
     module_type: Mapped["ModuleType"] = relationship(back_populates="slots")
     material_types: Mapped[list["MaterialType"]] = relationship(
@@ -507,9 +516,27 @@ class ModuleTypeSlot(Base):
     )
 
 
+class ModuleTypeTemplate(Base):
+    """Шаблон блока раздела («по умолчанию»): из него создаётся новый блок расчёта"""
+
+    __tablename__ = "module_type_templates"
+
+    id: Mapped[int] = mapped_column(primary_key=True)
+    module_type_id: Mapped[int] = mapped_column(ForeignKey("module_types_calc.id", ondelete="CASCADE"), nullable=False)
+    # Название шаблона — название нового блока (в комплектации ТКП: «КСО-204м сх7.1ВВ-Ввод»)
+    name: Mapped[str] = mapped_column(String(200), nullable=False)
+    purpose: Mapped[str | None] = mapped_column(String(20), nullable=True)
+    sort_order: Mapped[int] = mapped_column(Integer, default=0, nullable=False)
+
+    module_type: Mapped["ModuleType"] = relationship(back_populates="templates")
+    defaults: Mapped[list["ModuleTypeDefault"]] = relationship(
+        back_populates="template", cascade="all, delete-orphan", order_by="ModuleTypeDefault.id"
+    )
+
+
 class ModuleTypeDefault(Base):
     __tablename__ = "module_type_defaults"
-    __table_args__ = (UniqueConstraint("slot_id", name="uq_modtype_default_slot"),)
+    __table_args__ = (UniqueConstraint("template_id", "slot_id", name="uq_modtype_default_tpl_slot"),)
 
     id: Mapped[int] = mapped_column(primary_key=True)
     module_type_id: Mapped[int] = mapped_column(ForeignKey("module_types_calc.id", ondelete="CASCADE"), nullable=False)
@@ -517,10 +544,15 @@ class ModuleTypeDefault(Base):
     quantity: Mapped[int] = mapped_column(Integer, default=1, nullable=False)
     # Обязательная строка; None — обычный модуль по умолчанию
     slot_id: Mapped[int | None] = mapped_column(ForeignKey("module_type_slots.id", ondelete="SET NULL"), nullable=True)
+    # Шаблон блока; None — старые записи до шаблонов (переносятся в основной шаблон раздела)
+    template_id: Mapped[int | None] = mapped_column(
+        ForeignKey("module_type_templates.id", ondelete="CASCADE"), nullable=True
+    )
 
     module_type: Mapped["ModuleType"] = relationship(back_populates="defaults")
     module: Mapped["Module"] = relationship(foreign_keys=[module_id])
     slot: Mapped[Optional["ModuleTypeSlot"]] = relationship(foreign_keys=[slot_id])
+    template: Mapped[Optional["ModuleTypeTemplate"]] = relationship(back_populates="defaults")
 
 
 class RequestCalc(BaseID):
@@ -537,8 +569,13 @@ class RequestCalc(BaseID):
     # КСО: количество на 1-й и 2-й секции шин; quantity = qty_1sh + qty_2sh
     qty_1sh: Mapped[int] = mapped_column(Integer, default=0, server_default="0", nullable=False)
     qty_2sh: Mapped[int] = mapped_column(Integer, default=0, server_default="0", nullable=False)
-    # КСО: назначение камеры (Линия, Ввод, ТСН, ТН, СВ, СР) — в опросный лист КСО204
+    # Назначение блока: КСО — в опросный лист КСО204, ЩО — Ввод, Секционная, ...
     purpose: Mapped[str | None] = mapped_column(String(20), nullable=True)
+    # Название блока (из шаблона) — в комплектации ТКП: «{название}-{назначение}»
+    name: Mapped[str | None] = mapped_column(String(200), nullable=True)
+    template_id: Mapped[int | None] = mapped_column(
+        ForeignKey("module_type_templates.id", ondelete="SET NULL"), nullable=True
+    )
     # Себестоимость работ (Шеф-инженер, СМР, ПНР) — вместо модулей
     works_cost: Mapped[float] = mapped_column(Numeric(12, 2), default=0, server_default="0", nullable=False)
 

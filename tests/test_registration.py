@@ -23,7 +23,7 @@ async def test_register_invalid_domain(client):
             json={"name": "Чужак", "email": "user@other.com", "password": "123456"},
         )
         assert response.status_code == 400
-        assert "домена" in response.json()["detail"].lower()
+        assert "не допустима" in response.json()["detail"]
 
 
 @pytest.mark.asyncio
@@ -64,4 +64,4 @@ async def test_register_page_submit_invalid_domain(client):
             follow_redirects=False,
         )
         assert response.status_code == 200
-        assert "домена" in response.text.lower()
+        assert "Регистрация не допустима" in response.text

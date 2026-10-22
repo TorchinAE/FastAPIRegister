@@ -5,7 +5,7 @@ from fastapi.responses import HTMLResponse, JSONResponse, RedirectResponse
 from fastapi.templating import Jinja2Templates
 from sqlalchemy.ext.asyncio import AsyncSession
 
-from scr.constants import KSO_PURPOSES
+from scr.constants import LIST_ALL_ROWS, PASSWORD_MIN_LENGTH, REGISTRATION_DENIED_MSG, SECTION_PURPOSES
 from scr.dbase import (
     crud_counterparties,
     crud_directors,
@@ -114,7 +114,7 @@ async def register_submit(
                 "register.html",
                 {
                     "request": request,
-                    "error": f"Регистрация только с домена @{app_settings.MY_DOMEN}",
+                    "error": REGISTRATION_DENIED_MSG,
                     "user": None,
                     "my_domen": app_settings.MY_DOMEN,
                 },
@@ -129,6 +129,48 @@ async def register_submit(
     return response
 
 
+@pages_router.get("/reset-password", response_class=HTMLResponse)
+async def reset_password_page(
+    request: Request,
+    token: str = "",
+    session: AsyncSession = Depends(db_helper.session_dependency),
+):
+    """Ввод нового пароля по ссылке из письма."""
+    target = await crud_users.get_user_by_reset_token(session, token)
+    context = {"request": request, "user": None, "token": token, "min_length": PASSWORD_MIN_LENGTH}
+    if not target:
+        context["invalid"] = True
+    else:
+        context["email"] = target.email
+    return templates.TemplateResponse("reset_password.html", context)
+
+
+@pages_router.post("/reset-password", response_class=HTMLResponse)
+async def reset_password_submit(
+    request: Request,
+    token: str = Form(""),
+    password: str = Form(""),
+    password2: str = Form(""),
+    session: AsyncSession = Depends(db_helper.session_dependency),
+):
+    target = await crud_users.get_user_by_reset_token(session, token)
+    context = {"request": request, "user": None, "token": token, "min_length": PASSWORD_MIN_LENGTH}
+    if not target:
+        context["invalid"] = True
+        return templates.TemplateResponse("reset_password.html", context)
+    context["email"] = target.email
+    if len(password) < PASSWORD_MIN_LENGTH:
+        context["error"] = f"Пароль — не короче {PASSWORD_MIN_LENGTH} символов"
+    elif password != password2:
+        context["error"] = "Пароли не совпадают"
+    if "error" in context:
+        return templates.TemplateResponse("reset_password.html", context)
+    await crud_users.set_password(session, target, password)
+    await session.commit()
+    context["done"] = True
+    return templates.TemplateResponse("reset_password.html", context)
+
+
 @pages_router.get("/logout")
 async def logout():
     response = RedirectResponse("/reg/", status_code=302)
@@ -140,15 +182,13 @@ async def logout():
 @pages_router.get("/requests", response_class=HTMLResponse)
 async def requests_page(
     request: Request,
-    page: int = 1,
     session: AsyncSession = Depends(db_helper.session_dependency),
 ):
     user = await get_current_user(request, session)
     if not user:
         return RedirectResponse("/reg/", status_code=302)
     per_page = await _get_per_page(session)
-    requests_list, total = await crud_requests.get_requests(session, page=page, per_page=per_page)
-    pages = (total + per_page - 1) // per_page
+    requests_list, total = await crud_requests.get_requests(session, page=1, per_page=LIST_ALL_ROWS)
 
     # Load contract specs for the current page's requests
     from sqlalchemy import select as sa_select
@@ -173,8 +213,7 @@ async def requests_page(
             "request": request,
             "user": user,
             "items": requests_list,
-            "page": page,
-            "pages": pages,
+            "per_page": per_page,
             "total": total,
             "statuses": RequestStatus,
             "active_page": "requests",
@@ -362,14 +401,13 @@ async def request_edit_submit(
 @pages_router.get("/counterparties", response_class=HTMLResponse)
 async def counterparties_page(
     request: Request,
-    page: int = 1,
     session: AsyncSession = Depends(db_helper.session_dependency),
 ):
     user = await get_current_user(request, session)
     if not user:
         return RedirectResponse("/reg/", status_code=302)
     per_page = await _get_per_page(session)
-    items, total = await crud_counterparties.get_counterparties(session, page=page, per_page=per_page)
+    items, total = await crud_counterparties.get_counterparties(session, page=1, per_page=LIST_ALL_ROWS)
     companies, _ = await crud_organizations.get_organizations(session, per_page=100)
     return templates.TemplateResponse(
         "counterparties/list.html",
@@ -378,8 +416,7 @@ async def counterparties_page(
             "user": user,
             "items": items,
             "companies": companies,
-            "page": page,
-            "pages": (total + per_page - 1) // per_page,
+            "per_page": per_page,
             "total": total,
             "active_page": "counterparties",
             "statuses": RequestStatus,
@@ -462,14 +499,13 @@ async def counterparties_delete(
 @pages_router.get("/companies", response_class=HTMLResponse)
 async def companies_page(
     request: Request,
-    page: int = 1,
     session: AsyncSession = Depends(db_helper.session_dependency),
 ):
     user = await get_current_user(request, session)
     if not user:
         return RedirectResponse("/reg/", status_code=302)
     per_page = await _get_per_page(session)
-    items, total = await crud_organizations.get_organizations(session, page=page, per_page=per_page)
+    items, total = await crud_organizations.get_organizations(session, page=1, per_page=LIST_ALL_ROWS)
     directors, _ = await crud_directors.get_dirs(session, per_page=100)
     return templates.TemplateResponse(
         "companies/list.html",
@@ -478,8 +514,7 @@ async def companies_page(
             "user": user,
             "items": items,
             "directors": directors,
-            "page": page,
-            "pages": (total + per_page - 1) // per_page,
+            "per_page": per_page,
             "total": total,
             "active_page": "companies",
         },
@@ -560,22 +595,20 @@ async def companies_edit_page(
 @pages_router.get("/users", response_class=HTMLResponse)
 async def users_page(
     request: Request,
-    page: int = 1,
     session: AsyncSession = Depends(db_helper.session_dependency),
 ):
     user = await get_current_user(request, session)
     if not user:
         return RedirectResponse("/reg/", status_code=302)
     per_page = await _get_per_page(session)
-    items, total = await crud_users.get_users(session, page=page, per_page=per_page)
+    items, total = await crud_users.get_users(session, page=1, per_page=LIST_ALL_ROWS)
     return templates.TemplateResponse(
         "users/list.html",
         {
             "request": request,
             "user": user,
             "items": items,
-            "page": page,
-            "pages": (total + per_page - 1) // per_page,
+            "per_page": per_page,
             "total": total,
             "active_page": "users",
         },
@@ -644,14 +677,13 @@ async def users_detail_page(
 @pages_router.get("/directors", response_class=HTMLResponse)
 async def directors_page(
     request: Request,
-    page: int = 1,
     session: AsyncSession = Depends(db_helper.session_dependency),
 ):
     user = await get_current_user(request, session)
     if not user:
         return RedirectResponse("/reg/", status_code=302)
     per_page = await _get_per_page(session)
-    items, total = await crud_directors.get_dirs(session, page=page, per_page=per_page)
+    items, total = await crud_directors.get_dirs(session, page=1, per_page=LIST_ALL_ROWS)
     positions, _ = await crud_positions.get_all_positions(session, per_page=100)
     return templates.TemplateResponse(
         "directors/list.html",
@@ -660,8 +692,7 @@ async def directors_page(
             "user": user,
             "items": items,
             "positions": positions,
-            "page": page,
-            "pages": (total + per_page - 1) // per_page,
+            "per_page": per_page,
             "total": total,
             "active_page": "directors",
         },
@@ -755,22 +786,20 @@ async def directors_delete(
 @pages_router.get("/positions", response_class=HTMLResponse)
 async def positions_page(
     request: Request,
-    page: int = 1,
     session: AsyncSession = Depends(db_helper.session_dependency),
 ):
     user = await get_current_user(request, session)
     if not user:
         return RedirectResponse("/reg/", status_code=302)
     per_page = await _get_per_page(session)
-    items, total = await crud_positions.get_all_positions(session, page=page, per_page=per_page)
+    items, total = await crud_positions.get_all_positions(session, page=1, per_page=LIST_ALL_ROWS)
     return templates.TemplateResponse(
         "positions/list.html",
         {
             "request": request,
             "user": user,
             "items": items,
-            "page": page,
-            "pages": (total + per_page - 1) // per_page,
+            "per_page": per_page,
             "total": total,
             "active_page": "positions",
         },
@@ -818,22 +847,20 @@ async def positions_detail_page(
 @pages_router.get("/equipment", response_class=HTMLResponse)
 async def equipment_page(
     request: Request,
-    page: int = 1,
     session: AsyncSession = Depends(db_helper.session_dependency),
 ):
     user = await get_current_user(request, session)
     if not user:
         return RedirectResponse("/reg/", status_code=302)
     per_page = await _get_per_page(session)
-    items, total = await crud_equipment.get_equipment_list(session, page=page, per_page=per_page)
+    items, total = await crud_equipment.get_equipment_list(session, page=1, per_page=LIST_ALL_ROWS)
     return templates.TemplateResponse(
         "equipment/list.html",
         {
             "request": request,
             "user": user,
             "items": items,
-            "page": page,
-            "pages": (total + per_page - 1) // per_page,
+            "per_page": per_page,
             "total": total,
             "active_page": "equipment",
         },
@@ -922,7 +949,6 @@ async def settings_page(
 @pages_router.get("/invoices", response_class=HTMLResponse)
 async def invoices_page(
     request: Request,
-    page: int = 1,
     session: AsyncSession = Depends(db_helper.session_dependency),
 ):
     user = await get_current_user(request, session)
@@ -944,18 +970,15 @@ async def invoices_page(
     count_stmt = select(func.count(Invoice.id))
     total = (await session.execute(count_stmt)).scalar() or 0
     per_page = await _get_per_page(session)
-    stmt = stmt.offset((page - 1) * per_page).limit(per_page)
     result = await session.execute(stmt)
     items = list(result.scalars().all())
-    pages = (total + per_page - 1) // per_page
     return templates.TemplateResponse(
         "invoices/list.html",
         {
             "request": request,
             "user": user,
             "items": items,
-            "page": page,
-            "pages": pages,
+            "per_page": per_page,
             "total": total,
             "active_page": "invoices",
         },
@@ -1074,17 +1097,21 @@ async def request_calc_tkp_page(
 
 async def _render_tkp_page(request, user, req, session):
     from scr.dbase.crud_module_slots import sync_hidden_slots
-    from scr.dbase.crud_tkp import build_tkp_summary
+    from scr.dbase.crud_tkp import build_tkp_kit, build_tkp_summary
 
     if await sync_hidden_slots(session, req.id):
         await session.commit()
     summary = await build_tkp_summary(session, req)
+    kit = await build_tkp_kit(session, req)
+    kit_total = sum(b["sum"] for s in kit for b in s["blocks"])
     return templates.TemplateResponse(
         "requests/calc_tkp.html",
         {
             "request": request,
             "user": user,
             "req": req,
+            "kit": kit,
+            "kit_total": kit_total,
             "rows": summary["rows"],
             "totals": summary["totals"],
             "nds_percent": summary["nds_percent"],
@@ -1154,13 +1181,14 @@ async def request_calc_page_by_section(
     mt = await crud_module_types.get_module_type_by_slug(session, section)
     if not mt:
         return HTMLResponse("Раздел не найден", status_code=404)
-    from scr.dbase import crud_module_slots
+    from scr.dbase import crud_module_slots, crud_module_templates
 
     await crud_module_slots.sync_hidden_slots(session, req_id)
     calcs = await crud_module_types.get_or_create_calcs(session, req_id, mt.id)
+    works = section in crud_module_types.WORKS_SECTIONS
+    tpls = [] if works else await crud_module_templates.get_templates(session, mt.id)
     await session.commit()
-    modules_list, _ = await crud_modules.get_modules(session, per_page=10000)
-    prices = await crud_modules.get_module_prices(session)
+    _, prices, modules_data = await _sorted_modules(session)
     default_profit = await crud_module_types.default_profitability(session, req_id)
     slots = await crud_module_slots.get_slots(session, mt.id)
     blocks = [crud_module_types.calc_block_data(c, prices, default_profit, slots) for c in calcs]
@@ -1172,25 +1200,43 @@ async def request_calc_page_by_section(
             "req": req,
             "mt": mt,
             "blocks": blocks,
-            "modules": modules_list,
-            "modules_data": _modules_data(modules_list, prices),
+            "modules_data": modules_data,
             "slots": [crud_module_slots.slot_json(sl) for sl in slots if not sl.hidden],
             "prices": prices,
             "multi": section in crud_module_types.MULTI_BLOCK_SECTIONS,
             "split_qty": section in crud_module_types.SPLIT_QTY_SECTIONS,
-            "purposes": KSO_PURPOSES,
-            "works": section in crud_module_types.WORKS_SECTIONS,
+            "purposes": SECTION_PURPOSES.get(section, []),
+            "works": works,
+            "templates_list": [{"id": t.id, "name": t.name, "purpose": t.purpose or ""} for t in tpls],
             "active_page": "requests",
         },
     )
 
 
-def _modules_data(modules_list, prices: dict[int, float]) -> list[dict]:
-    """Модули для выбора в обязательные строки (фильтр по типу на странице)."""
+def _modules_data(modules_list, prices: dict[int, float], attrs: dict[int, dict]) -> list[dict]:
+    """Модули для выпадающих списков расчёта: тип (подбор в строку и цвет подсветки) и характеристики для фильтров."""
     return [
-        {"id": m.id, "name": m.name, "type_id": m.material_type_id, "price": prices.get(m.id, 0.0)}
+        {
+            "id": m.id,
+            "name": m.name,
+            "type_id": m.material_type_id,
+            "type_name": m.material_type.name if m.material_type else "",
+            "color": m.material_type.color if m.material_type else None,
+            "price": prices.get(m.id, 0.0),
+            "nom_tok": m.nom_tok or 0,
+            **attrs.get(m.id, {}),
+        }
         for m in modules_list
     ]
+
+
+async def _sorted_modules(session) -> tuple[list, dict[int, float], list[dict]]:
+    """Все модули в порядке «ном. ток, класс точности, название», цены и данные для страниц расчёта."""
+    modules_list, _ = await crud_modules.get_modules(session, per_page=LIST_ALL_ROWS)
+    attrs = await crud_modules.get_module_attrs(session)
+    modules_list = await crud_modules.sort_modules(session, modules_list, attrs)
+    prices = await crud_modules.get_module_prices(session)
+    return modules_list, prices, _modules_data(modules_list, prices, attrs)
 
 
 # --- Nominal Currents ---
@@ -1431,14 +1477,12 @@ async def module_types_defaults_page(
     mt = await crud_module_types.get_module_type_by_id(session, type_id)
     if not mt:
         return HTMLResponse("Тип модуля не найден", status_code=404)
-    from scr.dbase import crud_finance, crud_module_slots
+    from scr.dbase import crud_finance, crud_module_slots, crud_module_templates
 
-    defaults = await crud_module_types.get_defaults(session, type_id)
+    tpls = await crud_module_templates.get_templates(session, type_id)
+    await session.commit()
     slots = await crud_module_slots.get_slots(session, type_id)
-    slot_ids = {sl.id for sl in slots}
-    slot_defaults = {d.slot_id: d for d in defaults if d.slot_id is not None}
-    modules_list, _ = await crud_modules.get_modules(session, per_page=10000)
-    prices = await crud_modules.get_module_prices(session)
+    _, prices, modules_data = await _sorted_modules(session)
 
     payroll_items = await crud_finance.get_all_payroll_items(session)
     invoice_items = await crud_finance.get_all_invoice_items(session)
@@ -1448,18 +1492,10 @@ async def module_types_defaults_page(
             "request": request,
             "user": user,
             "mt": mt,
-            "defaults": [d for d in defaults if d.slot_id not in slot_ids],
-            "slots": [
-                {
-                    **crud_module_slots.slot_json(sl),
-                    "module_id": slot_defaults[sl.id].module_id if sl.id in slot_defaults else None,
-                    "quantity": slot_defaults[sl.id].quantity if sl.id in slot_defaults else 1,
-                }
-                for sl in slots
-            ],
-            "modules": modules_list,
-            "modules_data": _modules_data(modules_list, prices),
-            "prices": prices,
+            "slots": [crud_module_slots.slot_json(sl) for sl in slots],
+            "tpls": [crud_module_templates.template_json(t, slots, prices) for t in tpls],
+            "modules_data": modules_data,
+            "purposes": SECTION_PURPOSES.get(mt.slug, []),
             "payroll_items": payroll_items,
             "invoice_items": invoice_items,
             "active_page": "module_types_calc",
@@ -1634,22 +1670,20 @@ async def materials_detail_page(
 @pages_router.get("/material-types", response_class=HTMLResponse)
 async def material_types_page(
     request: Request,
-    page: int = 1,
     session: AsyncSession = Depends(db_helper.session_dependency),
 ):
     user = await get_current_user(request, session)
     if not user:
         return RedirectResponse("/reg/", status_code=302)
     per_page = await _get_per_page(session)
-    items, total = await crud_material_types.get_all_types(session, page=page, per_page=per_page)
+    items, total = await crud_material_types.get_all_types(session, page=1, per_page=LIST_ALL_ROWS)
     return templates.TemplateResponse(
         "material_types/list.html",
         {
             "request": request,
             "user": user,
             "items": items,
-            "page": page,
-            "pages": (total + per_page - 1) // per_page,
+            "per_page": per_page,
             "total": total,
             "active_page": "material_types",
         },
@@ -1721,15 +1755,13 @@ async def material_types_detail_page(
 @pages_router.get("/modules", response_class=HTMLResponse)
 async def modules_page(
     request: Request,
-    page: int = 1,
     session: AsyncSession = Depends(db_helper.session_dependency),
 ):
     user = await get_current_user(request, session)
     if not user:
         return RedirectResponse("/reg/", status_code=302)
     per_page = await _get_per_page(session)
-    items, total = await crud_modules.get_modules(session, page=page, per_page=per_page)
-    prices = await crud_modules.get_module_prices(session)
+    items, prices, modules_data = await _sorted_modules(session)
     return templates.TemplateResponse(
         "modules/list.html",
         {
@@ -1737,9 +1769,9 @@ async def modules_page(
             "user": user,
             "items": items,
             "prices": prices,
-            "page": page,
-            "pages": (total + per_page - 1) // per_page,
-            "total": total,
+            "attrs": {d["id"]: d for d in modules_data},
+            "per_page": per_page,
+            "total": len(items),
             "active_page": "modules",
         },
     )
@@ -1844,7 +1876,6 @@ async def modules_detail_page(
 @pages_router.get("/contracts", response_class=HTMLResponse)
 async def contracts_list_page(
     request: Request,
-    page: int = Query(1, ge=1),
     session: AsyncSession = Depends(db_helper.session_dependency),
 ):
     user = await get_current_user(request, session)
@@ -1863,15 +1894,12 @@ async def contracts_list_page(
     # Count total
     count_stmt = sa_select(sa_func.count(ContractSpec.id))
     total = (await session.execute(count_stmt)).scalar() or 0
-    pages = (total + per_page - 1) // per_page
 
     stmt = (
         sa_select(ContractSpec)
         .options(selectinload(ContractSpec.company))
         .options(selectinload(ContractSpec.request))
         .order_by(ContractSpec.contract_number, ContractSpec.specification_number)
-        .offset((page - 1) * per_page)
-        .limit(per_page)
     )
     result = await session.execute(stmt)
     specs = list(result.scalars().all())
@@ -1888,8 +1916,7 @@ async def contracts_list_page(
             "user": user,
             "specs": specs,
             "companies": companies,
-            "page": page,
-            "pages": pages,
+            "per_page": per_page,
             "total": total,
             "active_page": "contracts",
         },

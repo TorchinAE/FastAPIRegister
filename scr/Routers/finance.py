@@ -17,6 +17,7 @@ from scr.dbase.schemas.schemas import (
     PayrollItemResponseSchema,
     PayrollItemUpdateSchema,
 )
+from scr.utils.excel import MONEY_FMT
 
 fin_router = APIRouter(prefix="/api/finance", tags=["Finance"])
 
@@ -285,7 +286,7 @@ def _export_excel(items, title, item_mapper):
     for item in items:
         ws.append([item.id, item.name, float(item.cost)])
         row_num = ws.max_row
-        ws.cell(row_num, 3).number_format = "# ##0.00"
+        ws.cell(row_num, 3).number_format = MONEY_FMT
         for col_idx in range(1, num_cols + 1):
             ws.cell(row_num, col_idx).border = thin_border
 

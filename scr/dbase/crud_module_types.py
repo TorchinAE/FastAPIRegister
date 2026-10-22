@@ -173,9 +173,17 @@ async def get_calcs(session: AsyncSession, request_id: int, module_type_id: int)
     return list(result.scalars().all())
 
 
-async def create_calc(session: AsyncSession, request_id: int, module_type_id: int) -> RequestCalc:
-    """Новый блок расчёта со значениями по умолчанию: ФОТ/Накладные из справочников, модули по умолчанию."""
+async def create_calc(
+    session: AsyncSession, request_id: int, module_type_id: int, template_id: int | None = None
+) -> RequestCalc:
+    """Новый блок расчёта из шаблона (не задан — основной): ФОТ/Накладные из справочников, модули шаблона,
+    название и назначение блока — из шаблона."""
+    from scr.dbase.crud_module_slots import get_slots
+    from scr.dbase.crud_module_templates import resolve_template
+
     mod_type = await get_module_type_by_id(session, module_type_id)
+    works = bool(mod_type and mod_type.slug in WORKS_SECTIONS)
+    tpl = None if works else await resolve_template(session, module_type_id, template_id)
     calc = RequestCalc(
         request_id=request_id,
         module_type_id=module_type_id,
@@ -184,16 +192,19 @@ async def create_calc(session: AsyncSession, request_id: int, module_type_id: in
         quantity=1,
         qty_1sh=1 if mod_type and mod_type.slug in SPLIT_QTY_SECTIONS else 0,
         works_cost=0,
+        template_id=tpl.id if tpl else None,
+        name=tpl.name if tpl else None,
+        purpose=tpl.purpose if tpl else None,
     )
     session.add(calc)
     await session.flush()
 
-    if mod_type and mod_type.slug not in WORKS_SECTIONS:
-        # Состав нового блока — модули обязательных строк раздела
-        for d in await get_defaults(session, module_type_id):
-            if d.slot_id is None:
-                continue
-            session.add(RequestCalcItem(calc_id=calc.id, module_id=d.module_id, quantity=d.quantity, slot_id=d.slot_id))
+    if tpl:
+        # Состав нового блока — модули шаблона: обязательные строки и добавленные модули
+        slot_ids = {s.id for s in await get_slots(session, module_type_id)}
+        for d in tpl.defaults:
+            slot_id = d.slot_id if d.slot_id in slot_ids else None
+            session.add(RequestCalcItem(calc_id=calc.id, module_id=d.module_id, quantity=d.quantity, slot_id=slot_id))
         await session.flush()
 
     calc = await get_calc_by_id(session, calc.id)
@@ -259,6 +270,7 @@ def calc_block_data(calc: RequestCalc, prices: dict[int, float], default_profit:
         "qty_1sh": calc.qty_1sh or 0,
         "qty_2sh": calc.qty_2sh or 0,
         "purpose": calc.purpose or "",
+        "name": calc.name or "",
         "works_cost": float(calc.works_cost or 0),
         "total_cost": float(calc.total_cost or 0),
         "final_price": float(calc.final_price or 0),

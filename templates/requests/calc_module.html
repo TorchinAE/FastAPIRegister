@@ -28,27 +28,31 @@
 </div>
 {% endif %}
 
-<div id="blocks" class="calc-blocks {{ 'multi' if multi else 'single' }}">
+{% if not works %}
+<div id="moduleFilter" class="card mp-bar"></div>
+{% endif %}
+
+{# Корпуса, КТП, ПКУ, ПУС — один блок, но поля вертикально, как в КСО #}
+<div id="blocks" class="calc-blocks {{ 'multi' if multi or not works else 'single' }}">
     {% if multi %}
-    <button type="button" class="calc-block-add" id="addBlockBtn" onclick="addBlock()">
-        <span class="plus">+</span>
-        <span>Добавить</span>
-    </button>
+    <div class="calc-block-add-wrap">
+        <button type="button" class="calc-block-add" id="addBlockBtn" onclick="addBlock()">
+            <span class="plus">+</span>
+            <span>Добавить</span>
+        </button>
+        <div class="calc-template-menu" id="templateMenu" hidden>
+            <div class="calc-template-menu-title">Шаблон блока</div>
+        </div>
+    </div>
     {% endif %}
 </div>
-
-<template id="moduleOptions">
-    <option value="">-- Модуль --</option>
-    {% for mod in modules %}
-    <option value="{{ mod.id }}">{{ mod.name }} ({{ prices.get(mod.id, 0)|money }})</option>
-    {% endfor %}
-</template>
 </div>
 
 <div id="toast" class="toast" style="display:none"></div>
 {% endblock %}
 
 {% block scripts %}
+<script src="/static/module-picker.js?v={{ static_v }}"></script>
 <script>
 const reqId = {{ req.id }};
 const moduleTypeId = {{ mt.id }};
@@ -56,8 +60,10 @@ const MULTI = {{ 'true' if multi else 'false' }};
 const WORKS = {{ 'true' if works else 'false' }};
 // КСО: количество блоков по секциям шин (1СШ + 2СШ)
 const SPLIT = {{ 'true' if split_qty else 'false' }};
-// КСО: назначение камеры для опросного листа КСО204
+// Назначение блока: КСО — для опросного листа КСО204, ЩО — Ввод, Секционная, ...
 const PURPOSES = {{ purposes | tojson }};
+// Шаблоны раздела («по умолчанию») — выбор при добавлении блока
+const TEMPLATES = {{ templates_list | tojson }};
 const initialBlocks = {{ blocks | tojson }};
 // Обязательные строки раздела (видимые) и модули для выбора в них
 const SLOTS = Object.fromEntries({{ slots | tojson }}.map(s => [s.id, s]));
@@ -66,6 +72,8 @@ const SAVE_DELAY = 700;
 
 const blocksEl = document.getElementById('blocks');
 const addBtn = document.getElementById('addBlockBtn');
+const addTarget = addBtn ? addBtn.closest('.calc-block-add-wrap') : null;
+if (!WORKS) ModulePicker.init(modulesData, document.getElementById('moduleFilter'), formatFinancial);
 
 function esc(s) {
     return String(s ?? '').replace(/[&<>"']/g, c => ({'&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;'}[c]));
@@ -116,7 +124,12 @@ function renderBlock(data, index) {
             <span class="calc-save-status f-status" title="Автосохранение"></span>
             ${MULTI ? '<button type="button" class="calc-block-del f-delete-block" title="Удалить блок">&#10005;</button>' : ''}
         </div>
-        ${SPLIT ? `
+        ${!WORKS ? `
+        <div class="form-group">
+            <label>Название блока</label>
+            <input type="text" class="f-name" maxlength="200" value="${esc(data.name)}" placeholder="в комплектацию ТКП">
+        </div>` : ''}
+        ${PURPOSES.length ? `
         <div class="form-group calc-purpose">
             <label>Назначение</label>
             <select class="f-purpose">
@@ -178,7 +191,8 @@ function renderBlock(data, index) {
 
     const changed = mode => { recalc(el, mode); scheduleSave(el); };
     if (!WORKS) {
-        el.querySelector('.f-module').innerHTML = document.getElementById('moduleOptions').innerHTML;
+        ModulePicker.attach(el.querySelector('.f-module'));
+        el.querySelector('.f-name').addEventListener('input', () => scheduleSave(el));
         el.dataset.hiddenTotal = data.hidden_total || 0;
         data.slots.forEach(s => appendSlot(el, SLOTS[s.slot_id], s.item));
         data.items.forEach(item => appendItem(el, item));
@@ -191,8 +205,8 @@ function renderBlock(data, index) {
     bindMoney(el.querySelector('.f-profit-rub'), () => changed('rub'));
     bindMoney(el.querySelector('.f-final'), () => changed('final'));
     el.querySelector('.f-profit-pct').addEventListener('input', () => changed());
+    if (PURPOSES.length) el.querySelector('.f-purpose').addEventListener('change', () => scheduleSave(el));
     if (SPLIT) {
-        el.querySelector('.f-purpose').addEventListener('change', () => scheduleSave(el));
         for (const cls of ['.f-qty-1sh', '.f-qty-2sh']) {
             el.querySelector(cls).addEventListener('input', () => { syncSplitQty(el); changed(); });
         }
@@ -203,7 +217,7 @@ function renderBlock(data, index) {
     }
     el.querySelector('.f-clear').addEventListener('click', () => clearBlock(el));
 
-    if (addBtn) blocksEl.insertBefore(el, addBtn); else blocksEl.appendChild(el);
+    if (addTarget) blocksEl.insertBefore(el, addTarget); else blocksEl.appendChild(el);
     recalc(el);
     return el;
 }
@@ -231,6 +245,7 @@ function appendItem(el, item) {
         list.appendChild(row);
     }
     row.dataset.price = item.module_price;
+    row.style.borderLeftColor = ModulePicker.color(item.module_id) || '';
     row.querySelector('.f-item-qty').value = item.quantity;
     row.querySelector('.calc-item-price').textContent = formatFinancial(item.module_price);
 }
@@ -251,10 +266,12 @@ function appendSlot(el, slot, item) {
             <div class="calc-item-sum"></div>
         </div>`;
     const select = row.querySelector('.f-slot-module');
-    const currentId = item ? item.module_id : null;
-    modulesData
-        .filter(m => !slot.type_ids.length || slot.type_ids.includes(m.type_id) || m.id === currentId)
-        .forEach(m => select.add(new Option(`${m.name} (${formatFinancial(m.price)})`, m.id)));
+    if (item) select.add(new Option(item.module_name, item.module_id));
+    select.value = item ? item.module_id : '';
+    ModulePicker.attach(select, {
+        placeholder: '— не выбран —',
+        allow: (m, current) => !slot.type_ids.length || slot.type_ids.includes(m.type_id) || String(m.id) === current,
+    });
     select.addEventListener('change', () => saveSlot(el, row));
     row.querySelector('.f-item-qty').addEventListener('change', () => { if (select.value) saveSlot(el, row); });
     el.querySelector('.f-slots').appendChild(row);
@@ -264,7 +281,10 @@ function appendSlot(el, slot, item) {
 function setSlotItem(row, item) {
     row.dataset.price = item ? item.module_price : 0;
     row.dataset.moduleId = item ? item.module_id : '';
-    row.querySelector('.f-slot-module').value = item ? item.module_id : '';
+    const select = row.querySelector('.f-slot-module');
+    select.value = item ? item.module_id : '';
+    select.dispatchEvent(new Event('picker-paint'));
+    row.style.borderLeftColor = (item && ModulePicker.color(item.module_id)) || '';
     row.querySelector('.f-item-qty').value = item ? item.quantity : 1;
     row.querySelector('.calc-item-price').textContent = item ? formatFinancial(item.module_price) : '';
     row.classList.toggle('empty', !item);
@@ -370,11 +390,12 @@ function blockPayload(el) {
         final_price: Math.max(0, parseFloat(el.dataset.finalPrice) || 0),
     };
     if (WORKS) payload.works_cost = Math.max(0, moneyVal(el.querySelector('.f-works')));
+    else payload.name = el.querySelector('.f-name').value.trim() || null;
     if (MULTI) payload.quantity = Math.max(0, parseInt(el.querySelector('.f-qty').value) || 0);
+    if (PURPOSES.length) payload.purpose = el.querySelector('.f-purpose').value || null;
     if (SPLIT) {
         payload.qty_1sh = Math.max(0, parseInt(el.querySelector('.f-qty-1sh').value) || 0);
         payload.qty_2sh = Math.max(0, parseInt(el.querySelector('.f-qty-2sh').value) || 0);
-        payload.purpose = el.querySelector('.f-purpose').value || null;
     }
     return payload;
 }
@@ -412,13 +433,43 @@ window.addEventListener('pagehide', () => {
     for (const el of saveTimers.keys()) sendBlock(el, true);
 });
 
-async function addBlock() {
+// Добавление блока: шаблонов несколько — сначала выбор шаблона
+const templateMenu = document.getElementById('templateMenu');
+if (templateMenu) {
+    TEMPLATES.forEach(t => {
+        const b = document.createElement('button');
+        b.type = 'button';
+        b.className = 'calc-template-option';
+        b.textContent = t.name + (t.purpose ? ' — ' + t.purpose : '');
+        b.addEventListener('click', () => { templateMenu.hidden = true; createBlock(t.id); });
+        templateMenu.appendChild(b);
+    });
+    document.addEventListener('click', e => {
+        if (!templateMenu.hidden && !e.target.closest('.calc-block-add-wrap')) templateMenu.hidden = true;
+    });
+}
+
+function addBlock() {
+    if (TEMPLATES.length > 1) {
+        // Меню фиксировано по экрану: ряд блоков прокручивается и обрезал бы его
+        templateMenu.hidden = !templateMenu.hidden;
+        if (!templateMenu.hidden) {
+            const r = addBtn.getBoundingClientRect();
+            templateMenu.style.top = Math.max(8, Math.min(r.top, window.innerHeight - templateMenu.offsetHeight - 8)) + 'px';
+            templateMenu.style.left = Math.max(8, r.left - templateMenu.offsetWidth - 6) + 'px';
+        }
+        return;
+    }
+    createBlock(TEMPLATES.length ? TEMPLATES[0].id : null);
+}
+
+async function createBlock(templateId) {
     addBtn.disabled = true;
     try {
         const resp = await fetch('/reg/api/request-calcs/', {
             method: 'POST',
             headers: {'Content-Type': 'application/json'},
-            body: JSON.stringify({request_id: reqId, module_type_id: moduleTypeId}),
+            body: JSON.stringify({request_id: reqId, module_type_id: moduleTypeId, template_id: templateId}),
         });
         if (!resp.ok) { showToast('Ошибка создания блока'); return; }
         const data = await resp.json();

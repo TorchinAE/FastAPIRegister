@@ -48,6 +48,7 @@ async def add_slot(session: AsyncSession, data: ModuleTypeSlotCreateSchema) -> M
         module_type_id=data.module_type_id,
         name=name,
         hidden=data.hidden,
+        purpose=(data.purpose or "").strip() or None,
         sort_order=max((s.sort_order for s in slots), default=0) + 1,
     )
     slot.material_types = await _material_types(session, data.material_type_ids)
@@ -66,6 +67,8 @@ async def update_slot(session: AsyncSession, slot_id: int, data: ModuleTypeSlotU
         slot.hidden = data.hidden
     if data.material_type_ids is not None:
         slot.material_types = await _material_types(session, data.material_type_ids)
+    if "purpose" in data.model_fields_set:
+        slot.purpose = (data.purpose or "").strip() or None
     await session.flush()
     return slot
 
@@ -108,6 +111,7 @@ def slot_json(slot: ModuleTypeSlot) -> dict:
         "id": slot.id,
         "name": slot.name,
         "hidden": bool(slot.hidden),
+        "purpose": slot.purpose or "",
         "type_ids": [t.id for t in slot.material_types],
         "type_names": [t.name for t in slot.material_types],
     }
@@ -134,11 +138,16 @@ async def _check_module(session: AsyncSession, slot: ModuleTypeSlot, module_id: 
 
 
 async def set_slot_default(
-    session: AsyncSession, slot: ModuleTypeSlot, module_id: int | None, quantity: int
+    session: AsyncSession, slot: ModuleTypeSlot, module_id: int | None, quantity: int, template_id: int | None = None
 ) -> ModuleTypeDefault | None:
-    """Модуль строки по умолчанию; module_id=None — строка пустая."""
+    """Модуль строки в шаблоне (не задан — в основном шаблоне раздела); module_id=None — строка пустая."""
+    from scr.dbase.crud_module_templates import resolve_template
+
     await _check_module(session, slot, module_id)
-    stmt = select(ModuleTypeDefault).where(ModuleTypeDefault.slot_id == slot.id)
+    tpl = await resolve_template(session, slot.module_type_id, template_id)
+    stmt = select(ModuleTypeDefault).where(
+        ModuleTypeDefault.slot_id == slot.id, ModuleTypeDefault.template_id == tpl.id
+    )
     obj = (await session.execute(stmt)).scalar_one_or_none()
     if module_id is None:
         if obj:
@@ -146,7 +155,9 @@ async def set_slot_default(
             await session.flush()
         return None
     if not obj:
-        obj = ModuleTypeDefault(module_type_id=slot.module_type_id, slot_id=slot.id, module_id=module_id)
+        obj = ModuleTypeDefault(
+            module_type_id=slot.module_type_id, slot_id=slot.id, module_id=module_id, template_id=tpl.id
+        )
         session.add(obj)
     obj.module_id = module_id
     obj.quantity = quantity
@@ -176,8 +187,12 @@ async def set_calc_slot(
 
 
 async def sync_hidden_slots(session: AsyncSession, request_id: int) -> bool:
-    """Скрытые строки в расчётах заявки всегда как в «по умолчанию». Пересчитывает итоги изменённых блоков."""
+    """Скрытые строки в расчётах заявки всегда как в шаблоне блока (нет шаблона — основной шаблон раздела).
+
+    Пересчитывает итоги изменённых блоков.
+    """
     from scr.dbase import crud_module_types
+    from scr.dbase.crud_module_templates import get_templates
     from scr.dbase.crud_modules import get_module_prices
 
     hidden = (await session.execute(select(ModuleTypeSlot).where(ModuleTypeSlot.hidden.is_(True)))).scalars().all()
@@ -186,8 +201,22 @@ async def sync_hidden_slots(session: AsyncSession, request_id: int) -> bool:
     hidden_by_type: dict[int, list[int]] = {}
     for slot in hidden:
         hidden_by_type.setdefault(slot.module_type_id, []).append(slot.id)
+    used_types = await session.execute(
+        select(RequestCalc.module_type_id)
+        .where(RequestCalc.request_id == request_id, RequestCalc.module_type_id.in_(hidden_by_type))
+        .distinct()
+    )
+    templates_by_type = {t: await get_templates(session, t) for t in used_types.scalars().all()}
+    if not templates_by_type:
+        return False
+    main_template = {t: tpls[0].id for t, tpls in templates_by_type.items()}
+    template_ids = {tpl.id for tpls in templates_by_type.values() for tpl in tpls}
     defaults_stmt = select(ModuleTypeDefault).where(ModuleTypeDefault.slot_id.in_([s.id for s in hidden]))
-    defaults = {d.slot_id: d for d in (await session.execute(defaults_stmt)).scalars().all()}
+    defaults = {
+        (d.template_id, d.slot_id): d
+        for d in (await session.execute(defaults_stmt)).scalars().all()
+        if d.template_id in template_ids
+    }
 
     calcs_stmt = (
         select(RequestCalc)
@@ -197,9 +226,10 @@ async def sync_hidden_slots(session: AsyncSession, request_id: int) -> bool:
     changed_calcs: list[RequestCalc] = []
     for calc in (await session.execute(calcs_stmt)).scalars().all():
         items = {it.slot_id: it for it in calc.items if it.slot_id is not None}
+        tpl_id = calc.template_id if calc.template_id in template_ids else main_template[calc.module_type_id]
         changed = False
         for slot_id in hidden_by_type[calc.module_type_id]:
-            d, it = defaults.get(slot_id), items.get(slot_id)
+            d, it = defaults.get((tpl_id, slot_id)), items.get(slot_id)
             if d is None:
                 if it is not None:
                     calc.items.remove(it)

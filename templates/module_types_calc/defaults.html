@@ -1,37 +1,31 @@
 {% extends "base.html" %}
-{% block title %}{{ mt.name }} — модули по умолчанию{% endblock %}
+{% block title %}{{ mt.name }} — шаблоны по умолчанию{% endblock %}
 {% block content %}
 <div class="page-header">
     <div>
-        <h1>{{ mt.name }} — модули по умолчанию</h1>
-        <div class="subtitle">Slug: {{ mt.slug }}</div>
+        <h1>{{ mt.name }} — шаблоны по умолчанию</h1>
+        <div class="subtitle">Slug: {{ mt.slug }} &middot; новый блок расчёта создаётся из выбранного шаблона &middot; изменения сохраняются сразу</div>
     </div>
     <div style="display:flex;gap:0.5rem;flex-wrap:wrap;">
-        <a href="/reg/api/module-types/{{ mt.id }}/defaults/export-excel" class="btn btn-primary" download>Выгрузить Excel</a>
-        <button type="button" class="btn btn-success" onclick="document.getElementById('importFile').click()">Загрузить Excel</button>
-        <input type="file" id="importFile" accept=".xlsx" style="display:none" onchange="importExcel(this)">
+        <a href="/reg/module-type-slots?type={{ mt.slug }}" class="btn btn-ghost">Обязательные строки</a>
         <a href="/reg/module-types-calc" class="btn btn-ghost">&larr; Назад</a>
     </div>
 </div>
 
-<div style="display:flex;justify-content:space-between;align-items:baseline;gap:1rem;margin-bottom:0.5rem;">
-    <h3>Состав раздела — обязательные строки</h3>
-    <a href="/reg/module-type-slots?type={{ mt.slug }}" style="font-size:0.85rem;">Настроить обязательные строки</a>
-</div>
-{% if slots %}
-<div class="table-wrap">
-    <table>
-        <thead>
-            <tr><th>Строка</th><th>Модуль</th><th>Кол-во</th><th>Цена за ед.</th><th>Сумма</th></tr>
-        </thead>
-        <tbody id="slotsBody"></tbody>
-    </table>
-</div>
-{% else %}
-<div class="card" style="color:var(--text-muted);">
-    Нет обязательных строк. <a href="/reg/module-type-slots?type={{ mt.slug }}">Добавьте строки</a> — модули этих строк и есть состав раздела по умолчанию.
+{% if not slots %}
+<div class="card" style="color:var(--text-muted);margin-bottom:0.75rem;">
+    Нет обязательных строк. <a href="/reg/module-type-slots?type={{ mt.slug }}">Добавьте строки</a> — модули этих строк и есть состав блока по умолчанию.
 </div>
 {% endif %}
+
+<div id="moduleFilter" class="card mp-bar"></div>
+
+<div id="templates" class="calc-blocks multi">
+    <button type="button" class="calc-block-add" id="addTplBtn" onclick="addTemplate()" title="Новый шаблон — копия последнего">
+        <span class="plus">+</span>
+        <span>Шаблон</span>
+    </button>
+</div>
 
 <div class="card" style="margin-top:1rem;">
     <h3 style="margin-bottom:0.75rem;">ФОТ и Накладные</h3>
@@ -65,80 +59,240 @@
     </div>
 </div>
 
+<input type="file" id="importFile" accept=".xlsx" style="display:none" onchange="importExcel(this)">
 <div id="toast" class="toast" style="display:none"></div>
 {% endblock %}
 
 {% block scripts %}
+<script src="/static/module-picker.js?v={{ static_v }}"></script>
 <script>
 const typeId = {{ mt.id }};
-const slots = {{ slots | tojson }};
+const SLOTS = {{ slots | tojson }};
+const PURPOSES = {{ purposes | tojson }};
 const modulesData = {{ modules_data | tojson }};
+const tplsEl = document.getElementById('templates');
+const addTplBtn = document.getElementById('addTplBtn');
+let importTemplateId = null;
+
+ModulePicker.init(modulesData, document.getElementById('moduleFilter'), formatFinancial);
 
 function esc(s) {
     return String(s ?? '').replace(/[&<>"']/g, c => ({'&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;'}[c]));
 }
+const modulePrice = id => (modulesData.find(m => m.id === id) || {}).price || 0;
 
-// Модули, подходящие в строку по типу (типы не выбраны — любые)
-function slotModules(slot) {
-    return modulesData.filter(m => !slot.type_ids.length || slot.type_ids.includes(m.type_id) || m.id === slot.module_id);
+async function api(url, method, body) {
+    const resp = await fetch(url, {
+        method,
+        headers: body ? {'Content-Type': 'application/json'} : {},
+        body: body ? JSON.stringify(body) : undefined,
+    });
+    const data = await resp.json().catch(() => ({}));
+    if (!resp.ok) { showToast('Ошибка: ' + (data.detail || resp.status)); return null; }
+    return data;
 }
 
-function renderSlots() {
-    const body = document.getElementById('slotsBody');
-    if (!body) return;
-    body.innerHTML = '';
-    slots.forEach(slot => {
-        const tr = document.createElement('tr');
-        const options = slotModules(slot).map(m =>
-            `<option value="${m.id}" ${m.id === slot.module_id ? 'selected' : ''}>${esc(m.name)} (${formatFinancial(m.price)})</option>`).join('');
-        tr.innerHTML = `
-            <td><strong>${esc(slot.name)}</strong>${slot.hidden ? ' <span class="badge" style="background:#e2e8f0;color:#475569;" title="Не отображается в расчёте, но учитывается в стоимости">скрыта</span>' : ''}
-                ${slot.type_names.length ? `<div style="font-size:0.8rem;color:var(--text-muted);">${esc(slot.type_names.join(', '))}</div>` : ''}</td>
-            <td><select class="cell-input f-module" style="width:100%;min-width:220px;"><option value="">— не выбран —</option>${options}</select></td>
-            <td><input type="number" class="cell-input f-qty" value="${slot.quantity}" min="1"></td>
-            <td class="f-price"></td>
-            <td class="f-sum"></td>`;
-        const update = () => {
-            const mod = modulesData.find(m => m.id === slot.module_id);
-            tr.querySelector('.f-price').textContent = mod ? formatFinancial(mod.price) : '';
-            tr.querySelector('.f-sum').textContent = mod ? formatFinancial(mod.price * slot.quantity) : '';
+function renderTemplate(tpl) {
+    const el = document.createElement('div');
+    el.className = 'card calc-block';
+    el.dataset.id = tpl.id;
+    el.innerHTML = `
+        <div class="calc-block-head">
+            <span class="calc-block-title">Шаблон</span>
+            <span class="calc-save-status f-status"></span>
+            <button type="button" class="calc-block-del f-delete" title="Удалить шаблон">&#10005;</button>
+        </div>
+        <div class="form-group">
+            <label>Название (название нового блока)</label>
+            <input type="text" class="f-name" maxlength="200" value="${esc(tpl.name)}">
+        </div>
+        ${PURPOSES.length ? `
+        <div class="form-group">
+            <label>Назначение</label>
+            <select class="f-purpose">
+                <option value="">— не выбрано —</option>
+                ${PURPOSES.map(p => `<option value="${esc(p)}" ${p === tpl.purpose ? 'selected' : ''}>${esc(p)}</option>`).join('')}
+            </select>
+        </div>` : ''}
+        <div class="calc-items f-slots"></div>
+        <div class="calc-add-row">
+            <select class="f-module"></select>
+            <div class="calc-add-row-bottom">
+                <input type="number" class="f-module-qty" value="1" min="1" title="Кол-во">
+                <button type="button" class="btn btn-success btn-sm f-add-module">+ модуль</button>
+            </div>
+        </div>
+        <div class="calc-items f-items"></div>
+        <div class="calc-items-total">Модули: <strong class="f-total">0,00</strong></div>
+        <div class="calc-block-actions" style="gap:0.35rem;">
+            <a class="btn btn-ghost btn-sm" href="/reg/api/module-types/${typeId}/defaults/export-excel?template_id=${tpl.id}" download>Excel ↓</a>
+            <button type="button" class="btn btn-ghost btn-sm f-import">Excel ↑</button>
+        </div>`;
+
+    SLOTS.forEach(slot => appendSlot(el, slot, tpl.slots[slot.id]));
+    renderItems(el, tpl.items);
+    ModulePicker.attach(el.querySelector('.f-module'));
+
+    let nameTimer;
+    el.querySelector('.f-name').addEventListener('input', e => {
+        clearTimeout(nameTimer);
+        setStatus(el, '…');
+        nameTimer = setTimeout(() => saveTemplate(el, {name: e.target.value}), 600);
+    });
+    if (PURPOSES.length) {
+        el.querySelector('.f-purpose').addEventListener('change', e => saveTemplate(el, {purpose: e.target.value || null}));
+    }
+    el.querySelector('.f-delete').addEventListener('click', () => deleteTemplate(el));
+    el.querySelector('.f-add-module').addEventListener('click', () => addItem(el));
+    el.querySelector('.f-import').addEventListener('click', () => {
+        importTemplateId = tpl.id;
+        document.getElementById('importFile').click();
+    });
+    tplsEl.insertBefore(el, addTplBtn);
+    recalc(el);
+    return el;
+}
+
+// Обязательная строка шаблона: выбор модуля подходящего типа и количество
+function appendSlot(el, slot, value) {
+    const row = document.createElement('div');
+    row.className = 'calc-item calc-slot';
+    row.innerHTML = `
+        <div class="calc-item-main">
+            <div class="calc-slot-name" title="${esc(slot.type_names.join(', '))}">${esc(slot.name)}${slot.hidden ? ' · скрыта' : ''}</div>
+            <select class="f-slot-module"><option value="">— не выбран —</option></select>
+            <div class="calc-item-qty"><input type="number" class="f-item-qty" min="1" value="${value ? value.quantity : 1}"> шт.</div>
+        </div>
+        <div class="calc-item-side">
+            <div class="calc-item-price"></div>
+            <div class="calc-item-sum"></div>
+        </div>`;
+    const select = row.querySelector('.f-slot-module');
+    if (value) {
+        select.add(new Option('', value.module_id));
+        select.value = value.module_id;
+    }
+    ModulePicker.attach(select, {
+        placeholder: '— не выбран —',
+        allow: (m, current) => !slot.type_ids.length || slot.type_ids.includes(m.type_id) || String(m.id) === current,
+    });
+    const qtyEl = row.querySelector('.f-item-qty');
+    let saved = {module_id: value ? value.module_id : null, quantity: value ? value.quantity : 1};
+    const save = async () => {
+        const body = {
+            module_id: parseInt(select.value) || null,
+            quantity: Math.max(1, parseInt(qtyEl.value) || 1),
+            template_id: parseInt(el.dataset.id),
         };
-        const save = async () => {
-            const select = tr.querySelector('.f-module');
-            const qtyEl = tr.querySelector('.f-qty');
-            const moduleId = parseInt(select.value) || null;
-            const quantity = Math.max(1, parseInt(qtyEl.value) || 1);
-            const resp = await fetch('/reg/api/module-type-slots/' + slot.id + '/default', {
-                method: 'PUT',
-                headers: {'Content-Type': 'application/json'},
-                body: JSON.stringify({module_id: moduleId, quantity}),
-            });
-            if (resp.ok) {
-                slot.module_id = moduleId;
-                slot.quantity = quantity;
-                showToast('Сохранено');
-            } else {
-                const data = await resp.json().catch(() => ({}));
-                select.value = slot.module_id ?? '';
-                showToast('Ошибка: ' + (data.detail || resp.status));
-            }
-            qtyEl.value = slot.quantity;
-            update();
-        };
-        tr.querySelector('.f-module').addEventListener('change', save);
-        tr.querySelector('.f-qty').addEventListener('change', save);
-        update();
-        body.appendChild(tr);
+        const data = await api(`/reg/api/module-type-slots/${slot.id}/default`, 'PUT', body);
+        if (data) {
+            saved = {module_id: body.module_id, quantity: body.quantity};
+            setStatus(el, '✓ сохранено', 'ok');
+        } else {
+            select.value = saved.module_id ?? '';
+            select.dispatchEvent(new Event('picker-paint'));
+        }
+        qtyEl.value = saved.quantity;
+        recalc(el);
+    };
+    select.addEventListener('change', save);
+    qtyEl.addEventListener('change', () => { if (select.value) save(); else recalc(el); });
+    el.querySelector('.f-slots').appendChild(row);
+}
+
+function renderItems(el, items) {
+    const list = el.querySelector('.f-items');
+    list.innerHTML = '';
+    items.forEach(item => {
+        const row = document.createElement('div');
+        row.className = 'calc-item';
+        row.dataset.itemId = item.id;
+        row.dataset.price = item.module_price;
+        row.style.borderLeftColor = ModulePicker.color(item.module_id) || '';
+        row.innerHTML = `
+            <div class="calc-item-main">
+                <div class="calc-item-qty"><input type="number" class="f-item-qty" min="1" value="${item.quantity}"> шт.</div>
+                <div class="calc-item-name" title="${esc(item.module_name)}">${esc(item.module_name)}</div>
+            </div>
+            <div class="calc-item-side">
+                <div class="calc-item-price">${formatFinancial(item.module_price)}</div>
+                <div class="calc-item-sum"></div>
+            </div>
+            <button type="button" class="calc-item-del" title="Удалить">&#10005;</button>`;
+        row.querySelector('.f-item-qty').addEventListener('change', async e => {
+            const quantity = Math.max(1, parseInt(e.target.value) || 1);
+            if (await api(`/reg/api/module-types/defaults/${item.id}`, 'PATCH', {quantity})) setStatus(el, '✓ сохранено', 'ok');
+            e.target.value = quantity;
+            recalc(el);
+        });
+        row.querySelector('.calc-item-del').addEventListener('click', async () => {
+            if (!confirm('Удалить модуль из шаблона?')) return;
+            if (await api(`/reg/api/module-types/defaults/${item.id}`, 'DELETE')) { row.remove(); recalc(el); }
+        });
+        list.appendChild(row);
     });
 }
-renderSlots();
+
+function recalc(el) {
+    let total = 0;
+    el.querySelectorAll('.calc-item').forEach(row => {
+        const select = row.querySelector('.f-slot-module');
+        const price = select ? modulePrice(parseInt(select.value)) : parseFloat(row.dataset.price) || 0;
+        const qty = parseInt(row.querySelector('.f-item-qty').value) || 0;
+        const has = select ? !!select.value : true;
+        row.querySelector('.calc-item-price').textContent = has ? formatFinancial(price) : '';
+        row.querySelector('.calc-item-sum').textContent = has ? '= ' + formatFinancial(price * qty) : '';
+        if (select) {
+            row.classList.toggle('empty', !has);
+            row.style.borderLeftColor = (has && ModulePicker.color(parseInt(select.value))) || '';
+        }
+        if (has) total += price * qty;
+    });
+    el.querySelector('.f-total').textContent = formatFinancial(total);
+}
+
+function setStatus(el, text, cls = 'pending') {
+    const s = el.querySelector('.f-status');
+    s.textContent = text;
+    s.className = 'calc-save-status f-status ' + cls;
+}
+
+async function saveTemplate(el, body) {
+    if (await api(`/reg/api/module-type-templates/${el.dataset.id}`, 'PATCH', body)) setStatus(el, '✓ сохранено', 'ok');
+}
+
+async function addItem(el) {
+    const moduleId = parseInt(el.querySelector('.f-module').value);
+    if (!moduleId) { showToast('Выберите модуль'); return; }
+    const quantity = Math.max(1, parseInt(el.querySelector('.f-module-qty').value) || 1);
+    const tpl = await api(`/reg/api/module-type-templates/${el.dataset.id}/items`, 'POST', {module_id: moduleId, quantity});
+    if (tpl) { renderItems(el, tpl.items); recalc(el); setStatus(el, '✓ сохранено', 'ok'); }
+}
+
+async function addTemplate() {
+    const blocks = tplsEl.querySelectorAll('.calc-block');
+    const last = blocks[blocks.length - 1];
+    const name = prompt('Название шаблона (название нового блока)', 'Шаблон ' + (blocks.length + 1));
+    if (!name || !name.trim()) return;
+    const tpl = await api(`/reg/api/module-types/${typeId}/templates`, 'POST',
+        {name: name.trim(), copy_from: last ? parseInt(last.dataset.id) : null});
+    if (tpl) {
+        renderTemplate(tpl);
+        addTplBtn.scrollIntoView({behavior: 'smooth', inline: 'end', block: 'nearest'});
+    }
+}
+
+async function deleteTemplate(el) {
+    if (!confirm('Удалить шаблон?')) return;
+    if (await api(`/reg/api/module-type-templates/${el.dataset.id}`, 'DELETE')) { el.remove(); showToast('Шаблон удалён'); }
+}
 
 async function importExcel(input) {
     const file = input.files[0];
     if (!file) return;
     const fd = new FormData();
     fd.append('file', file);
-    const resp = await fetch('/reg/api/module-types/' + typeId + '/defaults/import-excel', {method: 'POST', body: fd});
+    const resp = await fetch(`/reg/api/module-types/${typeId}/defaults/import-excel?template_id=${importTemplateId}`, {method: 'POST', body: fd});
     input.value = '';
     const data = await resp.json().catch(() => ({}));
     if (resp.ok) {
@@ -153,7 +307,10 @@ function showToast(msg) {
     const t = document.getElementById('toast');
     t.textContent = msg;
     t.style.display = 'block';
-    setTimeout(() => t.style.display = 'none', 2500);
+    clearTimeout(showToast.timer);
+    showToast.timer = setTimeout(() => t.style.display = 'none', 2500);
 }
+
+{{ tpls | tojson }}.forEach(renderTemplate);
 </script>
 {% endblock %}

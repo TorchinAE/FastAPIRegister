@@ -1,3 +1,8 @@
+import base64
+import hashlib
+import hmac
+import time
+
 import bcrypt
 from sqlalchemy import Result, func, select
 from sqlalchemy.ext.asyncio import AsyncSession
@@ -87,3 +92,42 @@ async def authenticate_user(session: AsyncSession, email: str, password: str) ->
     if not verify_password(password, user.hashed_password):
         return None
     return user
+
+
+# ── Сброс пароля по ссылке из письма ──
+# Токен без хранения в БД: id, срок и подпись HMAC (секрет приложения + текущий хэш пароля).
+# После смены пароля хэш меняется — ссылка перестаёт действовать.
+
+
+def _reset_signature(user: User, expires: int) -> str:
+    from config import settings
+
+    message = f"{user.id}:{expires}:{user.hashed_password}".encode()
+    return hmac.new(settings.REG_SECRET_KEY.encode(), message, hashlib.sha256).hexdigest()
+
+
+def make_reset_token(user: User, ttl_hours: int) -> str:
+    expires = int(time.time()) + ttl_hours * 3600
+    raw = f"{user.id}:{expires}:{_reset_signature(user, expires)}"
+    return base64.urlsafe_b64encode(raw.encode()).decode().rstrip("=")
+
+
+async def get_user_by_reset_token(session: AsyncSession, token: str) -> User | None:
+    """Пользователь по токену сброса; None — токен неверный, просрочен или пароль уже сменён."""
+    try:
+        raw = base64.urlsafe_b64decode(token + "=" * (-len(token) % 4)).decode()
+        user_id, expires, signature = raw.split(":")
+        user_id, expires = int(user_id), int(expires)
+    except (ValueError, UnicodeDecodeError):
+        return None
+    if expires < time.time():
+        return None
+    user = await session.get(User, user_id)
+    if not user or not hmac.compare_digest(signature, _reset_signature(user, expires)):
+        return None
+    return user
+
+
+async def set_password(session: AsyncSession, user: User, password: str) -> None:
+    user.hashed_password = hash_password(password)
+    await session.flush()

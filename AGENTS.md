@@ -47,12 +47,14 @@ scr/
     models.py               # All SQLAlchemy models
     schemas/schemas.py      # All Pydantic schemas (ConfigDict style)
     crud_*.py               # One CRUD module per entity
+    crud_module_templates.py # Шаблоны блоков «по умолчанию» (несколько на раздел)
+    startup_migrations.py   # ADD COLUMN / пересоздание таблиц при старте (create_all колонки не добавляет)
   queries/                  # Empty directory (unused)
 tests/
   conftest.py               # In-memory SQLite, overrides session_dependency
   test_director_routes.py, test_excel.py, test_material_routes.py, test_module_routes.py
 templates/                  # Jinja2 HTML
-static/                     # CSS
+static/                     # CSS; table-filter.js (фильтры/пагинация списков), module-picker.js (выбор модулей в расчётах)
 alembic/                    # Migrations
 ```
 
@@ -87,4 +89,8 @@ alembic/                    # Migrations
 - Tests use in-memory SQLite with `dependency_overrides` — no real DB needed.
 - Новые константы (списки значений, ключи настроек, коэффициенты по умолчанию) — в `scr/constants.py`.
 - КСО204: значения пишутся прямо в XML листов (`scr/utils/xlsx_patch.py`), не через openpyxl save — иначе теряются сводные, подключения и картинки.
+- Списки (`<table data-filter-table data-per-page>`) грузятся целиком, фильтр и пагинация — на клиенте в `static/table-filter.js`; выгрузки берут строки с `data-matched != "0"`, а не видимые.
+- Выпадающие списки модулей в расчётах — через `ModulePicker` (`static/module-picker.js`): фильтр по характеристикам материалов, цвет типа материала (`MaterialType.color`). Порядок модулей — `crud_modules.sort_modules` (ток, класс точности, название).
+- Новый блок расчёта создаётся из шаблона (`ModuleTypeTemplate`): название, назначение, модули строк и добавленные модули. Скрытые строки синхронизируются с шаблоном блока.
+- Деньги в Excel — `scr.utils.excel.MONEY_FMT` (`#,##0.00`), не литеральный пробел.
 - Ruff ignores: `B008` (Depends in function args), `F401` (unused imports), `DTZ005` (datetime.utcnow).

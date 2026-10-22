@@ -23,6 +23,11 @@ ADD_COLUMNS = [
     ("request_calcs", "qty_1sh", "INTEGER NOT NULL DEFAULT 0"),
     ("request_calcs", "qty_2sh", "INTEGER NOT NULL DEFAULT 0"),
     ("request_calcs", "purpose", "VARCHAR(20)"),
+    ("material_types", "color", "VARCHAR(20)"),
+    ("module_type_slots", "purpose", "VARCHAR(100)"),
+    ("module_type_defaults", "template_id", "INTEGER REFERENCES module_type_templates(id) ON DELETE CASCADE"),
+    ("request_calcs", "name", "VARCHAR(200)"),
+    ("request_calcs", "template_id", "INTEGER REFERENCES module_type_templates(id) ON DELETE SET NULL"),
 ]
 
 # Существующие блоки КСО: всё количество — на 1СШ
@@ -34,6 +39,8 @@ WHERE module_type_id IN (SELECT id FROM module_types_calc WHERE slug = 'kso')
 # Таблицы с устаревшими UNIQUE-ограничениями: SQLite не умеет их удалять — таблица пересоздаётся по модели
 REBUILD_IF_CONSTRAINT = [
     ("module_type_defaults", "uq_modtype_default_module"),
+    # Модуль по умолчанию — один на строку в каждом шаблоне, а не на строку вообще
+    ("module_type_defaults", "uq_modtype_default_slot UNIQUE"),
     ("request_calc_items", "uq_calc_item_module"),
 ]
 

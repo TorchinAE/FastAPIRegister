@@ -61,5 +61,62 @@
     </div>
 </div>
 
+<div class="card" style="margin-top:1rem;">
+    <div style="display:flex;justify-content:space-between;align-items:center;gap:1rem;margin-bottom:0.75rem;flex-wrap:wrap;">
+        <h2 style="margin:0;">Комплектация</h2>
+        <a href="/reg/api/requests/{{ req.id }}/tkp-kit/export-excel" class="btn btn-primary btn-sm" download>Скачать Excel</a>
+    </div>
+    <div class="table-wrap">
+        <table class="tkp-kit">
+            <thead>
+                <tr>
+                    <th style="width:3rem;">№</th>
+                    <th>Наименование оборудования</th>
+                    <th style="text-align:right;">Кол-во, шт</th>
+                    <th style="text-align:right;">Цена за ед. без НДС</th>
+                    <th style="text-align:right;">Стоимость без НДС</th>
+                </tr>
+            </thead>
+            <tbody>
+                {% set ns = namespace(n=0) %}
+                {% for section in kit %}
+                {% if section.header %}
+                <tr class="tkp-kit-section"><td></td><td colspan="4"><strong>{{ section.name }} в составе:</strong></td></tr>
+                {% endif %}
+                {% for block in section.blocks %}
+                {% set ns.n = ns.n + 1 %}
+                <tr>
+                    <td>{{ ns.n }}</td>
+                    <td>
+                        <strong>{{ block.title }}</strong>
+                        {% for line in block.lines %}<div class="tkp-kit-line">{{ line }}</div>{% endfor %}
+                    </td>
+                    <td style="text-align:right;">{{ block.quantity }}</td>
+                    <td style="text-align:right;white-space:nowrap;">{{ block.price|money }}</td>
+                    <td style="text-align:right;white-space:nowrap;font-weight:600;">{{ block.sum|money }}</td>
+                </tr>
+                {% endfor %}
+                {% endfor %}
+                {% if not kit %}
+                <tr><td colspan="5" style="text-align:center;color:var(--text-muted);padding:1.5rem;">Нет блоков расчёта</td></tr>
+                {% endif %}
+            </tbody>
+            {% if kit %}
+            <tfoot>
+                <tr style="font-weight:bold;"><td colspan="4" style="text-align:right;">Итого</td><td style="text-align:right;white-space:nowrap;">{{ kit_total|money }}</td></tr>
+                <tr><td colspan="4" style="text-align:right;">НДС {{ '%g'|format(nds_percent) }}%</td><td style="text-align:right;white-space:nowrap;">{{ (kit_total * nds_percent / 100)|money }}</td></tr>
+                <tr style="font-weight:bold;background:#f0fdf4;"><td colspan="4" style="text-align:right;">Всего</td><td style="text-align:right;white-space:nowrap;color:#16a34a;">{{ (kit_total * (1 + nds_percent / 100))|money }}</td></tr>
+            </tfoot>
+            {% endif %}
+        </table>
+    </div>
+</div>
+
+<style>
+.tkp-kit td { vertical-align: top; }
+.tkp-kit-line { font-size: 0.85rem; color: var(--text-muted); }
+.tkp-kit-section td { background: #f8fafc; }
+</style>
+
 <div id="toast" class="toast" style="display:none"></div>
 {% endblock %}

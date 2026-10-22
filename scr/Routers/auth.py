@@ -2,6 +2,7 @@ from fastapi import APIRouter, Depends, HTTPException, Request, Response
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from config import settings
+from scr.constants import REGISTRATION_DENIED_MSG
 from scr.dbase import crud_users
 from scr.dbase.database import db_helper
 from scr.dbase.schemas.schemas import UserCreate, UserLogin, UserResponse
@@ -23,7 +24,7 @@ async def register(
     if settings.MY_DOMEN:
         domain = user_in.email.split("@")[-1].lower()
         if domain != settings.MY_DOMEN.lower():
-            raise HTTPException(status_code=400, detail=f"Регистрация только с домена @{settings.MY_DOMEN}")
+            raise HTTPException(status_code=400, detail=REGISTRATION_DENIED_MSG)
     user = await crud_users.create_user(session, user_in)
     await session.commit()
     response.set_cookie(key=SESSION_KEY, value=user.email, httponly=True)

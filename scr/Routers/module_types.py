@@ -1,11 +1,11 @@
 import io
 
-from fastapi import APIRouter, Depends, File, HTTPException, UploadFile
+from fastapi import APIRouter, Depends, File, HTTPException, Query, UploadFile
 from openpyxl import Workbook, load_workbook
 from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
 
-from scr.dbase import crud_module_slots, crud_module_types, crud_modules
+from scr.dbase import crud_module_slots, crud_module_templates, crud_module_types, crud_modules
 from scr.dbase.database import db_helper
 from scr.dbase.models import ModuleTypeDefault
 from scr.dbase.schemas.schemas import (
@@ -15,6 +15,8 @@ from scr.dbase.schemas.schemas import (
     ModuleTypeResponseSchema,
     ModuleTypeSlotCreateSchema,
     ModuleTypeSlotUpdateSchema,
+    ModuleTypeTemplateCreateSchema,
+    ModuleTypeTemplateUpdateSchema,
     RequestCalcCreateSchema,
     RequestCalcItemCreateSchema,
     RequestCalcItemResponseSchema,
@@ -22,6 +24,7 @@ from scr.dbase.schemas.schemas import (
     RequestCalcResponseSchema,
     RequestCalcUpdateSchema,
     SlotModuleSchema,
+    TemplateItemCreateSchema,
 )
 
 mt_calc_router = APIRouter(tags=["ModuleTypes"])
@@ -165,8 +168,10 @@ _DEFAULTS_ALIASES = {
 @mt_calc_router.get("/api/module-types/{type_id}/defaults/export-excel")
 async def export_defaults_excel(
     type_id: int,
+    template_id: int | None = Query(None),
     session: AsyncSession = Depends(db_helper.session_dependency),
 ):
+    """Модули шаблона (не задан — основного) по обязательным строкам."""
     from datetime import datetime as dt
 
     from openpyxl.styles import Font
@@ -176,16 +181,16 @@ async def export_defaults_excel(
     mt = await crud_module_types.get_module_type_by_id(session, type_id)
     if not mt:
         raise HTTPException(status_code=404, detail="Тип модуля не найден")
-    defaults = await crud_module_types.get_defaults(session, type_id)
+    tpl = await crud_module_templates.resolve_template(session, type_id, template_id)
     slots = await crud_module_slots.get_slots(session, type_id)
     prices = await crud_modules.get_module_prices(session)
-    by_slot = {d.slot_id: d for d in defaults if d.slot_id is not None}
+    by_slot = {d.slot_id: d for d in tpl.defaults if d.slot_id is not None}
 
     wb = Workbook()
     ws = wb.active
     ws.title = "Модули по умолчанию"
     headers = ["ID", "Строка", "Модуль", "Кол-во", "Цена за ед.", "Сумма"]
-    ws.append([f"{mt.name} — модули по умолчанию"])
+    ws.append([f"{mt.name} — модули по умолчанию, шаблон «{tpl.name}»"])
     ws.merge_cells(start_row=1, start_column=1, end_row=1, end_column=len(headers))
     ws.cell(1, 1).font = Font(bold=True, size=14)
     write_header(ws, headers)
@@ -213,16 +218,19 @@ async def export_defaults_excel(
         ws.cell(total_row, col).font = Font(bold=True)
     border_row(ws, total_row, len(headers))
     auto_fit_columns(ws)
-    return xlsx_response(wb, f"defaults_{safe_filename(mt.slug)}_{dt.now().strftime('%Y%m%d')}.xlsx")
+    name = f"defaults_{safe_filename(mt.slug)}_{safe_filename(tpl.name)}_{dt.now().strftime('%Y%m%d')}.xlsx"
+    return xlsx_response(wb, name)
 
 
 @mt_calc_router.post("/api/module-types/{type_id}/defaults/import-excel")
 async def import_defaults_excel(
     type_id: int,
     file: UploadFile = File(...),
+    template_id: int | None = Query(None),
     session: AsyncSession = Depends(db_helper.session_dependency),
 ):
-    """Модуль ищется по ID, затем по названию. Уже добавленный модуль — количество заменяется.
+    """Загрузка в шаблон (не задан — в основной). Модуль ищется по ID, затем по названию.
+    Уже добавленный модуль — количество заменяется.
 
     Колонка «Строка» с названием обязательной строки — модуль ставится в эту строку.
     Строки без обязательной строки пропускаются: модули по умолчанию — только обязательные строки.
@@ -247,6 +255,7 @@ async def import_defaults_excel(
         raise HTTPException(status_code=400, detail="Не найдена строка заголовка с колонкой «Модуль»")
 
     slots = {s.name.strip().lower(): s for s in await crud_module_slots.get_slots(session, type_id)}
+    tpl = await crud_module_templates.resolve_template(session, type_id, template_id)
     find_or_create = await material_finder(session)
     added = updated = created_modules = created_materials = 0
     skipped: list[str] = []
@@ -283,10 +292,12 @@ async def import_defaults_excel(
         if not slot:
             skipped.append(f"{mod.name}: нет обязательной строки «{slot_name or ''}»")
             continue
-        default_stmt = select(ModuleTypeDefault.id).where(ModuleTypeDefault.slot_id == slot.id)
+        default_stmt = select(ModuleTypeDefault.id).where(
+            ModuleTypeDefault.slot_id == slot.id, ModuleTypeDefault.template_id == tpl.id
+        )
         had_default = (await session.execute(default_stmt)).first() is not None
         try:
-            await crud_module_slots.set_slot_default(session, slot, mod.id, qty)
+            await crud_module_slots.set_slot_default(session, slot, mod.id, qty, tpl.id)
         except ValueError as exc:
             skipped.append(f"{mod.name}: {exc}")
             continue
@@ -404,10 +415,10 @@ async def set_slot_default(
     data: SlotModuleSchema,
     session: AsyncSession = Depends(db_helper.session_dependency),
 ):
-    """Модуль обязательной строки в «модулях по умолчанию»."""
+    """Модуль обязательной строки в шаблоне «по умолчанию» (template_id не задан — в основном)."""
     slot = await _slot_or_404(session, slot_id)
     try:
-        obj = await crud_module_slots.set_slot_default(session, slot, data.module_id, data.quantity)
+        obj = await crud_module_slots.set_slot_default(session, slot, data.module_id, data.quantity, data.template_id)
     except ValueError as exc:
         raise HTTPException(status_code=400, detail=str(exc)) from exc
     await session.commit()
@@ -416,6 +427,86 @@ async def set_slot_default(
     prices = await crud_modules.get_module_prices(session)
     return {"item": {"id": obj.id, "module_id": obj.module_id, "quantity": obj.quantity,
                      "module_price": prices.get(obj.module_id, 0.0)}}  # fmt: skip
+
+
+# ── Шаблоны блоков («по умолчанию») ──
+
+
+async def _template_or_404(session: AsyncSession, template_id: int):
+    tpl = await crud_module_templates.get_template(session, template_id)
+    if not tpl:
+        raise HTTPException(status_code=404, detail="Шаблон не найден")
+    return tpl
+
+
+async def _template_json(session: AsyncSession, template_id: int) -> dict:
+    tpl = await _template_or_404(session, template_id)
+    slots = await crud_module_slots.get_slots(session, tpl.module_type_id)
+    prices = await crud_modules.get_module_prices(session)
+    return crud_module_templates.template_json(tpl, slots, prices)
+
+
+@mt_calc_router.get("/api/module-types/{type_id}/templates")
+async def list_templates(type_id: int, session: AsyncSession = Depends(db_helper.session_dependency)):
+    """Шаблоны раздела (id, название, назначение) — для выбора при добавлении блока."""
+    templates = await crud_module_templates.get_templates(session, type_id)
+    await session.commit()
+    return [{"id": t.id, "name": t.name, "purpose": t.purpose or ""} for t in templates]
+
+
+@mt_calc_router.post("/api/module-types/{type_id}/templates")
+async def create_template(
+    type_id: int,
+    data: ModuleTypeTemplateCreateSchema,
+    session: AsyncSession = Depends(db_helper.session_dependency),
+):
+    if not await crud_module_types.get_module_type_by_id(session, type_id):
+        raise HTTPException(status_code=404, detail="Тип модуля не найден")
+    tpl = await crud_module_templates.add_template(session, type_id, data.name, data.purpose, data.copy_from)
+    await session.commit()
+    return await _template_json(session, tpl.id)
+
+
+@mt_calc_router.patch("/api/module-type-templates/{template_id}")
+async def update_template(
+    template_id: int,
+    data: ModuleTypeTemplateUpdateSchema,
+    session: AsyncSession = Depends(db_helper.session_dependency),
+):
+    tpl = await crud_module_templates.update_template(
+        session, template_id, data.name, data.purpose, set_purpose="purpose" in data.model_fields_set
+    )
+    if not tpl:
+        raise HTTPException(status_code=404, detail="Шаблон не найден")
+    await session.commit()
+    return {"id": tpl.id, "name": tpl.name, "purpose": tpl.purpose or ""}
+
+
+@mt_calc_router.delete("/api/module-type-templates/{template_id}")
+async def delete_template(template_id: int, session: AsyncSession = Depends(db_helper.session_dependency)):
+    try:
+        tpl = await crud_module_templates.delete_template(session, template_id)
+    except ValueError as exc:
+        raise HTTPException(status_code=400, detail=str(exc)) from exc
+    if not tpl:
+        raise HTTPException(status_code=404, detail="Шаблон не найден")
+    await session.commit()
+    return {"ok": True}
+
+
+@mt_calc_router.post("/api/module-type-templates/{template_id}/items")
+async def add_template_item(
+    template_id: int,
+    data: TemplateItemCreateSchema,
+    session: AsyncSession = Depends(db_helper.session_dependency),
+):
+    """Модуль шаблона вне обязательных строк."""
+    tpl = await _template_or_404(session, template_id)
+    if not await crud_modules.get_module_by_id(session, data.module_id):
+        raise HTTPException(status_code=404, detail="Модуль не найден")
+    await crud_module_templates.add_template_item(session, tpl, data.module_id, data.quantity)
+    await session.commit()
+    return await _template_json(session, template_id)
 
 
 @mt_calc_router.put("/api/request-calcs/{calc_id}/slots/{slot_id}")
@@ -463,7 +554,7 @@ async def create_calc(
     """Новый блок расчёта со значениями по умолчанию. Возвращает данные блока для страницы."""
     if not await crud_module_types.get_module_type_by_id(session, data.module_type_id):
         raise HTTPException(status_code=404, detail="Тип модуля не найден")
-    calc = await crud_module_types.create_calc(session, data.request_id, data.module_type_id)
+    calc = await crud_module_types.create_calc(session, data.request_id, data.module_type_id, data.template_id)
     section_cost = await crud_module_types.recalc_section_cost(session, data.request_id, data.module_type_id)
     await session.commit()
     prices = await crud_modules.get_module_prices(session)
@@ -627,14 +718,25 @@ async def export_kit_excel(req_id: int, session: AsyncSession = Depends(db_helpe
     add_row(ws, [f"Итого с НДС {summary['nds_percent']:g}%", *[None] * 7, t["final_nds"]], (9,), len(headers), True)
     auto_fit_columns(ws)
 
-    # Модули
+    # Модули: строка раздела (кол-во и стоимость без НДС — у всех разделов, включая корпуса и работы),
+    # под ней модули раздела
     ws = wb.create_sheet("Комплектация")
     headers = ["Раздел", "ID", "Модуль", "Кол-во", "Цена за ед.", "Сумма"]
     sheet_title(ws, f"{title} — комплектация", len(headers))
     write_header(ws, headers)
+    modules_by_section: dict[str, list[dict]] = {}
     for r in kit["modules"]:
-        add_row(ws, [r["section"], r["module_id"], r["name"], r["quantity"], r["price"], r["sum"]], (5, 6), 6)
-    add_row(ws, ["Итого", None, None, None, None, sum(r["sum"] for r in kit["modules"])], (6,), 6, True)
+        modules_by_section.setdefault(r["section"], []).append(r)
+    for s in summary["rows"]:
+        unit = s["final"] / s["quantity"] if s["quantity"] else s["final"]
+        add_row(ws, [s["name"], None, None, s["quantity"], unit, s["final"]], (5, 6), 6, is_total=True)
+        for r in modules_by_section.pop(s["name"], []):
+            add_row(ws, [r["section"], r["module_id"], r["name"], r["quantity"], r["price"], r["sum"]], (5, 6), 6)
+    for rows in modules_by_section.values():
+        for r in rows:
+            add_row(ws, [r["section"], r["module_id"], r["name"], r["quantity"], r["price"], r["sum"]], (5, 6), 6)
+    add_row(ws, ["Итого модули", None, None, None, None, sum(r["sum"] for r in kit["modules"])], (6,), 6, True)
+    add_row(ws, ["Итого без НДС", None, None, None, None, summary["totals"]["final"]], (6,), 6, True)
     auto_fit_columns(ws)
 
     # Материалы (подмодули раскрыты)
@@ -649,6 +751,73 @@ async def export_kit_excel(req_id: int, session: AsyncSession = Depends(db_helpe
     auto_fit_columns(ws)
 
     return xlsx_response(wb, f"komplektaciya_tkp_{req.id}_{dt.now().strftime('%Y%m%d')}.xlsx")
+
+
+@mt_calc_router.get("/api/requests/{req_id}/tkp-kit/export-excel")
+async def export_tkp_kit_excel(req_id: int, session: AsyncSession = Depends(db_helper.session_dependency)):
+    """Комплектация ТКП таблицей, как в файле ТКП: №, наименование (блок и состав), кол-во, цена, стоимость,
+    итого, НДС, всего — с формулами."""
+    from datetime import datetime as dt
+
+    from openpyxl.styles import Alignment, Font
+
+    from scr.dbase import crud_requests, crud_settings
+    from scr.dbase.crud_tkp import build_tkp_kit
+    from scr.utils.excel import MONEY_FMT, border_row, write_header, xlsx_response
+
+    req = await crud_requests.get_request_by_id(session, req_id)
+    if not req:
+        raise HTTPException(status_code=404, detail="ТКП не найдена")
+    if await crud_module_slots.sync_hidden_slots(session, req_id):
+        await session.commit()
+    kit = await build_tkp_kit(session, req)
+    nds_val = await crud_settings.get_setting(session, "nds_percent")
+    nds = float(nds_val) if nds_val else 20.0
+
+    bold = Font(bold=True)
+    wrap = Alignment(wrap_text=True, vertical="top")
+    wb = Workbook()
+    ws = wb.active
+    ws.title = "Комплектация"
+    ws.append([f"Комплектация ТКП № {req.tkp_num or req.id}"])
+    ws.cell(1, 1).font = Font(bold=True, size=14)
+    ws.merge_cells(start_row=1, start_column=1, end_row=1, end_column=5)
+    write_header(ws, ["№", "Наименование оборудования", "Кол-во, шт", "Цена за ед продукции без НДС, руб",
+                      "Стоимость без НДС, руб"])  # fmt: skip
+    for col in range(1, 6):
+        ws.cell(ws.max_row, col).alignment = Alignment(wrap_text=True, vertical="center")
+    first = ws.max_row + 1
+    n = 0
+    for section in kit:
+        if section["header"]:
+            ws.append([None, f"{section['name']} в составе:"])
+            ws.cell(ws.max_row, 2).font = bold
+            border_row(ws, ws.max_row, 5)
+        for block in section["blocks"]:
+            n += 1
+            # Состав блока — в той же ячейке, построчно
+            text = ", \n".join([block["title"], *block["lines"]])
+            ws.append([n, text, block["quantity"], block["price"]])
+            r = ws.max_row
+            ws.cell(r, 5).value = f"=D{r}*C{r}"
+            ws.cell(r, 2).font = bold
+            for col in range(1, 6):
+                ws.cell(r, col).alignment = wrap
+            ws.cell(r, 4).number_format = MONEY_FMT
+            ws.cell(r, 5).number_format = MONEY_FMT
+            border_row(ws, r, 5)
+    last = ws.max_row
+    for label, formula in (
+        ("Итого", f"=SUM(E{first}:E{last})" if last >= first else 0),
+        (f"НДС {nds:g}%:", f"=E{last + 1}*{nds / 100:g}"),
+        ("Всего:", f"=E{last + 1}+E{last + 2}"),
+    ):
+        ws.append([None, None, None, label, formula])
+        ws.cell(ws.max_row, 4).font = bold
+        ws.cell(ws.max_row, 5).number_format = MONEY_FMT
+    for col, width in zip("ABCDE", (5, 70, 10, 18, 18), strict=True):
+        ws.column_dimensions[col].width = width
+    return xlsx_response(wb, f"komplektaciya_tkp_{req.tkp_num or req.id}_{dt.now().strftime('%Y%m%d')}.xlsx")
 
 
 @mt_calc_router.get("/api/requests/{req_id}/calc/{section}/export-excel")

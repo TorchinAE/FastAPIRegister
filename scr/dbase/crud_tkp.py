@@ -5,10 +5,18 @@ from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy.orm import selectinload
 
 from scr.dbase import crud_modules, crud_settings
-from scr.dbase.crud_module_types import MULTI_BLOCK_SECTIONS
+from scr.dbase.crud_module_types import MULTI_BLOCK_SECTIONS, SECTION_COST_FIELDS, WORKS_SECTIONS
 from scr.dbase.models import Delivery, Material, ModuleType, Request, RequestCalc, RequestCalcItem, ServiceCalc
 
 SERVICE_SECTIONS = [("chief-engineer", "Шеф-инженер"), ("smr", "СМР"), ("pnr", "ПНР")]
+# Порядок разделов в сводной и комплектации ТКП — как на странице расчёта
+SECTION_ORDER = {slug: i for i, slug in enumerate(SECTION_COST_FIELDS)}
+# Разделы, где количество — сумма количеств блоков (у Корпусов один блок, но со своим количеством)
+BLOCK_QTY_SECTIONS = MULTI_BLOCK_SECTIONS | {"corpusa"}
+
+
+def _block_qty(calc: RequestCalc) -> int:
+    return calc.quantity if calc.quantity is not None else 1
 
 
 def _row(slug: str, name: str, qty, comp, fot, overhead, cost, final) -> dict:
@@ -60,10 +68,11 @@ async def build_tkp_summary(session: AsyncSession, req: Request) -> dict:
             cost += c_cost * q
             comp += max(c_cost - c_fot - c_overhead, 0) * q
             final += float(c.final_price or 0) * q
-        if mt.slug in MULTI_BLOCK_SECTIONS:
+        if mt.slug in BLOCK_QTY_SECTIONS:
             qty = sum(c.quantity or 0 for c in type_calcs)
         else:
-            qty = request_quantities.get(mt.slug, 0) or 0
+            # КТП, ПКУ, ПУС — из заявки; работы и прочие — 1, если есть стоимость
+            qty = request_quantities.get(mt.slug, 0) or (1 if final > 0 else 0)
         rows.append(_row(mt.slug, mt.name, qty, comp, fot, overhead, cost, final))
 
     delivery = (await session.execute(select(Delivery).where(Delivery.request_id == req.id))).scalars().first()
@@ -84,6 +93,7 @@ async def build_tkp_summary(session: AsyncSession, req: Request) -> dict:
             base = float(sc.base_cost or 0)
             rows.append(_row(section, label, sc.quantity or 1, 0.0, 0.0, 0.0, base, float(sc.final_price)))
 
+    rows.sort(key=lambda r: SECTION_ORDER.get(r["slug"], len(SECTION_ORDER)))
     totals = {key: sum(r[key] for r in rows) for key in ("comp", "fot", "overhead", "cost", "final")}
     totals["final_nds"] = totals["final"] * (1 + nds_percent / 100)
     # Средняя рентабельность — взвешенная по себестоимости: прибыль / себестоимость
@@ -173,6 +183,88 @@ async def build_kit(session: AsyncSession, req: Request) -> dict:
             )
         material_rows.sort(key=lambda r: (r["type"], r["name"]))
     return {"modules": module_rows, "materials": material_rows}
+
+
+def kit_line(purpose: str | None, quantity: int, name: str) -> str:
+    """Строка модуля в комплектации: «Назначение: 3хНазвание» (1 шт. — без «1х»), без назначения — «1хНазвание»."""
+    if purpose:
+        return f"{purpose}: {f'{quantity}х' if quantity > 1 else ''}{name}"
+    return f"{quantity}х{name}"
+
+
+async def build_tkp_kit(session: AsyncSession, req: Request) -> list[dict]:
+    """Комплектация для ТКП: разделы по порядку, в них блоки с составом, количеством и ценой.
+
+    Блок: title — «{название блока}-{назначение}», lines — модули блока по порядку строк (скрытые строки
+    не выводятся, но входят в цену), quantity — количество блоков, price — общая стоимость блока без НДС.
+    Разделы работ и доставка — одной строкой, количество 1 при ненулевой стоимости.
+    """
+    from scr.dbase.crud_module_slots import get_slots, order_by_slots
+
+    stmt = (
+        select(RequestCalc)
+        .where(RequestCalc.request_id == req.id)
+        .options(
+            selectinload(RequestCalc.module_type),
+            selectinload(RequestCalc.items).selectinload(RequestCalcItem.module),
+        )
+        .order_by(RequestCalc.module_type_id, RequestCalc.id)
+    )
+    calcs = list((await session.execute(stmt)).scalars().all())
+    by_type: dict[int, list[RequestCalc]] = {}
+    for calc in calcs:
+        by_type.setdefault(calc.module_type_id, []).append(calc)
+
+    sections: list[dict] = []
+    for type_calcs in by_type.values():
+        mt = type_calcs[0].module_type
+        if mt.slug in WORKS_SECTIONS:
+            price = sum(float(c.final_price or 0) * _block_qty(c) for c in type_calcs)
+            if price > 0:
+                block = {"title": mt.name, "lines": [], "quantity": 1, "price": price, "sum": price}
+                sections.append({"slug": mt.slug, "name": mt.name, "header": False, "blocks": [block]})
+            continue
+        slots = {s.id: s for s in await get_slots(session, mt.id)}
+        blocks = []
+        for calc in type_calcs:
+            qty = _block_qty(calc)
+            price = float(calc.final_price or 0)
+            if not qty or (not calc.items and not price):
+                continue
+            title = calc.name or mt.name
+            if calc.purpose:
+                title += f"-{calc.purpose}"
+            lines = []
+            for item in order_by_slots(calc.items, list(slots.values())):
+                slot = slots.get(item.slot_id)
+                if slot is not None and slot.hidden or not item.quantity:
+                    continue
+                name = item.module.name if item.module else f"Модуль {item.module_id}"
+                lines.append(kit_line(slot.purpose if slot else None, item.quantity, name))
+            blocks.append({"title": title, "lines": lines, "quantity": qty, "price": price, "sum": price * qty})
+        if blocks:
+            # Заголовок «в составе» — у разделов из нескольких блоков (КСО, КРУ, ЩО)
+            header = mt.slug in MULTI_BLOCK_SECTIONS
+            sections.append({"slug": mt.slug, "name": mt.name, "header": header, "blocks": blocks})
+
+    delivery = (await session.execute(select(Delivery).where(Delivery.request_id == req.id))).scalars().first()
+    if delivery and float(delivery.final_price or 0) > 0:
+        price = float(delivery.final_price)
+        block = {"title": "Доставка", "lines": [], "quantity": 1, "price": price, "sum": price}
+        sections.append({"slug": "delivery", "name": "Доставка", "header": False, "blocks": [block]})
+    # Старые расчёты услуг — как в сводной: только если по разделу нет нового расчёта
+    present = {s["slug"] for s in sections} | {c.module_type.slug for c in calcs}
+    for section, label in SERVICE_SECTIONS:
+        if section in present:
+            continue
+        sc_stmt = select(ServiceCalc).where(ServiceCalc.request_id == req.id, ServiceCalc.section == section)
+        sc = (await session.execute(sc_stmt)).scalars().first()
+        if sc and float(sc.final_price or 0) > 0:
+            price = float(sc.final_price)
+            block = {"title": label, "lines": [], "quantity": 1, "price": price, "sum": price}
+            sections.append({"slug": section, "name": label, "header": False, "blocks": [block]})
+    sections.sort(key=lambda s: SECTION_ORDER.get(s["slug"], len(SECTION_ORDER)))
+    return sections
 
 
 async def build_calc_materials(session: AsyncSession, calcs: list[RequestCalc]) -> tuple[list[dict], list[dict]]:

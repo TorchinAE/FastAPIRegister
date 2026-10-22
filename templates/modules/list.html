@@ -22,16 +22,17 @@
     <button type="submit" class="btn btn-success" style="height:38px;">Добавить</button>
 </form>
 <div class="table-wrap">
-    <table id="dataTable">
+    <table id="dataTable" data-filter-table data-per-page="{{ per_page }}">
         <thead>
             <tr>
-                <th>ID</th><th>Название</th><th>Тип</th><th>Ном Ток</th><th>Компонентов</th><th>Стоимость</th><th></th>
+                <th>ID</th><th>Название</th><th>Тип</th><th>Ном Ток</th><th>Кл. точн.</th><th>Компонентов</th><th>Стоимость</th><th></th>
             </tr>
             <tr class="table-filter">
-                <th><input type="text" data-col="0" data-min="1" placeholder="Фильтр..." class="tf-input"></th>
+                <th><input type="text" data-col="0" placeholder="Фильтр..." class="tf-input"></th>
                 <th><input type="text" data-col="1" placeholder="Фильтр..." class="tf-input"></th>
                 <th><input type="text" data-col="2" placeholder="Фильтр..." class="tf-input"></th>
-                <th></th>
+                <th><input type="text" data-col="3" placeholder="Фильтр..." class="tf-input"></th>
+                <th><input type="text" data-col="4" placeholder="Фильтр..." class="tf-input"></th>
                 <th></th>
                 <th></th>
                 <th></th>
@@ -44,6 +45,7 @@
                 <td>{{ item.name }}</td>
                 <td>{{ item.material_type.name if item.material_type else '' }}</td>
                 <td>{{ item.nom_tok or 0 }}</td>
+                <td>{{ attrs[item.id].accuracy_class if item.id in attrs else '' }}</td>
                 <td>{{ item.items_count }}</td>
                 <td>{{ prices.get(item.id, 0)|money }}</td>
                 <td style="text-align:center;width:40px">
@@ -51,17 +53,10 @@
                 </td>
             </tr>
             {% endfor %}
-            {% if not items %}<tr class="empty-row"><td colspan="7">Нет модулей</td></tr>{% endif %}
+            {% if not items %}<tr class="empty-row"><td colspan="8">Нет модулей</td></tr>{% endif %}
         </tbody>
     </table>
 </div>
-{% if pages > 1 %}
-<div class="pagination">
-    {% for p in range(1, pages + 1) %}
-    <a href="/reg/modules?page={{ p }}" class="{{ 'active' if p == page else '' }}">{{ p }}</a>
-    {% endfor %}
-</div>
-{% endif %}
 <div id="toast" class="toast" style="display:none"></div>
 {% endblock %}
 
@@ -92,17 +87,5 @@ function showToast(msg) {
     const t = document.getElementById('toast'); t.textContent = msg;
     t.style.display = 'block'; setTimeout(() => t.style.display = 'none', 2500);
 }
-document.querySelectorAll('.tf-input').forEach(input => {
-    input.addEventListener('input', function() {
-        const col = parseInt(this.dataset.col);
-        const minLen = parseInt(this.dataset.min) || 3;
-        const val = this.value.toLowerCase();
-        document.querySelectorAll('#dataTable tbody tr:not(.empty-row)').forEach(row => {
-            if (val.length < minLen) { row.style.display = ''; return; }
-            const cell = row.cells[col];
-            row.style.display = cell && cell.textContent.toLowerCase().includes(val) ? '' : 'none';
-        });
-    });
-});
 </script>
 {% endblock %}

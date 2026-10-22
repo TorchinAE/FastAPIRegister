@@ -13,7 +13,9 @@ HEADER_FILL = PatternFill(start_color="D9D9D9", end_color="D9D9D9", fill_type="s
 THIN_BORDER = Border(
     left=Side(style="thin"), right=Side(style="thin"), top=Side(style="thin"), bottom=Side(style="thin")
 )
-MONEY_FMT = "# ##0.00"
+# Разделитель групп — по локали Excel (в русской — пробел), поэтому «,» а не литеральный пробел:
+# «# ##0.00» отделяло только последнюю тройку (1234 567,00)
+MONEY_FMT = "#,##0.00"
 
 
 def normalize(value) -> str:

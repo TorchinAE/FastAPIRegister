@@ -22,6 +22,7 @@ from scr.dbase.schemas.schemas import (
     MaterialUpdateSchema,
     PaginatedResponse,
 )
+from scr.utils.excel import MONEY_FMT
 
 mat_router = APIRouter(prefix="/api/materials", tags=["Materials"])
 
@@ -175,7 +176,7 @@ def _materials_excel(items: list) -> StreamingResponse:
             ]
         )
         row_num = ws.max_row
-        ws.cell(row_num, 4).number_format = "# ##0.00"
+        ws.cell(row_num, 4).number_format = MONEY_FMT
         for col_idx in range(1, num_cols + 1):
             ws.cell(row_num, col_idx).border = thin_border
 
