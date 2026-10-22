@@ -24,9 +24,11 @@ ADD_COLUMNS = [
     ("request_calcs", "qty_2sh", "INTEGER NOT NULL DEFAULT 0"),
     ("request_calcs", "purpose", "VARCHAR(20)"),
     ("material_types", "color", "VARCHAR(20)"),
-    ("module_type_slots", "purpose", "VARCHAR(100)"),
+    ("module_type_slots", "filters", "VARCHAR(200)"),
     ("module_type_defaults", "template_id", "INTEGER REFERENCES module_type_templates(id) ON DELETE CASCADE"),
     ("request_calcs", "name", "VARCHAR(200)"),
+    ("requests", "power_transformer_cost", "NUMERIC(12, 2) DEFAULT 0"),
+    ("requests", "mounting_cost", "NUMERIC(12, 2) DEFAULT 0"),
     ("request_calcs", "template_id", "INTEGER REFERENCES module_type_templates(id) ON DELETE SET NULL"),
 ]
 

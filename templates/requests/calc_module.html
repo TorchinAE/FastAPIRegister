@@ -58,6 +58,10 @@ const reqId = {{ req.id }};
 const moduleTypeId = {{ mt.id }};
 const MULTI = {{ 'true' if multi else 'false' }};
 const WORKS = {{ 'true' if works else 'false' }};
+// Монтаж оборудования в блоки: количество ячеек (КСО + КРУ + ЩО), иначе null
+const CELLS = {{ cells | tojson }};
+// Количество блока: у нескольких блоков — вводится, у монтажа — количество ячеек
+const HAS_QTY = MULTI || CELLS !== null;
 // КСО: количество блоков по секциям шин (1СШ + 2СШ)
 const SPLIT = {{ 'true' if split_qty else 'false' }};
 // Назначение блока: КСО — для опросного листа КСО204, ЩО — Ввод, Секционная, ...
@@ -104,7 +108,7 @@ function renderBlock(data, index) {
 
     const modulesPart = WORKS ? `
         <div class="form-group">
-            <label>Себестоимость работ</label>
+            <label>${CELLS !== null ? 'Стоимость монтажа 1 ячейки' : 'Себестоимость работ'}</label>
             ${moneyInput('f-works', data.works_cost)}
         </div>` : `
         <div class="calc-items f-slots"></div>
@@ -173,13 +177,13 @@ function renderBlock(data, index) {
                     <label>2СШ</label>
                     <input type="number" class="f-qty-2sh" value="${data.qty_2sh}" min="0" step="1">
                 </div>` : ''}
-                ${MULTI ? `
+                ${HAS_QTY ? `
                 <div class="form-group calc-qty-group">
-                    <label>${SPLIT ? 'Всего' : 'Кол-во'}</label>
-                    <input type="number" class="f-qty" value="${data.quantity}" min="0" step="1" ${SPLIT ? 'readonly tabindex="-1"' : ''}>
+                    <label ${CELLS !== null ? 'title="Сумма количеств КСО, КРУ, ЩО"' : ''}>${SPLIT ? 'Всего' : CELLS !== null ? 'Ячеек' : 'Кол-во'}</label>
+                    <input type="number" class="f-qty" value="${CELLS ?? data.quantity}" min="0" step="1" ${SPLIT || CELLS !== null ? 'readonly tabindex="-1"' : ''}>
                 </div>` : ''}
             </div>
-            ${MULTI ? `
+            ${HAS_QTY ? `
             <div class="form-group">
                 <label>Итого × кол-во</label>
                 ${moneyInput('f-block-total calc-strong', 0, 'readonly tabindex="-1"')}
@@ -345,7 +349,7 @@ function recalc(el, mode = 'pct') {
     setMoney(el.querySelector('.f-total-cost'), totalCost);
     setMoney(rubEl, profitRub);
     setMoney(finalEl, finalPrice);
-    if (MULTI) setMoney(el.querySelector('.f-block-total'), finalPrice * (parseInt(el.querySelector('.f-qty').value) || 0));
+    if (HAS_QTY) setMoney(el.querySelector('.f-block-total'), finalPrice * (parseInt(el.querySelector('.f-qty').value) || 0));
     el.dataset.totalCost = totalCost;
     el.dataset.finalPrice = finalPrice;
     updateSectionTotal();

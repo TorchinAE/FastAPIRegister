@@ -27,10 +27,12 @@
                 ('ktp', 'КТП', 'ktp_cost', req.ktp_cost),
                 ('pku', 'ПКУ', 'pku_cost', req.pku_cost),
                 ('pus', 'ПУС', 'pus_cost', req.pus_cost),
-                ('delivery', 'Доставка', 'delivery_cost', req.delivery_cost),
+                ('power-transformer', 'Силовой трансформатор', 'power_transformer_cost', req.power_transformer_cost),
+                ('mounting', 'Монтаж оборудования в блоки', 'mounting_cost', req.mounting_cost),
                 ('chief-engineer', 'Шеф-инженер', 'chief_engineer_cost', req.chief_engineer_cost),
                 ('smr', 'СМР', 'smr_cost', req.smr_cost),
                 ('pnr', 'ПНР', 'pnr_cost', req.pnr_cost),
+                ('delivery', 'Доставка', 'delivery_cost', req.delivery_cost),
             ] %}
 
             {% for key, label, field, cost in sections %}

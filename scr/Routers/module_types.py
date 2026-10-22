@@ -755,69 +755,69 @@ async def export_kit_excel(req_id: int, session: AsyncSession = Depends(db_helpe
 
 @mt_calc_router.get("/api/requests/{req_id}/tkp-kit/export-excel")
 async def export_tkp_kit_excel(req_id: int, session: AsyncSession = Depends(db_helper.session_dependency)):
-    """Комплектация ТКП таблицей, как в файле ТКП: №, наименование (блок и состав), кол-во, цена, стоимость,
-    итого, НДС, всего — с формулами."""
+    """ТКП по шаблону xlsx_templates/ТКП.xlsx: шапка, комплектация с формулами, итого, НДС, условия оплаты."""
     from datetime import datetime as dt
+    from urllib.parse import quote
 
-    from openpyxl.styles import Alignment, Font
+    from fastapi.responses import Response
 
     from scr.dbase import crud_requests, crud_settings
     from scr.dbase.crud_tkp import build_tkp_kit
-    from scr.utils.excel import MONEY_FMT, border_row, write_header, xlsx_response
+    from scr.utils.tkp_excel import TkpData, TkpRow, build_tkp_xlsx
 
     req = await crud_requests.get_request_by_id(session, req_id)
     if not req:
         raise HTTPException(status_code=404, detail="ТКП не найдена")
-    if await crud_module_slots.sync_hidden_slots(session, req_id):
-        await session.commit()
+    await crud_module_slots.sync_hidden_slots(session, req_id)
+    await crud_module_types.sync_mounting(session, req_id)
+    await session.commit()
     kit = await build_tkp_kit(session, req)
     nds_val = await crud_settings.get_setting(session, "nds_percent")
-    nds = float(nds_val) if nds_val else 20.0
 
-    bold = Font(bold=True)
-    wrap = Alignment(wrap_text=True, vertical="top")
-    wb = Workbook()
-    ws = wb.active
-    ws.title = "Комплектация"
-    ws.append([f"Комплектация ТКП № {req.tkp_num or req.id}"])
-    ws.cell(1, 1).font = Font(bold=True, size=14)
-    ws.merge_cells(start_row=1, start_column=1, end_row=1, end_column=5)
-    write_header(ws, ["№", "Наименование оборудования", "Кол-во, шт", "Цена за ед продукции без НДС, руб",
-                      "Стоимость без НДС, руб"])  # fmt: skip
-    for col in range(1, 6):
-        ws.cell(ws.max_row, col).alignment = Alignment(wrap_text=True, vertical="center")
-    first = ws.max_row + 1
-    n = 0
+    rows: list[TkpRow] = []
     for section in kit:
         if section["header"]:
-            ws.append([None, f"{section['name']} в составе:"])
-            ws.cell(ws.max_row, 2).font = bold
-            border_row(ws, ws.max_row, 5)
+            rows.append(TkpRow(f"{section['name']} в составе:"))
         for block in section["blocks"]:
-            n += 1
-            # Состав блока — в той же ячейке, построчно
             text = ", \n".join([block["title"], *block["lines"]])
-            ws.append([n, text, block["quantity"], block["price"]])
-            r = ws.max_row
-            ws.cell(r, 5).value = f"=D{r}*C{r}"
-            ws.cell(r, 2).font = bold
-            for col in range(1, 6):
-                ws.cell(r, col).alignment = wrap
-            ws.cell(r, 4).number_format = MONEY_FMT
-            ws.cell(r, 5).number_format = MONEY_FMT
-            border_row(ws, r, 5)
-    last = ws.max_row
-    for label, formula in (
-        ("Итого", f"=SUM(E{first}:E{last})" if last >= first else 0),
-        (f"НДС {nds:g}%:", f"=E{last + 1}*{nds / 100:g}"),
-        ("Всего:", f"=E{last + 1}+E{last + 2}"),
-    ):
-        ws.append([None, None, None, label, formula])
-        ws.cell(ws.max_row, 4).font = bold
-        ws.cell(ws.max_row, 5).number_format = MONEY_FMT
-    for col, width in zip("ABCDE", (5, 70, 10, 18, 18), strict=True):
-        ws.column_dimensions[col].width = width
-    return xlsx_response(wb, f"komplektaciya_tkp_{req.tkp_num or req.id}_{dt.now().strftime('%Y%m%d')}.xlsx")
+            rows.append(TkpRow(text, block["quantity"], block["price"]))
+    from sqlalchemy.orm import selectinload
+
+    from scr.dbase.models import Directors, Organization, PaymentItem
+
+    company = None
+    if req.company_id:
+        org_stmt = (
+            select(Organization)
+            .where(Organization.id == req.company_id)
+            .options(selectinload(Organization.director).selectinload(Directors.position))
+        )
+        company = (await session.execute(org_stmt)).scalar_one_or_none()
+    director = company.director if company else None
+    pay_stmt = select(PaymentItem).where(PaymentItem.request_id == req.id).order_by(PaymentItem.id)
+    payment_items = (await session.execute(pay_stmt)).scalars().all()
+    payment = ", ".join(f"{float(p.percent or 0):g}% {p.payment_type}" for p in payment_items if p.percent)
+    # Исх.№ {№ ТКП} от {Дата выдачи ТКП}; не задана — сегодня
+    issued = req.issue_date or dt.now()
+    data = TkpData(
+        number=f"{req.tkp_num or req.id} от {issued.strftime('%d.%m.%Y')}",
+        incoming=req.incoming_letter_num or "",
+        company=company.name if company else "",
+        position=director.position.name if director and director.position else "",
+        director=director.name if director else "",
+        rows=rows,
+        nds_percent=float(nds_val) if nds_val else 20.0,
+        payment=payment,
+        # Исполнитель — подпись менеджера со страницы «Пользователи» (не задана — имя)
+        executor=(req.manager.signature or req.manager.name) if req.manager else "",
+        phone=req.manager.phone or "" if req.manager else "",
+    )
+    filename = f"ТКП-{req.tkp_num or req.id}.xlsx"
+    return Response(
+        build_tkp_xlsx(data),
+        media_type="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
+        headers={"Content-Disposition": f"attachment; filename*=UTF-8''{quote(filename)}"},
+    )
 
 
 @mt_calc_router.get("/api/requests/{req_id}/calc/{section}/export-excel")

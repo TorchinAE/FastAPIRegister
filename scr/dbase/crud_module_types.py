@@ -2,6 +2,7 @@ from sqlalchemy import func, select
 from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy.orm import selectinload
 
+from scr.constants import CELL_SECTIONS, MOUNTING_SECTION, POWER_TRANSFORMER_SECTION
 from scr.dbase.models import InvoiceItem, ModuleType, ModuleTypeDefault, PayrollItem, RequestCalc, RequestCalcItem
 from scr.dbase.schemas.schemas import (
     ModuleTypeCreateSchema,
@@ -136,24 +137,26 @@ async def delete_default(session: AsyncSession, default_id: int) -> ModuleTypeDe
 
 # ── RequestCalc ──
 
-# Разделы расчёта → поле стоимости в Request
+# Разделы расчёта → поле стоимости в Request (порядок — как на странице расчёта и в ТКП, доставка последней)
 SECTION_COST_FIELDS = {
     "corpusa": "corpusa_cost",
     "kso": "kso_cost",
     "kru": "kru_cost",
     "sho": "sho_cost",
+    POWER_TRANSFORMER_SECTION: "power_transformer_cost",
     "ktp": "ktp_cost",
     "pku": "pku_cost",
     "pus": "pus_cost",
-    "delivery": "delivery_cost",
+    MOUNTING_SECTION: "mounting_cost",
     "chief-engineer": "chief_engineer_cost",
     "smr": "smr_cost",
     "pnr": "pnr_cost",
+    "delivery": "delivery_cost",
 }
 # Разделы, где можно добавлять несколько блоков расчёта
-MULTI_BLOCK_SECTIONS = {"kso", "kru", "sho"}
-# Разделы работ: вместо модулей — себестоимость работ
-WORKS_SECTIONS = {"chief-engineer", "smr", "pnr"}
+MULTI_BLOCK_SECTIONS = CELL_SECTIONS | {POWER_TRANSFORMER_SECTION}
+# Разделы работ: вместо модулей — себестоимость работ (у монтажа — стоимость монтажа 1 ячейки)
+WORKS_SECTIONS = {"chief-engineer", "smr", "pnr", MOUNTING_SECTION}
 # Разделы, где количество блоков разбито по секциям шин: 1СШ + 2СШ
 SPLIT_QTY_SECTIONS = {"kso"}
 
@@ -317,7 +320,36 @@ async def recalc_section_cost(session: AsyncSession, request_id: int, module_typ
     if field:
         setattr(req, field, round(total, 2))
         await session.flush()
+    if mod_type.slug in CELL_SECTIONS:
+        await sync_mounting(session, request_id)
     return total
+
+
+async def cells_count(session: AsyncSession, request_id: int) -> int:
+    """Количество ячеек заявки: сумма количеств блоков КСО, КРУ, ЩО."""
+    stmt = (
+        select(func.coalesce(func.sum(RequestCalc.quantity), 0))
+        .join(ModuleType, ModuleType.id == RequestCalc.module_type_id)
+        .where(RequestCalc.request_id == request_id, ModuleType.slug.in_(CELL_SECTIONS))
+    )
+    return int((await session.execute(stmt)).scalar() or 0)
+
+
+async def sync_mounting(session: AsyncSession, request_id: int) -> int:
+    """Монтаж оборудования в блоки: количество блока = количество ячеек, стоимость раздела пересчитывается."""
+    cells = await cells_count(session, request_id)
+    stmt = (
+        select(RequestCalc)
+        .join(ModuleType, ModuleType.id == RequestCalc.module_type_id)
+        .where(RequestCalc.request_id == request_id, ModuleType.slug == MOUNTING_SECTION)
+    )
+    calcs = list((await session.execute(stmt)).scalars().all())
+    for calc in calcs:
+        calc.quantity = cells
+    if calcs:
+        await session.flush()
+        await recalc_section_cost(session, request_id, calcs[0].module_type_id)
+    return cells
 
 
 async def delete_calc(session: AsyncSession, calc_id: int) -> RequestCalc | None:

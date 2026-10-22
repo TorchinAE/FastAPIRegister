@@ -4,6 +4,7 @@ from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy.orm import selectinload
 
+from scr.constants import CELL_SECTIONS, MOUNTING_SECTION
 from scr.dbase import crud_modules, crud_settings
 from scr.dbase.crud_module_types import MULTI_BLOCK_SECTIONS, SECTION_COST_FIELDS, WORKS_SECTIONS
 from scr.dbase.models import Delivery, Material, ModuleType, Request, RequestCalc, RequestCalcItem, ServiceCalc
@@ -11,8 +12,9 @@ from scr.dbase.models import Delivery, Material, ModuleType, Request, RequestCal
 SERVICE_SECTIONS = [("chief-engineer", "Шеф-инженер"), ("smr", "СМР"), ("pnr", "ПНР")]
 # Порядок разделов в сводной и комплектации ТКП — как на странице расчёта
 SECTION_ORDER = {slug: i for i, slug in enumerate(SECTION_COST_FIELDS)}
-# Разделы, где количество — сумма количеств блоков (у Корпусов один блок, но со своим количеством)
-BLOCK_QTY_SECTIONS = MULTI_BLOCK_SECTIONS | {"corpusa"}
+# Разделы, где количество — сумма количеств блоков (у Корпусов один блок, но со своим количеством,
+# у монтажа — количество ячеек)
+BLOCK_QTY_SECTIONS = MULTI_BLOCK_SECTIONS | {"corpusa", MOUNTING_SECTION}
 
 
 def _block_qty(calc: RequestCalc) -> int:
@@ -185,10 +187,10 @@ async def build_kit(session: AsyncSession, req: Request) -> dict:
     return {"modules": module_rows, "materials": material_rows}
 
 
-def kit_line(purpose: str | None, quantity: int, name: str) -> str:
-    """Строка модуля в комплектации: «Назначение: 3хНазвание» (1 шт. — без «1х»), без назначения — «1хНазвание»."""
-    if purpose:
-        return f"{purpose}: {f'{quantity}х' if quantity > 1 else ''}{name}"
+def kit_line(label: str | None, quantity: int, name: str) -> str:
+    """Строка модуля в комплектации: «Название строки: 3хМодуль» (1 шт. — без «1х»), вне строк — «1хМодуль»."""
+    if label:
+        return f"{label}: {f'{quantity}х' if quantity > 1 else ''}{name}"
     return f"{quantity}х{name}"
 
 
@@ -240,11 +242,11 @@ async def build_tkp_kit(session: AsyncSession, req: Request) -> list[dict]:
                 if slot is not None and slot.hidden or not item.quantity:
                     continue
                 name = item.module.name if item.module else f"Модуль {item.module_id}"
-                lines.append(kit_line(slot.purpose if slot else None, item.quantity, name))
+                lines.append(kit_line(slot.name if slot else None, item.quantity, name))
             blocks.append({"title": title, "lines": lines, "quantity": qty, "price": price, "sum": price * qty})
         if blocks:
-            # Заголовок «в составе» — у разделов из нескольких блоков (КСО, КРУ, ЩО)
-            header = mt.slug in MULTI_BLOCK_SECTIONS
+            # Заголовок «в составе» — у разделов из ячеек (КСО, КРУ, ЩО)
+            header = mt.slug in CELL_SECTIONS
             sections.append({"slug": mt.slug, "name": mt.name, "header": header, "blocks": blocks})
 
     delivery = (await session.execute(select(Delivery).where(Delivery.request_id == req.id))).scalars().first()

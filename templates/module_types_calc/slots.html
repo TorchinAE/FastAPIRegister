@@ -17,7 +17,7 @@
 <div class="page-header">
     <div>
         <h1>Обязательные строки</h1>
-        <div class="subtitle">Строки подставляются в модули по умолчанию и расчёт. В строку можно выбрать только модуль выбранных типов.</div>
+        <div class="subtitle">Строки подставляются в модули по умолчанию и расчёт. В строку можно выбрать только модуль выбранных типов. Название строки идёт в комплектацию ТКП.</div>
     </div>
     {% if mt %}
     <div style="display:flex;gap:0.5rem;flex-wrap:wrap;">
@@ -39,10 +39,6 @@
             <label>Название строки</label>
             <input type="text" id="newName" required maxlength="200" style="width:100%;">
         </div>
-        <div class="form-group" style="flex:1;min-width:220px;margin-bottom:0;">
-            <label>Назначение (в комплектацию ТКП)</label>
-            <input type="text" id="newPurpose" maxlength="100" placeholder="напр. Вакуумный выключатель" style="width:100%;">
-        </div>
         <label style="display:flex;gap:0.4rem;align-items:center;height:38px;margin:0;">
             <input type="checkbox" id="newHidden"> Не отображать в расчёте
         </label>
@@ -56,8 +52,8 @@
             <tr>
                 <th style="width:40px">№</th>
                 <th>Название строки</th>
-                <th title="Подпись модуля строки в комплектации ТКП: «Назначение: модуль»">Назначение</th>
                 <th>Типы модулей</th>
+                <th title="Фильтры выбора модуля строки в шаблонах по умолчанию">Фильтр модулей</th>
                 <th title="Не отображать в расчёте, но учитывать в стоимости">Не отображать</th>
                 <th style="width:90px">Порядок</th>
                 <th style="width:50px"></th>
@@ -68,6 +64,8 @@
 </div>
 <div style="margin-top:0.75rem;font-size:0.85rem;color:var(--text-muted);">
     Тип модуля задаётся на странице модуля. Если типы не выбраны — в строку подходит любой модуль.
+    В комплектации ТКП модуль строки выводится как «Название строки: модуль».
+    Отмеченные фильтры показываются у строки в шаблонах по умолчанию.
     Скрытая строка не показывается в расчёте, её модуль всегда берётся из модулей по умолчанию и учитывается в стоимости.
 </div>
 {% else %}
@@ -82,6 +80,7 @@
 <script>
 const typeId = {{ mt.id }};
 const materialTypes = {{ material_types | tojson }};
+const slotFilters = {{ slot_filters | tojson }};
 let slots = {{ slots | tojson }};
 
 function esc(s) {
@@ -91,6 +90,28 @@ function esc(s) {
 function typesSummary(slot) {
     return slot.type_names.length ? esc(slot.type_names.join(', ')) : '<span class="slot-muted">любые</span>';
 }
+
+function filtersSummary(slot) {
+    return slot.filters.length ? esc(slot.filters.map(k => slotFilters[k] || k).join(', ')) : '<span class="slot-muted">нет</span>';
+}
+
+// Выпадающий список чекбоксов; при закрытии — onClose(отмеченные значения)
+function checkList(summary, title, options, onClose) {
+    const details = document.createElement('details');
+    details.className = 'slot-types';
+    details.innerHTML = `
+        <summary title="${esc(title)}">${summary}</summary>
+        <div class="slot-types-list">
+            ${options.map(o => `
+            <label><input type="checkbox" value="${esc(o.value)}" ${o.checked ? 'checked' : ''}> ${esc(o.label)}</label>`).join('')}
+        </div>`;
+    details.addEventListener('toggle', () => {
+        if (!details.open) onClose([...details.querySelectorAll('input:checked')].map(c => c.value));
+    });
+    return details;
+}
+
+const sameSet = (a, b) => a.length === b.length && a.every(x => b.includes(x));
 
 function render() {
     const body = document.getElementById('slotsBody');
@@ -105,16 +126,8 @@ function render() {
         tr.innerHTML = `
             <td>${i + 1}</td>
             <td><input type="text" class="cell-input f-name" value="${esc(slot.name)}" maxlength="200" style="width:100%;min-width:180px;"></td>
-            <td><input type="text" class="cell-input f-purpose" value="${esc(slot.purpose)}" maxlength="100" style="width:100%;min-width:160px;" placeholder="—"></td>
-            <td>
-                <details class="slot-types">
-                    <summary title="${esc(slot.type_names.join(', '))}">${typesSummary(slot)}</summary>
-                    <div class="slot-types-list">
-                        ${materialTypes.map(t => `
-                        <label><input type="checkbox" value="${t.id}" ${slot.type_ids.includes(t.id) ? 'checked' : ''}> ${esc(t.name)}</label>`).join('')}
-                    </div>
-                </details>
-            </td>
+            <td class="f-types"></td>
+            <td class="f-filters"></td>
             <td style="text-align:center"><input type="checkbox" class="f-hidden" ${slot.hidden ? 'checked' : ''}></td>
             <td>
                 <button type="button" class="btn btn-ghost btn-sm f-up" title="Выше" ${i === 0 ? 'disabled' : ''}>&uarr;</button>
@@ -126,15 +139,20 @@ function render() {
             if (!name) { e.target.value = slot.name; showToast('Название не может быть пустым'); return; }
             patch(slot, {name});
         });
-        tr.querySelector('.f-purpose').addEventListener('change', e => patch(slot, {purpose: e.target.value.trim() || null}));
         tr.querySelector('.f-hidden').addEventListener('change', e => patch(slot, {hidden: e.target.checked}));
-        const details = tr.querySelector('.slot-types');
-        details.addEventListener('toggle', () => {
-            if (details.open) return;
-            const ids = [...details.querySelectorAll('input:checked')].map(c => parseInt(c.value));
-            const same = ids.length === slot.type_ids.length && ids.every(id => slot.type_ids.includes(id));
-            if (!same) patch(slot, {material_type_ids: ids});
-        });
+        tr.querySelector('.f-types').appendChild(checkList(
+            typesSummary(slot), slot.type_names.join(', '),
+            materialTypes.map(t => ({value: t.id, label: t.name, checked: slot.type_ids.includes(t.id)})),
+            values => {
+                const ids = values.map(v => parseInt(v));
+                if (!sameSet(ids, slot.type_ids)) patch(slot, {material_type_ids: ids});
+            },
+        ));
+        tr.querySelector('.f-filters').appendChild(checkList(
+            filtersSummary(slot), slot.filters.map(k => slotFilters[k] || k).join(', '),
+            Object.entries(slotFilters).map(([k, label]) => ({value: k, label, checked: slot.filters.includes(k)})),
+            keys => { if (!sameSet(keys, slot.filters)) patch(slot, {filters: keys}); },
+        ));
         tr.querySelector('.f-up').addEventListener('click', () => move(slot, -1));
         tr.querySelector('.f-down').addEventListener('click', () => move(slot, 1));
         tr.querySelector('.f-del').addEventListener('click', () => removeSlot(slot));
@@ -193,12 +211,10 @@ document.getElementById('addForm').addEventListener('submit', async e => {
             module_type_id: typeId,
             name,
             hidden: document.getElementById('newHidden').checked,
-            purpose: document.getElementById('newPurpose').value.trim() || null,
         }),
     });
     if (resp.ok) {
         document.getElementById('newName').value = '';
-        document.getElementById('newPurpose').value = '';
         document.getElementById('newHidden').checked = false;
         reload();
         showToast('Строка добавлена');

@@ -32,6 +32,7 @@ uv run alembic upgrade head                   # apply migrations
 main.py                     # App entrypoint, lifespan creates tables + seeds Probability defaults
 config.py                   # pydantic-settings reads .env (NAME_BASE, REG_SECRET_KEY, admin creds)
 xlsx_templates/КСО204.xlsx  # шаблон опросного листа КСО204 (заполняется scr/utils/kso204.py)
+xlsx_templates/ТКП.xlsx     # шаблон ТКП (заполняется scr/utils/tkp_excel.py, логотип переносится из шаблона)
 seed.py                     # Standalone script to populate DB with test data
 scr/
   constants.py              # константы приложения (новые константы — сюда)

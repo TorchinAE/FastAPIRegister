@@ -220,6 +220,8 @@ class Request(BaseID):
     ktp_cost: Mapped[float] = mapped_column(Numeric(12, 2), default=0)
     pku_cost: Mapped[float] = mapped_column(Numeric(12, 2), default=0)
     pus_cost: Mapped[float] = mapped_column(Numeric(12, 2), default=0)
+    power_transformer_cost: Mapped[float] = mapped_column(Numeric(12, 2), default=0)
+    mounting_cost: Mapped[float] = mapped_column(Numeric(12, 2), default=0)
     delivery_cost: Mapped[float] = mapped_column(Numeric(12, 2), default=0)
     chief_engineer_cost: Mapped[float] = mapped_column(Numeric(12, 2), default=0)
     smr_cost: Mapped[float] = mapped_column(Numeric(12, 2), default=0)
@@ -507,8 +509,8 @@ class ModuleTypeSlot(Base):
     sort_order: Mapped[int] = mapped_column(Integer, default=0, nullable=False)
     # Не отображать в расчёте (модуль всегда берётся из «по умолчанию»), но учитывать в стоимости
     hidden: Mapped[bool] = mapped_column(default=False, server_default="0", nullable=False)
-    # Назначение — подпись модуля строки в комплектации ТКП: «Вакуумный выключатель: ESQ ВВ(F)-12-25/1250»
-    purpose: Mapped[str | None] = mapped_column(String(100), nullable=True)
+    # Фильтры модулей строки в шаблонах блоков: ключи SLOT_FILTERS через запятую
+    filters: Mapped[str | None] = mapped_column(String(200), nullable=True)
 
     module_type: Mapped["ModuleType"] = relationship(back_populates="slots")
     material_types: Mapped[list["MaterialType"]] = relationship(

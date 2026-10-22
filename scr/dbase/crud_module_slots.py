@@ -4,6 +4,7 @@ from sqlalchemy import delete, select, update
 from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy.orm import selectinload
 
+from scr.constants import SLOT_FILTERS
 from scr.dbase.models import (
     MaterialType,
     Module,
@@ -38,6 +39,11 @@ async def _material_types(session: AsyncSession, ids: list[int]) -> list[Materia
     return list((await session.execute(select(MaterialType).where(MaterialType.id.in_(ids)))).scalars().all())
 
 
+def _filters(keys: list[str]) -> str | None:
+    """Известные ключи фильтров в порядке SLOT_FILTERS через запятую."""
+    return ",".join(k for k in SLOT_FILTERS if k in keys) or None
+
+
 async def add_slot(session: AsyncSession, data: ModuleTypeSlotCreateSchema) -> ModuleTypeSlot:
     slots = await get_slots(session, data.module_type_id)
     name = data.name.strip()
@@ -48,7 +54,7 @@ async def add_slot(session: AsyncSession, data: ModuleTypeSlotCreateSchema) -> M
         module_type_id=data.module_type_id,
         name=name,
         hidden=data.hidden,
-        purpose=(data.purpose or "").strip() or None,
+        filters=_filters(data.filters),
         sort_order=max((s.sort_order for s in slots), default=0) + 1,
     )
     slot.material_types = await _material_types(session, data.material_type_ids)
@@ -67,8 +73,8 @@ async def update_slot(session: AsyncSession, slot_id: int, data: ModuleTypeSlotU
         slot.hidden = data.hidden
     if data.material_type_ids is not None:
         slot.material_types = await _material_types(session, data.material_type_ids)
-    if "purpose" in data.model_fields_set:
-        slot.purpose = (data.purpose or "").strip() or None
+    if data.filters is not None:
+        slot.filters = _filters(data.filters)
     await session.flush()
     return slot
 
@@ -111,7 +117,7 @@ def slot_json(slot: ModuleTypeSlot) -> dict:
         "id": slot.id,
         "name": slot.name,
         "hidden": bool(slot.hidden),
-        "purpose": slot.purpose or "",
+        "filters": slot.filters.split(",") if slot.filters else [],
         "type_ids": [t.id for t in slot.material_types],
         "type_names": [t.name for t in slot.material_types],
     }

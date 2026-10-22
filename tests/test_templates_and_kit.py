@@ -1,6 +1,7 @@
 """Шаблоны блоков «по умолчанию», комплектация ТКП, характеристики модулей, сброс пароля."""
 
 import io
+import zipfile
 from unittest.mock import AsyncMock, patch
 
 from openpyxl import load_workbook
@@ -33,7 +34,7 @@ async def _setup(s, sfx: str):
     mat1, mat2 = Material(name=f"Мат1-{sfx}", price=100), Material(name=f"Мат2-{sfx}", price=50)
     s.add_all([req, mt, m1, m2, mat1, mat2])
     await s.flush()
-    breaker = ModuleTypeSlot(module_type_id=mt.id, name="Выключатель", sort_order=1, purpose="Вакуумный выключатель")
+    breaker = ModuleTypeSlot(module_type_id=mt.id, name="Вакуумный выключатель", sort_order=1)
     hidden = ModuleTypeSlot(module_type_id=mt.id, name="Корпус", sort_order=2, hidden=True)
     s.add_all([breaker, hidden])
     await s.flush()
@@ -138,11 +139,16 @@ async def test_tkp_kit_page_and_excel(client, db_session):
 
     resp = await client.get(f"/reg/api/requests/{ids['req']}/tkp-kit/export-excel")
     assert resp.status_code == 200
+    # По шаблону ТКП: блок — в строке 14, затем Итого / НДС / Всего; логотип из шаблона сохранён
+    assert "xl/drawings/drawing1.xml" in zipfile.ZipFile(io.BytesIO(resp.content)).namelist()
     ws = load_workbook(io.BytesIO(resp.content)).active
-    rows = list(ws.iter_rows(min_row=3, values_only=True))
-    assert rows[0][1] == "КСО-204м сх7.1ВВ-Ввод, \nВакуумный выключатель: ВВ-b"
-    assert rows[0][2:5] == (2, 1000, "=D3*C3")
-    assert ws.cell(3, 4).number_format == MONEY_FMT
+    assert ws["B6"].value.startswith(f"{ids['req']} от ")
+    assert ws["B14"].value == "КСО-204м сх7.1ВВ-Ввод, \nВакуумный выключатель: ВВ-b"
+    assert (ws["C14"].value, ws["D14"].value, ws["E14"].value) == (2, 1000, "=D14*C14")
+    assert ws["E15"].value == "=SUM(E14:E14)"
+    assert ws["E17"].value == "=E15+E16"
+    # Исполнитель — подпись пользователя (не задана — имя)
+    assert ws["B27"].value == "Tplb"
 
     client.cookies.set("user_email", "tplb@test.ru")
     resp = await client.get(f"/reg/requests/{ids['req']}/calc/tkp")
@@ -241,10 +247,49 @@ async def test_pages_render(client, db_session):
             assert resp.status_code == 200, url
             assert "data-filter-table" in resp.text, url
         resp = await client.get(f"/reg/module-types-calc/{ids['mt']}/defaults")
-        assert resp.status_code == 200 and "module-picker.js" in resp.text
+        assert resp.status_code == 200 and "module-picker.js" in resp.text and 'id="moduleFilter"' not in resp.text
         resp = await client.get(f"/reg/requests/{ids['req']}/calc/{mt.slug}")
         assert resp.status_code == 200 and 'id="moduleFilter"' in resp.text
         resp = await client.get(f"/reg/module-type-slots?type={mt.slug}")
-        assert resp.status_code == 200 and "Назначение" in resp.text
+        assert resp.status_code == 200 and "Фильтр модулей" in resp.text and "Назначение" not in resp.text
     finally:
         client.cookies.clear()
+
+
+async def test_slot_filters(client, db_session):
+    ids = await _setup(db_session, "f")
+    url = f"/reg/api/module-type-slots/{ids['breaker']}"
+    resp = await client.patch(url, json={"filters": ["vykat", "nom_tok", "неизвестный"]})
+    assert resp.json()["filters"] == ["nom_tok", "vykat"]
+    resp = await client.patch(url, json={"filters": []})
+    assert resp.json()["filters"] == []
+
+
+async def test_mounting_cells(db_session):
+    """Монтаж оборудования в блоки: количество = сумма количеств блоков КСО, КРУ, ЩО."""
+    from scr.dbase import crud_module_types
+    from scr.dbase.models import RequestCalc
+
+    s = db_session
+    user = User(name="Mnt", email="mnt@test.ru", hashed_password="x")
+    s.add(user)
+    await s.flush()
+    req = Request(manager_id=user.id)
+    s.add(req)
+    types = {}
+    for slug in ("kso", "sho", "mounting"):
+        types[slug] = await crud_module_types.get_module_type_by_slug(s, slug)
+        if not types[slug]:
+            types[slug] = ModuleType(name=f"Раздел {slug}", slug=slug)
+            s.add(types[slug])
+    await s.flush()
+    s.add_all(
+        [
+            RequestCalc(request_id=req.id, module_type_id=types["kso"].id, quantity=3, final_price=10),
+            RequestCalc(request_id=req.id, module_type_id=types["sho"].id, quantity=2, final_price=10),
+            RequestCalc(request_id=req.id, module_type_id=types["mounting"].id, quantity=1, final_price=100),
+        ]
+    )
+    await s.flush()
+    assert await crud_module_types.sync_mounting(s, req.id) == 5
+    assert float(req.mounting_cost) == 500

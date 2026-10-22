@@ -5,7 +5,14 @@ from fastapi.responses import HTMLResponse, JSONResponse, RedirectResponse
 from fastapi.templating import Jinja2Templates
 from sqlalchemy.ext.asyncio import AsyncSession
 
-from scr.constants import LIST_ALL_ROWS, PASSWORD_MIN_LENGTH, REGISTRATION_DENIED_MSG, SECTION_PURPOSES
+from scr.constants import (
+    LIST_ALL_ROWS,
+    MOUNTING_SECTION,
+    PASSWORD_MIN_LENGTH,
+    REGISTRATION_DENIED_MSG,
+    SECTION_PURPOSES,
+    SLOT_FILTERS,
+)
 from scr.dbase import (
     crud_counterparties,
     crud_directors,
@@ -986,7 +993,7 @@ async def invoices_page(
 
 
 # Разделы, у которых на странице расчёта показывается сумма блоков
-BLOCK_TOTAL_SECTIONS = ("corpusa", "kso", "kru", "sho")
+BLOCK_TOTAL_SECTIONS = ("corpusa", "kso", "kru", "sho", "power-transformer", "mounting")
 
 
 @pages_router.get("/requests/{req_id}/calc", response_class=HTMLResponse)
@@ -1035,8 +1042,9 @@ async def request_calc_page(
     from scr.dbase.crud_module_slots import sync_hidden_slots
     from scr.dbase.crud_tkp import build_tkp_summary
 
-    if await sync_hidden_slots(session, req.id):
-        await session.commit()
+    await sync_hidden_slots(session, req.id)
+    await crud_module_types.sync_mounting(session, req.id)
+    await session.commit()
     summary = await build_tkp_summary(session, req)
     tkp_total = round(summary["totals"]["final"], 2)
     if float(req.tkp_calc_cost or 0) != tkp_total:
@@ -1185,6 +1193,8 @@ async def request_calc_page_by_section(
 
     await crud_module_slots.sync_hidden_slots(session, req_id)
     calcs = await crud_module_types.get_or_create_calcs(session, req_id, mt.id)
+    # Монтаж: количество — ячейки КСО + КРУ + ЩО
+    cells = await crud_module_types.sync_mounting(session, req_id) if section == MOUNTING_SECTION else None
     works = section in crud_module_types.WORKS_SECTIONS
     tpls = [] if works else await crud_module_templates.get_templates(session, mt.id)
     await session.commit()
@@ -1207,6 +1217,7 @@ async def request_calc_page_by_section(
             "split_qty": section in crud_module_types.SPLIT_QTY_SECTIONS,
             "purposes": SECTION_PURPOSES.get(section, []),
             "works": works,
+            "cells": cells,
             "templates_list": [{"id": t.id, "name": t.name, "purpose": t.purpose or ""} for t in tpls],
             "active_page": "requests",
         },
@@ -1386,6 +1397,7 @@ async def module_type_slots_page(
             "mt": mt,
             "slots": [crud_module_slots.slot_json(sl) for sl in slots],
             "material_types": [{"id": t.id, "name": t.name} for t in material_types],
+            "slot_filters": SLOT_FILTERS,
             "active_page": "module_type_slots",
         },
     )

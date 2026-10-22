@@ -18,8 +18,6 @@
 </div>
 {% endif %}
 
-<div id="moduleFilter" class="card mp-bar"></div>
-
 <div id="templates" class="calc-blocks multi">
     <button type="button" class="calc-block-add" id="addTplBtn" onclick="addTemplate()" title="Новый шаблон — копия последнего">
         <span class="plus">+</span>
@@ -74,7 +72,7 @@ const tplsEl = document.getElementById('templates');
 const addTplBtn = document.getElementById('addTplBtn');
 let importTemplateId = null;
 
-ModulePicker.init(modulesData, document.getElementById('moduleFilter'), formatFinancial);
+ModulePicker.init(modulesData, null, formatFinancial);
 
 function esc(s) {
     return String(s ?? '').replace(/[&<>"']/g, c => ({'&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;'}[c]));
@@ -153,15 +151,18 @@ function renderTemplate(tpl) {
     return el;
 }
 
-// Обязательная строка шаблона: выбор модуля подходящего типа и количество
+// Обязательная строка шаблона: название, количество, фильтры строки и выбор модуля подходящего типа
 function appendSlot(el, slot, value) {
     const row = document.createElement('div');
     row.className = 'calc-item calc-slot';
     row.innerHTML = `
         <div class="calc-item-main">
             <div class="calc-slot-name" title="${esc(slot.type_names.join(', '))}">${esc(slot.name)}${slot.hidden ? ' · скрыта' : ''}</div>
+            <div class="calc-slot-filters">
+                <div class="calc-item-qty"><input type="number" class="f-item-qty" min="1" value="${value ? value.quantity : 1}"> шт.</div>
+                <span class="f-filters"></span>
+            </div>
             <select class="f-slot-module"><option value="">— не выбран —</option></select>
-            <div class="calc-item-qty"><input type="number" class="f-item-qty" min="1" value="${value ? value.quantity : 1}"> шт.</div>
         </div>
         <div class="calc-item-side">
             <div class="calc-item-price"></div>
@@ -176,6 +177,7 @@ function appendSlot(el, slot, value) {
         placeholder: '— не выбран —',
         allow: (m, current) => !slot.type_ids.length || slot.type_ids.includes(m.type_id) || String(m.id) === current,
     });
+    if (slot.filters.length) ModulePicker.slotFilters(row.querySelector('.f-filters'), select, slot.filters);
     const qtyEl = row.querySelector('.f-item-qty');
     let saved = {module_id: value ? value.module_id : null, quantity: value ? value.quantity : 1};
     const save = async () => {

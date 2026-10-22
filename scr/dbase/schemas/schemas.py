@@ -459,6 +459,8 @@ class RequestUpdateSchema(BaseModel):
     ktp_cost: float | None = Field(None, ge=0)
     pku_cost: float | None = Field(None, ge=0)
     pus_cost: float | None = Field(None, ge=0)
+    power_transformer_cost: float | None = Field(None, ge=0)
+    mounting_cost: float | None = Field(None, ge=0)
     delivery_cost: float | None = Field(None, ge=0)
     chief_engineer_cost: float | None = Field(None, ge=0)
     smr_cost: float | None = Field(None, ge=0)
@@ -508,6 +510,8 @@ class RequestResponseSchema(BaseModel):
     ktp_cost: float = 0
     pku_cost: float = 0
     pus_cost: float = 0
+    power_transformer_cost: float = 0
+    mounting_cost: float = 0
     delivery_cost: float = 0
     chief_engineer_cost: float = 0
     smr_cost: float = 0
@@ -815,7 +819,7 @@ class ModuleTypeSlotCreateSchema(BaseModel):
     name: str = Field(..., min_length=1, max_length=200)
     hidden: bool = False
     material_type_ids: list[int] = []
-    purpose: str | None = Field(None, max_length=100)
+    filters: list[str] = []
 
 
 class ModuleTypeSlotUpdateSchema(BaseModel):
@@ -824,7 +828,7 @@ class ModuleTypeSlotUpdateSchema(BaseModel):
     name: str | None = Field(None, max_length=200)
     hidden: bool | None = None
     material_type_ids: list[int] | None = None
-    purpose: str | None = Field(None, max_length=100)
+    filters: list[str] | None = None
 
 
 class SlotModuleSchema(BaseModel):

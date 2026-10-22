@@ -82,7 +82,6 @@ async def lifespan(_: FastAPI):
                 session.add(Setting(key=key, value=value))
         await session.commit()
     # Seed default module types
-    from sqlalchemy import func
     from sqlalchemy import select as sa_select
 
     from scr.dbase.models import ModuleType
@@ -99,14 +98,16 @@ async def lifespan(_: FastAPI):
         ("Шеф-инженер", "chief-engineer"),
         ("СМР", "smr"),
         ("ПНР", "pnr"),
+        ("Силовой трансформатор", "power-transformer"),
+        ("Монтаж оборудования в блоки", "mounting"),
     ]
     async with db_helper.session_factory() as session:
-        result = await session.execute(sa_select(func.count(ModuleType.id)))
-        count = result.scalar() or 0
-        if count == 0:
-            for name, slug in DEFAULT_MODULE_TYPES:
+        # Недостающие разделы (новые добавляются и в существующую базу)
+        existing = set((await session.execute(sa_select(ModuleType.slug))).scalars().all())
+        for name, slug in DEFAULT_MODULE_TYPES:
+            if slug not in existing:
                 session.add(ModuleType(name=name, slug=slug))
-            await session.commit()
+        await session.commit()
     # Seed nominal currents: standard values + values already used in materials
     from scr.constants import DEFAULT_NOMINAL_CURRENTS
     from scr.dbase import crud_nominal_currents
