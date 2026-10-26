@@ -254,7 +254,7 @@ function appendItem(el, item) {
     row.querySelector('.calc-item-price').textContent = formatFinancial(item.module_price);
 }
 
-// Обязательная строка: название, выбор модуля подходящего типа, количество
+// Обязательная строка: название, количество, фильтры строки и выбор модуля подходящего типа (как в шаблонах)
 function appendSlot(el, slot, item) {
     const row = document.createElement('div');
     row.className = 'calc-item calc-slot';
@@ -262,8 +262,11 @@ function appendSlot(el, slot, item) {
     row.innerHTML = `
         <div class="calc-item-main">
             <div class="calc-slot-name" title="${esc(slot.type_names.join(', '))}">${esc(slot.name)}</div>
+            <div class="calc-slot-filters">
+                <div class="calc-item-qty"><input type="number" class="f-item-qty" min="1" value="1"> шт.</div>
+                <span class="f-filters"></span>
+            </div>
             <select class="f-slot-module"><option value="">— не выбран —</option></select>
-            <div class="calc-item-qty"><input type="number" class="f-item-qty" min="1" value="1"> шт.</div>
         </div>
         <div class="calc-item-side">
             <div class="calc-item-price"></div>
@@ -276,6 +279,7 @@ function appendSlot(el, slot, item) {
         placeholder: '— не выбран —',
         allow: (m, current) => !slot.type_ids.length || slot.type_ids.includes(m.type_id) || String(m.id) === current,
     });
+    if (slot.filters.length) ModulePicker.slotFilters(row.querySelector('.f-filters'), select, slot.filters);
     select.addEventListener('change', () => saveSlot(el, row));
     row.querySelector('.f-item-qty').addEventListener('change', () => { if (select.value) saveSlot(el, row); });
     el.querySelector('.f-slots').appendChild(row);

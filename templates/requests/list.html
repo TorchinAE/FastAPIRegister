@@ -3,13 +3,15 @@
 {% block content %}
 <div class="page-header" style="gap:1rem; flex-wrap:wrap;">
     <div style="display:flex; align-items:center; gap:0.75rem;">
+        <h1>Реестр ТКП</h1>
+        <span class="subtitle">Всего: {{ total }}</span>
+    </div>
+    <div style="display:flex; align-items:center; gap:0.75rem;">
         <a href="/reg/requests/create" class="btn btn-success">+ Создать ТКП</a>
         <button type="button" class="btn btn-ghost" onclick="resetFilters()">Сбросить фильтры</button>
         <button type="button" class="btn btn-primary" onclick="exportFilteredExcel()">Скачать Excel</button>
         <button type="button" class="btn btn-primary" onclick="exportPaymentRegistry()" title="Порядок оплаты по видимым ТКП (с учётом фильтров)">Реестр оплат</button>
-        <h1>Реестр ТКП</h1>
     </div>
-    <span class="subtitle">Всего: {{ total }}</span>
 </div>
 <div class="table-wrap" style="overflow-x:auto;">
     <table id="dataTable" data-filter-table data-per-page="{{ per_page }}">
@@ -25,6 +27,7 @@
                 <th>Статус</th>
                 <th>Оборудование</th>
                 <th>Описание</th>
+                <th>Штамп</th>
                 <th>Стоимость с НДС</th>
                 <th>БКТПБ</th>
                 <th>КТПБ</th>
@@ -82,6 +85,7 @@
                 <th><input type="text" data-col="24" placeholder="..." class="tf-input"></th>
                 <th><input type="text" data-col="25" placeholder="..." class="tf-input"></th>
                 <th><input type="text" data-col="26" placeholder="..." class="tf-input"></th>
+                <th><input type="text" data-col="27" placeholder="..." class="tf-input"></th>
             </tr>
         </thead>
         <tbody>
@@ -104,6 +108,7 @@
                 </td>
                 <td>{{ req.equipment.name if req.equipment else '-' }}</td>
                 <td class="desc-cell">{{ req.description or '-' }}</td>
+                <td>{{ req.project_stamp or '-' }}</td>
                 <td style="text-align:right;white-space:nowrap;">{{ req.cost|money if req.cost else '0.00' }}</td>
                 <td>{{ req.bktpb }}</td>
                 <td>{{ req.ktpb }}</td>
@@ -125,7 +130,7 @@
             </tr>
             {% endfor %}
             {% if not items %}
-            <tr class="empty-row"><td colspan="28">Нет ТКП</td></tr>
+            <tr class="empty-row"><td colspan="29">Нет ТКП</td></tr>
             {% endif %}
         </tbody>
     </table>
@@ -230,9 +235,9 @@ async function exportFilteredExcel() {
         };
     });
 
-    // Columns that are integers (0-indexed: 10-20 = БКТПБ..ПАРН)
-    const intCols = new Set([11, 12, 13, 14, 15, 16, 17, 18, 19, 20, 21]);
-    const costCol = 10; // Стоимость с НДС
+    // Columns that are integers (0-indexed: 12-22 = БКТПБ..ПАРН)
+    const intCols = new Set([12, 13, 14, 15, 16, 17, 18, 19, 20, 21, 22]);
+    const costCol = 11; // Стоимость с НДС
 
     // Rows 3+: data
     rows.forEach(r => {

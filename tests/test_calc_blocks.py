@@ -1,8 +1,10 @@
 import io
 
 from openpyxl import Workbook, load_workbook
+from sqlalchemy import func, select
 
 from scr.dbase.models import (
+    ContractSpec,
     Directors,
     Material,
     Module,
@@ -13,6 +15,8 @@ from scr.dbase.models import (
     Organization,
     Positions,
     Request,
+    RequestCalc,
+    RequestCalcItem,
     User,
 )
 
@@ -216,3 +220,24 @@ async def test_kso_split_qty_and_calc_excel(client, db_session):
     assert [c.value for c in ws[2]] == ["ID", "Строка", "Модуль", "Кол-во", "Цена за ед.", "Сумма"]
     assert ws.cell(3, 1).value == ids["top"]
     assert ws.cell(4, 2).value == "Общая стоимость" and ws.cell(4, 6).value == "=SUM(F3:F3)"
+
+
+async def test_delete_request_removes_calcs_and_unlinks_specs(client, db_session):
+    ids = await _setup(db_session, "-del")
+    resp = await client.post("/reg/api/request-calcs/", json={"request_id": ids["req"], "module_type_id": ids["mt"]})
+    calc_id = resp.json()["block"]["id"]
+    req = await db_session.get(Request, ids["req"])
+    spec = ContractSpec(company_id=req.company_id, request_id=req.id, contract_number=1, specification_number=1)
+    db_session.add(spec)
+    await db_session.commit()
+    spec_id = spec.id
+
+    resp = await client.delete(f"/reg/api/requests/{ids['req']}")
+    assert resp.status_code == 200
+
+    db_session.expire_all()
+    assert await db_session.get(Request, ids["req"]) is None
+    assert await db_session.get(RequestCalc, calc_id) is None
+    items = await db_session.scalar(select(func.count()).where(RequestCalcItem.calc_id == calc_id))
+    assert items == 0
+    assert (await db_session.get(ContractSpec, spec_id)).request_id is None

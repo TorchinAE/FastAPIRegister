@@ -1,10 +1,21 @@
 from datetime import datetime
 
-from sqlalchemy import Result, func, select
+from sqlalchemy import Result, delete, func, select, update
 from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy.orm import selectinload
 
-from scr.dbase.models import Counterparty, Directors, Organization, Probability, Request, RequestStatus
+from scr.dbase.models import (
+    ContractSpec,
+    Counterparty,
+    Directors,
+    Organization,
+    Probability,
+    Request,
+    RequestCalc,
+    RequestCalcItem,
+    RequestStatus,
+    ServiceCalc,
+)
 from scr.dbase.schemas.schemas import RequestCreateSchema, RequestUpdateSchema
 
 
@@ -156,6 +167,13 @@ async def update_request(session: AsyncSession, upd_req: RequestUpdateSchema) ->
 async def delete_request(session: AsyncSession, req_id: int) -> Request | None:
     req = await session.get(Request, req_id)
     if req:
+        # Счета, платежи и доставка удаляются каскадом ORM; расчёты и услуги — здесь (FK в SQLite не включены).
+        # Спецификации остаются в договорах компании, только отвязываются от ТКП.
+        calc_ids = select(RequestCalc.id).where(RequestCalc.request_id == req_id)
+        await session.execute(delete(RequestCalcItem).where(RequestCalcItem.calc_id.in_(calc_ids)))
+        await session.execute(delete(RequestCalc).where(RequestCalc.request_id == req_id))
+        await session.execute(delete(ServiceCalc).where(ServiceCalc.request_id == req_id))
+        await session.execute(update(ContractSpec).where(ContractSpec.request_id == req_id).values(request_id=None))
         await session.delete(req)
         await session.flush()
     return req

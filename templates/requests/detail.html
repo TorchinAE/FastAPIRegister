@@ -15,6 +15,7 @@
     <button type="button" id="btn-open-zz" class="btn btn-primary" onclick="openFolderZZ()" style="display:none;">Открыть папку ЗЗ</button>
     <a href="/reg/requests/{{ req.id }}/calc" class="btn btn-primary">Расчет ТКП</a>
     <a href="/reg/requests/{{ req.id }}/contracts" class="btn btn-primary">Договоры</a>
+    <button type="button" class="btn btn-danger" onclick="deleteRequest()">Удалить ТКП</button>
 </div>
 <div class="edit-compact">
 
@@ -717,6 +718,9 @@ async function goVariant(n, tkpNum) {
 }
 
 // === Auto-save main form ===
+// Автосохранение приводит суммы к денежному виду — задержка, чтобы не мешать вводу числа
+const FORM_INPUT_DELAY = 2000;
+const FORM_CHANGE_DELAY = 1200;
 const mainForm = document.getElementById('main-form');
 let saveTimer = null;
 const isNewRequest = mainForm.dataset.isNew === '1';
@@ -745,13 +749,13 @@ async function autoSaveForm() {
 mainForm.addEventListener('input', () => {
     hasUserChanges = true;
     clearTimeout(saveTimer);
-    saveTimer = setTimeout(autoSaveForm, 500);
+    saveTimer = setTimeout(autoSaveForm, FORM_INPUT_DELAY);
 });
 
 mainForm.addEventListener('change', () => {
     hasUserChanges = true;
     clearTimeout(saveTimer);
-    saveTimer = setTimeout(autoSaveForm, 300);
+    saveTimer = setTimeout(autoSaveForm, FORM_CHANGE_DELAY);
 });
 
 mainForm.addEventListener('submit', e => {
@@ -759,6 +763,15 @@ mainForm.addEventListener('submit', e => {
     clearTimeout(saveTimer);
     autoSaveForm();
 });
+
+async function deleteRequest() {
+    if (!confirm('Удалить ТКП #' + REQ_ID + '? Расчёты, счета и платежи этого ТКП будут удалены.')) return;
+    clearTimeout(saveTimer);
+    const resp = await fetch(`/reg/api/requests/${REQ_ID}`, {method: 'DELETE'});
+    if (!resp.ok) { alert('Ошибка удаления'); return; }
+    hasUserChanges = true;
+    window.location = '/reg/requests';
+}
 
 // Delete empty new request on page unload
 window.addEventListener('beforeunload', () => {
