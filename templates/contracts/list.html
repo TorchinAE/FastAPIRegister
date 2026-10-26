@@ -20,7 +20,7 @@
                 <th>Дата спецификации</th>
                 <th>ТКП</th>
                 <th>Сумма</th>
-                <th style="width:40px;"></th>
+                <th style="width:90px;"></th>
             </tr>
             <tr class="table-filter">
                 <th><input type="text" data-col="0" placeholder="Название..." class="tf-input"></th>
@@ -43,7 +43,8 @@
                 <td>{{ spec.contract_date.strftime('%d.%m.%Y') if spec.contract_date else '-' }}</td>
                 <td>{% if spec.request_id %}#{{ spec.request_id }}{% if spec.request %} — {{ spec.request.tkp_num or '' }}{% endif %}{% else %}-{% endif %}</td>
                 <td style="text-align:right;">{{ spec.request.cost|money if spec.request and spec.request.cost else '-' }}</td>
-                <td style="text-align:center;width:40px">
+                <td style="text-align:center;width:90px;white-space:nowrap;">
+                    <button class="btn btn-ghost btn-sm btn-icon" title="Открыть папку договора №{{ spec.contract_number }}" onclick="event.stopPropagation(); openContractFolder({{ spec.id }})">&#128193;</button>
                     <button class="btn btn-danger btn-sm btn-icon" title="Удалить" onclick="event.stopPropagation(); deleteSpec({{ spec.id }}, this)">&#10005;</button>
                 </td>
             </tr>
@@ -62,6 +63,14 @@
 <script src="https://cdnjs.cloudflare.com/ajax/libs/exceljs/4.4.0/exceljs.min.js"></script>
 <script src="https://cdnjs.cloudflare.com/ajax/libs/FileSaver.js/2.0.5/FileSaver.min.js"></script>
 <script>
+// Папка договора: {contract_folder}/{номер договора}_{организация}, спецификации договора — в ней
+async function openContractFolder(specId) {
+    const resp = await fetch('/reg/api/contract-specs/' + specId + '/folder', {method: 'POST'});
+    const data = await resp.json().catch(() => ({}));
+    if (!resp.ok) { showToast('Ошибка: ' + (data.detail || resp.status)); return; }
+    window.open(data.path, '_blank');
+}
+
 async function deleteSpec(specId, btn) {
     if (!confirm('Удалить спецификацию?')) return;
     const resp = await fetch('/reg/api/contract-specs/' + specId, {method: 'DELETE'});

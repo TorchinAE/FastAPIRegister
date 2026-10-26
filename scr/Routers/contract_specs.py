@@ -33,8 +33,22 @@ async def create_spec(
             session, data.company_id, data.contract_number, data.request_id, data.contract_date
         )
     await session.commit()
-    await session.refresh(spec, ["request"])
+    await session.refresh(spec, ["request", "company"])
+    # Папка договора создаётся сразу; спецификации хранятся в папке своего договора
+    await crud_contract_specs.ensure_contract_folder(session, spec)
     return spec
+
+
+@cs_router.post("/{spec_id}/folder")
+async def open_contract_folder(spec_id: int, session: AsyncSession = Depends(db_helper.session_dependency)):
+    """Папка договора спецификации (создаётся): {contract_folder}/{номер договора}_{организация}."""
+    spec = await crud_contract_specs.get_spec_by_id(session, spec_id)
+    if not spec:
+        raise HTTPException(status_code=404, detail="Спецификация не найдена")
+    path, created = await crud_contract_specs.ensure_contract_folder(session, spec)
+    if not path:
+        raise HTTPException(status_code=400, detail="Не задана папка договоров (contract_folder) в настройках")
+    return {"path": path, "created": created}
 
 
 @cs_router.patch("/{spec_id}", response_model=ContractSpecResponseSchema)

@@ -1,8 +1,44 @@
+import os
+import re
+
 from sqlalchemy import func, select
 from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy.orm import selectinload
 
+from scr.constants import SETTING_CONTRACT_FOLDER
+from scr.dbase import crud_settings
 from scr.dbase.models import ContractSpec
+
+
+def folder_safe_name(name: str) -> str:
+    """Название для имени папки: без кавычек, пробелы и недопустимые в Windows символы — «_» (как у папки ТКП)."""
+    return re.sub(r"[\s/\\:*?<>|]+", "_", re.sub(r"[\"']", "", name)).strip("_") or "Unknown"
+
+
+def contract_folder_path(base: str, spec: ContractSpec) -> str | None:
+    """Папка договора: {contract_folder}/{номер договора}_{организация}. Все спецификации договора — в ней."""
+    if not base:
+        return None
+    org = folder_safe_name(spec.company.name if spec.company else "Unknown")
+    return base.rstrip("/\\") + "/" + f"{spec.contract_number}_{org}"
+
+
+async def ensure_contract_folder(session: AsyncSession, spec: ContractSpec) -> tuple[str | None, bool]:
+    """Путь папки договора и удалось ли её создать (папка может быть недоступна с сервера)."""
+    base = await crud_settings.get_setting(session, SETTING_CONTRACT_FOLDER) or ""
+    path = contract_folder_path(base, spec)
+    if not path:
+        return None, False
+    try:
+        os.makedirs(path, exist_ok=True)
+        return path, True
+    except OSError:
+        return path, False
+
+
+async def get_spec_by_id(session: AsyncSession, spec_id: int) -> ContractSpec | None:
+    stmt = select(ContractSpec).where(ContractSpec.id == spec_id).options(selectinload(ContractSpec.company))
+    return (await session.execute(stmt)).scalar_one_or_none()
 
 
 async def get_specs_by_company(session: AsyncSession, company_id: int) -> list[ContractSpec]:

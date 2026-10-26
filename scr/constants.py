@@ -35,6 +35,9 @@ SETTING_K_NAKL = "k_nakl"
 DEFAULT_K_FOT = 0.21
 DEFAULT_K_NAKL = 1.6
 
+# Папка договоров: {contract_folder}/{номер договора}_{организация}, спецификации договора — в ней же
+SETTING_CONTRACT_FOLDER = "contract_folder"
+
 # Вероятности ТКП по умолчанию: (id, название, значение)
 DEFAULT_PROBABILITIES = [
     (1, "30%", 30),

@@ -58,7 +58,7 @@ async def lifespan(_: FastAPI):
                 session.add(Probability(id=id_, name=name, value=value))
         await session.commit()
     # Seed default settings
-    from scr.constants import DEFAULT_K_FOT, DEFAULT_K_NAKL, SETTING_K_FOT, SETTING_K_NAKL
+    from scr.constants import DEFAULT_K_FOT, DEFAULT_K_NAKL, SETTING_CONTRACT_FOLDER, SETTING_K_FOT, SETTING_K_NAKL
     from scr.dbase.models import Setting
 
     DEFAULT_SETTINGS = [
@@ -69,6 +69,7 @@ async def lifespan(_: FastAPI):
         ("smtp_from", ""),
         ("adres_server", ""),
         ("tkp_template_folder", ""),
+        (SETTING_CONTRACT_FOLDER, ""),
         ("materials_per_page", "30"),
         ("nds_percent", "20"),
         # Коэффициенты ФОТ и накладных для расчёта КСО204 (лист «расчет», строки 41 и 40)

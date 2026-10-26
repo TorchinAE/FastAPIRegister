@@ -41,7 +41,7 @@
                     <th>Дата договора</th>
                     <th>Спецификация №</th>
                     <th>ТКП</th>
-                    <th style="width:60px;"></th>
+                    <th style="width:90px;"></th>
                 </tr>
             </thead>
             <tbody id="specsBody">
@@ -51,7 +51,8 @@
                     <td><input type="date" value="{{ spec.contract_date.strftime('%Y-%m-%d') if spec.contract_date else '' }}" class="spec-contract-date" data-spec-id="{{ spec.id }}" style="border:1px solid var(--border);border-radius:4px;padding:2px 4px;" onclick="event.stopPropagation()"></td>
                     <td>{{ spec.specification_number }}</td>
                     <td>{% if spec.request_id %}#{{ spec.request_id }}{% if spec.request %} — {{ spec.request.tkp_num or '' }}{% endif %}{% else %}-{% endif %}</td>
-                    <td style="text-align:center;">
+                    <td style="text-align:center;white-space:nowrap;">
+                        <button class="btn btn-ghost btn-sm btn-icon" onclick="event.stopPropagation();openContractFolder({{ spec.id }})" title="Открыть папку договора №{{ spec.contract_number }}">&#128193;</button>
                         <button class="btn btn-danger btn-sm btn-icon" onclick="event.stopPropagation();deleteSpec({{ spec.id }})" title="Удалить">&#10005;</button>
                     </td>
                 </tr>
@@ -96,6 +97,14 @@ async function newContract(reqId, companyId) {
         const err = await resp.json();
         showToast('Ошибка: ' + (err.detail || ''));
     }
+}
+
+// Папка договора: {contract_folder}/{номер договора}_{организация}, спецификации договора — в ней
+async function openContractFolder(specId) {
+    const resp = await fetch('/reg/api/contract-specs/' + specId + '/folder', {method: 'POST'});
+    const data = await resp.json().catch(() => ({}));
+    if (!resp.ok) { showToast('Ошибка: ' + (data.detail || resp.status)); return; }
+    window.open(data.path, '_blank');
 }
 
 function showNewSpecForm() {
