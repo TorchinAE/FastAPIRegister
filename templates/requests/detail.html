@@ -11,10 +11,10 @@
 <div style="display:flex;gap:0.5rem;margin-bottom:0.75rem;flex-wrap:wrap;">
     <a href="/reg/requests" class="btn btn-ghost">← Назад к списку</a>
     <a href="/reg/requests/create" class="btn btn-success">+ Новое ТКП</a>
-    <button type="button" class="btn btn-primary" onclick="openFolderTKP()">Открыть папку ТКП</button>
-    <button type="button" id="btn-open-zz" class="btn btn-primary" onclick="openFolderZZ()" style="display:none;">Открыть папку ЗЗ</button>
-    <a href="/reg/requests/{{ req.id }}/calc" class="btn btn-primary">Расчет ТКП</a>
-    <a href="/reg/requests/{{ req.id }}/contracts" class="btn btn-primary">Договоры</a>
+    <button type="button" class="btn btn-folder" onclick="openFolderTKP()">Открыть папку ТКП</button>
+    <button type="button" id="btn-open-zz" class="btn btn-folder" onclick="openFolderZZ()" style="display:none;">Открыть папку ЗЗ</button>
+    <a href="/reg/requests/{{ req.id }}/calc" class="btn btn-nav">Расчет ТКП</a>
+    <a href="/reg/requests/{{ req.id }}/contracts" class="btn btn-nav">Договоры</a>
     <button type="button" class="btn btn-danger" onclick="deleteRequest()">Удалить ТКП</button>
 </div>
 <div class="edit-compact">

@@ -24,7 +24,9 @@ uv run alembic upgrade head                   # apply migrations
 - **uv** is the package manager. Python >= 3.12.
 - `.env` must exist with `NAME_BASE=registration` (DB filename stem). CI creates it automatically.
 - Linter/formatter: **ruff** (`line-length=120`, ignores `B008`, `F401`, `DTZ005` in `pyproject.toml`).
-- CI runs: lint (`ruff format --check` + `ruff check`) -> test (`pytest --cov`) -> deploy (SSH + systemd restart). Deploys only on push to `main`.
+- CI runs: lint (`ruff format --check` + `ruff check`) -> test (`pytest --cov`) -> deploy (SSH, `uv sync`, `alembic stamp aab557719d57` + `alembic upgrade head`, systemd restart). Deploys only on push to `main`. Health check — `/reg/`, не `/`.
+- **CI ставит зависимости через `pip install -r requirements.txt`**, а не uv. Новую зависимость добавлять и в `pyproject.toml`/`uv.lock`, и в `requirements.txt`.
+- Тестовые логины после `seed.py`: `ivan@test.ru`, `maria@test.ru`, `sidorov@company.ru`, пароль `123456`.
 
 ## Source layout
 
@@ -37,23 +39,35 @@ seed.py                     # Standalone script to populate DB with test data
 scr/
   constants.py              # константы приложения (новые константы — сюда)
   Routers/                  # All API routers mounted at /reg/api/...; page routes at /reg/...
-    auth.py                 # /api/auth (register, login, logout, me)
+    auth.py                 # /api/auth (register, login, logout, me, сброс пароля)
     pages.py                # Jinja2 page routes
     directors.py, positions.py, companies.py, counterparties.py,
-    requests.py, equipment.py, managers.py, users.py,
-    invoices.py, payments.py, materials.py, material_types.py,
-    modules.py, settings.py
+    requests.py, equipment.py, users.py, settings.py,
+    invoices.py, payments.py, deliveries.py, contract_specs.py, finance.py,
+    materials.py, material_types.py, modules.py,
+    units.py, nominal_currents.py, accuracy_classes.py  # справочники
+    module_types.py         # разделы расчёта (КСО, КРУ, ЩО, ...), строки и шаблоны блоков; без общего prefix
+    service_calcs.py        # /api/service-calcs — расчёт услуг
+    kso204.py               # /api/requests/... — выгрузка КСО204 и ТКП в Excel
   dbase/
     database.py             # DatabaseHelper, engine, session_dependency
     models.py               # All SQLAlchemy models
     schemas/schemas.py      # All Pydantic schemas (ConfigDict style)
     crud_*.py               # One CRUD module per entity
+    crud_module_slots.py    # Обязательные строки разделов расчёта (одна строка — один модуль)
     crud_module_templates.py # Шаблоны блоков «по умолчанию» (несколько на раздел)
+    crud_tkp.py             # Сводная таблица ТКП: разделы расчёта, доставка, услуги
     startup_migrations.py   # ADD COLUMN / пересоздание таблиц при старте (create_all колонки не добавляет)
-  queries/                  # Empty directory (unused)
+  utils/
+    excel.py                # Общие помощники импорта/экспорта Excel (MONEY_FMT)
+    xlsx_patch.py           # Запись значений прямо в XML листов xlsx (без пересохранения openpyxl)
+    kso204.py               # Расчёт КСО ↔ книга КСО204.xlsx
+    tkp_excel.py            # ТКП в Excel по шаблону
+    declension.py           # Дательный падеж должности/ФИО для ТКП (pytrovich)
+    email.py                # Отправка писем (SMTP)
 tests/
   conftest.py               # In-memory SQLite, overrides session_dependency
-  test_director_routes.py, test_excel.py, test_material_routes.py, test_module_routes.py
+  test_*.py                 # роуты справочников/модулей, расчётные блоки, КСО204, Excel, шаблоны и комплектация, платежи
 templates/                  # Jinja2 HTML
 static/                     # CSS; table-filter.js (фильтры/пагинация списков), module-picker.js (выбор модулей в расчётах)
 alembic/                    # Migrations
@@ -63,7 +77,7 @@ alembic/                    # Migrations
 
 - **Async SQLAlchemy** throughout. Sessions via `db_helper.session_dependency` (FastAPI `Depends`).
 - **All routes are prefixed `/reg`** in `main.py` (not `/api` directly). So the actual URL is `/reg/api/...` for API and `/reg/...` for pages. Nginx proxies `/reg/` -> `:8000`.
-- **Table creation**: lifespan calls `Base.metadata.create_all` + seeds `Probability` defaults on every startup.
+- **Table creation**: lifespan calls `Base.metadata.create_all`, then `run_startup_migrations`, then seeds `Probability` defaults on every startup. Новую колонку в существующей модели добавлять также в `ADD_COLUMNS` в `scr/dbase/startup_migrations.py` (там же — разовые UPDATE для заполнения данных).
 - Alembic's `env.py` uses sync driver (strips `+aiosqlite`) and `render_as_batch=True` for SQLite ALTER TABLE.
 - `BaseID` abstract base: `id`, `created_by`, `created_at`, `updated_at`, `changed_by_id` (FK to `users.id`).
 - Auth: cookie-based sessions (`user_email` cookie). Passwords hashed with bcrypt.

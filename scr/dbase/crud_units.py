@@ -6,12 +6,12 @@ from scr.dbase.models import Material, Unit
 
 
 async def get_all(session: AsyncSession) -> list[Unit]:
-    result = await session.execute(select(Unit).order_by(Unit.id))
+    result = await session.execute(select(Unit).order_by(Unit.name))
     return list(result.scalars().all())
 
 
 async def get_names(session: AsyncSession) -> list[str]:
-    result = await session.execute(select(Unit.name).order_by(Unit.id))
+    result = await session.execute(select(Unit.name).order_by(Unit.name))
     return list(result.scalars().all())
 
 

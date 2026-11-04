@@ -5,12 +5,12 @@ from scr.dbase.models import AccuracyClass, Material
 
 
 async def get_all(session: AsyncSession) -> list[AccuracyClass]:
-    result = await session.execute(select(AccuracyClass).order_by(AccuracyClass.id))
+    result = await session.execute(select(AccuracyClass).order_by(AccuracyClass.name))
     return list(result.scalars().all())
 
 
 async def get_names(session: AsyncSession) -> list[str]:
-    result = await session.execute(select(AccuracyClass.name).order_by(AccuracyClass.id))
+    result = await session.execute(select(AccuracyClass.name).order_by(AccuracyClass.name))
     return list(result.scalars().all())
 
 

@@ -7,7 +7,7 @@
         <span class="subtitle">Всего: {{ total }}</span>
     </div>
     <div style="display:flex;gap:0.5rem;">
-        <a href="/reg/api/modules/export-excel" class="btn btn-primary" download>Скачать Excel</a>
+        <a href="/reg/api/modules/export-excel" class="btn btn-excel" download>Скачать Excel</a>
         <label class="btn btn-primary" style="cursor:pointer;">
             Загрузить Excel
             <input type="file" accept=".xlsx,.xls" style="display:none" onchange="importExcel(this)">
@@ -40,14 +40,15 @@
         </thead>
         <tbody>
             {% for item in items %}
-            <tr style="cursor:pointer" onclick="location.href='/reg/modules/{{ item.id }}'">
+            {% set is_zero = attrs[item.id].zero if item.id in attrs else false %}
+            <tr style="cursor:pointer" onclick="location.href='/reg/modules/{{ item.id }}'"{% if is_zero %} class="zero-price" title="Цена 0 или в составе материал с ценой 0"{% endif %}>
                 <td><strong>{{ item.id }}</strong></td>
                 <td>{{ item.name }}</td>
                 <td>{{ item.material_type.name if item.material_type else '' }}</td>
                 <td>{{ item.nom_tok or 0 }}</td>
                 <td>{{ attrs[item.id].accuracy_class if item.id in attrs else '' }}</td>
                 <td>{{ item.items_count }}</td>
-                <td>{{ prices.get(item.id, 0)|money }}</td>
+                <td{% if is_zero %} class="zero-cell"{% endif %}>{{ prices.get(item.id, 0)|money }}</td>
                 <td style="text-align:center;width:40px">
                     <button class="btn btn-danger btn-sm btn-icon" title="Удалить" onclick="event.stopPropagation(); deleteMod({{ item.id }}, this)">&#10005;</button>
                 </td>

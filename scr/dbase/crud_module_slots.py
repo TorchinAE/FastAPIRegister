@@ -55,6 +55,7 @@ async def add_slot(session: AsyncSession, data: ModuleTypeSlotCreateSchema) -> M
         name=name,
         hidden=data.hidden,
         filters=_filters(data.filters),
+        color=data.color or None,
         sort_order=max((s.sort_order for s in slots), default=0) + 1,
     )
     slot.material_types = await _material_types(session, data.material_type_ids)
@@ -75,6 +76,8 @@ async def update_slot(session: AsyncSession, slot_id: int, data: ModuleTypeSlotU
         slot.material_types = await _material_types(session, data.material_type_ids)
     if data.filters is not None:
         slot.filters = _filters(data.filters)
+    if "color" in data.model_fields_set:
+        slot.color = data.color or None
     await session.flush()
     return slot
 
@@ -118,6 +121,7 @@ def slot_json(slot: ModuleTypeSlot) -> dict:
         "name": slot.name,
         "hidden": bool(slot.hidden),
         "filters": slot.filters.split(",") if slot.filters else [],
+        "color": slot.color,
         "type_ids": [t.id for t in slot.material_types],
         "type_names": [t.name for t in slot.material_types],
     }
@@ -255,6 +259,7 @@ async def sync_hidden_slots(session: AsyncSession, request_id: int) -> bool:
     prices = await get_module_prices(session)
     for calc in changed_calcs:
         works = calc.module_type.slug in crud_module_types.WORKS_SECTIONS
+        crud_module_types.apply_fot_rule(calc, prices, await crud_module_types.get_fot_rule(session, calc.module_type))
         total = crud_module_types.calc_base_cost(calc, prices, works=works)
         calc.total_cost = round(total, 2)
         calc.final_price = round(total * (1 + float(calc.profitability_percent or 0) / 100), 2)

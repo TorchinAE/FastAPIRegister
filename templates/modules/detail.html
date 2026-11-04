@@ -4,11 +4,11 @@
 <div class="page-header">
     <div>
         <h1>{{ mod.name }}</h1>
-        <div class="subtitle">Модуль #{{ mod.id }} &middot; Стоимость: {{ prices.get(mod.id, 0)|money }}</div>
+        <div class="subtitle">Модуль #{{ mod.id }} &middot; Стоимость: <span{% if mod.id in zero %} class="zero-cell" title="Цена 0 или в составе материал с ценой 0"{% endif %}>{{ prices.get(mod.id, 0)|money }}</span></div>
     </div>
     <div style="display:flex;gap:0.5rem;flex-wrap:wrap;">
-        <a href="/reg/api/modules/{{ mod.id }}/export-excel" class="btn btn-primary" download>Скачать Excel</a>
-        <button type="button" class="btn btn-success" onclick="document.getElementById('importFile').click()" title="Колонки: Название, Цена за ед., Кол-во, Тип материала (необязательно: ID, Код 1С)">Загрузить Excel</button>
+        <a href="/reg/api/modules/{{ mod.id }}/export-excel" class="btn btn-excel" download>Скачать Excel</a>
+        <button type="button" class="btn btn-excel-outline" onclick="document.getElementById('importFile').click()" title="Колонки: Название, Цена за ед., Кол-во, Тип материала (необязательно: ID, Код 1С)">Загрузить Excel</button>
         <input type="file" id="importFile" accept=".xlsx" style="display:none" onchange="importExcel(this)">
         <a href="{{ back_to or '/modules' }}" class="btn btn-ghost">← Назад</a>
     </div>
@@ -122,7 +122,8 @@
         </thead>
         <tbody>
             {% for item in mod.items %}
-            <tr data-item-id="{{ item.id }}">
+            {% set is_zero = (item.material and not item.material.price) or (item.sub_module_id and item.sub_module_id in zero) %}
+            <tr data-item-id="{{ item.id }}"{% if is_zero %} class="zero-price" title="Цена 0 или в составе материал с ценой 0"{% endif %}>
                 <td>{% if item.material_id %}Материал{% else %}Модуль{% endif %}</td>
                 <td>{% if item.material and item.material.type %}{{ item.material.type.name }}{% endif %}</td>
                 <td>{% if item.material %}<a href="/reg/materials/{{ item.material_id }}" onclick="event.stopPropagation()">{{ item.material.name }}</a>{% elif item.sub_module %}<a href="/reg/modules/{{ item.sub_module_id }}" onclick="event.stopPropagation()">{{ item.sub_module.name }}</a>{% endif %}</td>
@@ -155,7 +156,7 @@
         </thead>
         <tbody>
             {% for bi in bom_items %}
-            <tr>
+            <tr{% if not bi.price %} class="zero-price"{% endif %}>
                 <td>{{ bi.name }}</td>
                 <td>{{ bi.price|money }}</td>
                 <td>{{ bi.quantity }}</td>

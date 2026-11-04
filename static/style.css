@@ -5,6 +5,12 @@
     --success-hover: #047857;
     --danger: #dc2626;
     --danger-hover: #b91c1c;
+    --excel: #1d6f42;
+    --excel-hover: #155232;
+    --nav: #0369a1;
+    --nav-hover: #075985;
+    --folder: #b45309;
+    --folder-hover: #92400e;
     --bg: #f1f5f9;
     --surface: #ffffff;
     --text: #1e293b;
@@ -95,6 +101,17 @@ tr { transition: background var(--transition); }
 .btn-success:hover { background: var(--success-hover); }
 .btn-danger { background: var(--danger); }
 .btn-danger:hover { background: var(--danger-hover); }
+/* Excel: выгрузка (заливка) и загрузка / вторичная выгрузка (контур) */
+.btn-excel { background: var(--excel); }
+.btn-excel:hover { background: var(--excel-hover); }
+.btn-excel-outline { background: #fff; color: var(--excel); border: 1px solid var(--excel); }
+.btn-excel-outline:hover { background: #ecfdf3; color: var(--excel-hover); }
+/* Переход на связанные страницы (по умолчанию, обязательные строки, расчёт, договоры) */
+.btn-nav { background: var(--nav); }
+.btn-nav:hover { background: var(--nav-hover); }
+/* Папки на сервере */
+.btn-folder { background: var(--folder); }
+.btn-folder:hover { background: var(--folder-hover); }
 .btn-ghost { background: transparent; color: var(--text-muted); border: 1px solid var(--border); }
 .btn-ghost:hover { background: #f8fafc; color: var(--text); }
 .btn-sm { padding: 0.35rem 0.7rem; font-size: 0.8rem; }
@@ -353,7 +370,8 @@ form { background: var(--surface); padding: 1.5rem; border-radius: var(--radius)
 .tkp-totals { flex: 1; min-width: 0; display: flex; flex-direction: column; gap: 0.75rem; }
 .tkp-totals-head { display: flex; align-items: center; justify-content: space-between; gap: 0.75rem; flex-wrap: wrap; }
 .tkp-totals-head h3 { margin: 0; font-size: 1rem; }
-.tkp-totals-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(190px, 1fr)); gap: 0.6rem; }
+.tkp-totals-grid { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 0.6rem; }
+@media (max-width: 900px) { .tkp-totals-grid { grid-template-columns: repeat(2, minmax(0, 1fr)); } }
 .tkp-total { display: flex; flex-direction: column; gap: 0.2rem; padding: 0.6rem 0.75rem; border: 1px solid #edf1f5; border-radius: 8px; background: #f8fafc; }
 .tkp-total-label { font-size: 0.75rem; color: var(--text-muted); font-weight: 600; }
 .tkp-total-value { font-size: 1.05rem; font-weight: 700; font-variant-numeric: tabular-nums; }
@@ -389,3 +407,18 @@ form { background: var(--surface); padding: 1.5rem; border-radius: var(--radius)
 .calc-template-menu-title { font-size: 0.72rem; font-weight: 600; color: var(--text-muted); padding: 0.2rem 0.4rem; }
 .calc-template-option { text-align: left; border: none; background: transparent; padding: 0.4rem 0.5rem; border-radius: 6px; cursor: pointer; font-size: 0.85rem; color: var(--text); }
 .calc-template-option:hover { background: rgba(79, 70, 229, 0.08); color: var(--sidebar-active); }
+
+/* Строка с модулем/материалом с ценой 0 — красная подсветка */
+.calc-item.zero-price { background: #fef2f2; border-color: #fca5a5; }
+.calc-item.zero-price .calc-item-price, .calc-item.zero-price .calc-item-sum { color: #c62828; }
+select.mp-zero { outline: 2px solid #ef4444; outline-offset: -1px; }
+tr.zero-price > td { background: #fef2f2; }
+.zero-cell { color: #c62828; font-weight: 600; }
+/* Цвет обязательной строки (шаблоны по умолчанию, расчёт) */
+.calc-item.slot-colored { background: color-mix(in srgb, var(--slot-color) 18%, #fff); border-color: color-mix(in srgb, var(--slot-color) 45%, #fff); }
+.calc-item.slot-colored.zero-price { background: #fef2f2; }
+/* Поиск модуля по названию в строке добавления */
+.calc-add-row .f-module-search.active { border-color: var(--primary); background: #eef2ff; }
+/* Как рассчитаны ФОТ и накладные: «0,21*Комп», «MAX», «Вручную» */
+.calc-how { margin-left: 0.3rem; padding: 0 0.35rem; border-radius: 4px; background: #eef2ff; color: #4338ca; font-size: 0.7rem; font-weight: 600; text-transform: none; letter-spacing: 0; }
+.calc-how-auto { margin-left: 0.25rem; border: none; background: none; color: var(--primary); font-size: 0.7rem; cursor: pointer; text-decoration: underline; padding: 0; }

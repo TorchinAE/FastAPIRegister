@@ -200,8 +200,12 @@ async def build_tkp_kit(session: AsyncSession, req: Request) -> list[dict]:
     Блок: title — «{название блока}-{назначение}», lines — модули блока по порядку строк (скрытые строки
     не выводятся, но входят в цену), quantity — количество блоков, price — общая стоимость блока без НДС.
     Разделы работ и доставка — одной строкой, количество 1 при ненулевой стоимости.
+    zero_lines — номера строк lines с модулем с ценой 0 (сам или материал состава), has_zero — такой модуль
+    есть в блоке (в т.ч. в скрытой строке).
     """
     from scr.dbase.crud_module_slots import get_slots, order_by_slots
+
+    zero = await crud_modules.get_zero_price_modules(session)
 
     stmt = (
         select(RequestCalc)
@@ -236,14 +240,32 @@ async def build_tkp_kit(session: AsyncSession, req: Request) -> list[dict]:
             title = calc.name or mt.name
             if calc.purpose:
                 title += f"-{calc.purpose}"
-            lines = []
+            lines: list[str] = []
+            zero_lines: list[int] = []
+            has_zero = False
             for item in order_by_slots(calc.items, list(slots.values())):
                 slot = slots.get(item.slot_id)
-                if slot is not None and slot.hidden or not item.quantity:
+                if not item.quantity:
+                    continue
+                is_zero = item.module_id in zero
+                has_zero = has_zero or is_zero
+                if slot is not None and slot.hidden:
                     continue
                 name = item.module.name if item.module else f"Модуль {item.module_id}"
+                if is_zero:
+                    zero_lines.append(len(lines))
                 lines.append(kit_line(slot.name if slot else None, item.quantity, name))
-            blocks.append({"title": title, "lines": lines, "quantity": qty, "price": price, "sum": price * qty})
+            blocks.append(
+                {
+                    "title": title,
+                    "lines": lines,
+                    "zero_lines": zero_lines,
+                    "has_zero": has_zero,
+                    "quantity": qty,
+                    "price": price,
+                    "sum": price * qty,
+                }
+            )
         if blocks:
             # Заголовок «в составе» — у разделов из ячеек (КСО, КРУ, ЩО)
             header = mt.slug in CELL_SECTIONS

@@ -1,8 +1,19 @@
+from dataclasses import dataclass
+
 from sqlalchemy import func, select
 from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy.orm import selectinload
 
-from scr.constants import CELL_SECTIONS, MOUNTING_SECTION, POWER_TRANSFORMER_SECTION
+from scr.constants import (
+    AUTO_FOT_SECTIONS,
+    CELL_SECTIONS,
+    DEFAULT_K_FOT,
+    DEFAULT_K_NAKL,
+    MOUNTING_SECTION,
+    POWER_TRANSFORMER_SECTION,
+    SETTING_K_FOT,
+    SETTING_K_NAKL,
+)
 from scr.dbase.models import InvoiceItem, ModuleType, ModuleTypeDefault, PayrollItem, RequestCalc, RequestCalcItem
 from scr.dbase.schemas.schemas import (
     ModuleTypeCreateSchema,
@@ -19,7 +30,7 @@ async def get_module_types(session: AsyncSession) -> list[ModuleType]:
     stmt = (
         select(ModuleType)
         .options(selectinload(ModuleType.fot_item), selectinload(ModuleType.overhead_item))
-        .order_by(ModuleType.id)
+        .order_by(ModuleType.name)
     )
     result = await session.execute(stmt)
     return list(result.scalars().all())
@@ -216,6 +227,7 @@ async def create_calc(
 
     prices = await get_module_prices(session)
     profit = await default_profitability(session, request_id)
+    apply_fot_rule(calc, prices, await get_fot_rule(session, mod_type))
     total = calc_base_cost(calc, prices, works=bool(mod_type and mod_type.slug in WORKS_SECTIONS))
     calc.profitability_percent = profit
     calc.total_cost = round(total, 2)
@@ -233,12 +245,71 @@ async def default_profitability(session: AsyncSession, request_id: int) -> float
     return float(value) if value else 15.0
 
 
+@dataclass
+class FotRule:
+    """Автоматический ФОТ и накладные раздела: коэффициенты из настроек, «макс» — из справочников (0 — без макс)."""
+
+    k_fot: float
+    k_nakl: float
+    fot_max: float
+    overhead_max: float
+
+    def fot(self, comp: float) -> float:
+        value = comp * self.k_fot
+        return min(value, self.fot_max) if self.fot_max > 0 else value
+
+    def overhead(self, fot: float) -> float:
+        value = fot * self.k_nakl
+        return min(value, self.overhead_max) if self.overhead_max > 0 else value
+
+    def as_json(self) -> dict:
+        return {"k_fot": self.k_fot, "k_nakl": self.k_nakl, "fot_max": self.fot_max, "overhead_max": self.overhead_max}
+
+
+async def setting_float(session: AsyncSession, key: str, default: float) -> float:
+    from scr.dbase import crud_settings
+
+    value = await crud_settings.get_setting(session, key)
+    try:
+        return float(str(value).replace(",", ".")) if value else default
+    except ValueError:
+        return default
+
+
+async def get_fot_rule(session: AsyncSession, mod_type: ModuleType | None) -> FotRule | None:
+    """Правило автоматического ФОТ раздела; None — раздел без автоматического расчёта (ФОТ вводится вручную)."""
+    if mod_type is None or mod_type.slug not in AUTO_FOT_SECTIONS:
+        return None
+    if "fot_item" not in mod_type.__dict__ or "overhead_item" not in mod_type.__dict__:
+        mod_type = await get_module_type_by_id(session, mod_type.id)
+    return FotRule(
+        k_fot=await setting_float(session, SETTING_K_FOT, DEFAULT_K_FOT),
+        k_nakl=await setting_float(session, SETTING_K_NAKL, DEFAULT_K_NAKL),
+        fot_max=float(mod_type.fot_item.cost) if mod_type.fot_item else 0.0,
+        overhead_max=float(mod_type.overhead_item.cost) if mod_type.overhead_item else 0.0,
+    )
+
+
+def modules_cost(calc: RequestCalc, prices: dict[int, float]) -> float:
+    return sum(prices.get(it.module_id, 0.0) * it.quantity for it in calc.items)
+
+
+def apply_fot_rule(calc: RequestCalc, prices: dict[int, float], rule: FotRule | None) -> None:
+    """Пересчитывает ФОТ и накладные блока, не введённые вручную."""
+    if rule is None:
+        return
+    if not calc.fot_manual:
+        calc.fot = round(rule.fot(modules_cost(calc, prices)), 2)
+    if not calc.overhead_manual:
+        calc.overhead = round(rule.overhead(float(calc.fot or 0)), 2)
+
+
 def calc_base_cost(calc: RequestCalc, prices: dict[int, float], works: bool) -> float:
     """Себестоимость блока: модули (или себестоимость работ) + ФОТ + Накладные."""
     if works:
         base = float(calc.works_cost or 0)
     else:
-        base = sum(prices.get(it.module_id, 0.0) * it.quantity for it in calc.items)
+        base = modules_cost(calc, prices)
     return base + float(calc.fot or 0) + float(calc.overhead or 0)
 
 
@@ -268,6 +339,8 @@ def calc_block_data(calc: RequestCalc, prices: dict[int, float], default_profit:
         "id": calc.id,
         "fot": float(calc.fot or 0),
         "overhead": float(calc.overhead or 0),
+        "fot_manual": bool(calc.fot_manual),
+        "overhead_manual": bool(calc.overhead_manual),
         "profitability_percent": profit if profit > 0 else default_profit,
         "quantity": calc.quantity if calc.quantity is not None else 1,
         "qty_1sh": calc.qty_1sh or 0,
@@ -292,9 +365,12 @@ async def get_or_create_calcs(session: AsyncSession, request_id: int, module_typ
     if not calcs:
         return [await create_calc(session, request_id, module_type_id)]
 
-    # Refresh fot/overhead from linked items if calc values are still 0
+    # ФОТ/Накладные ещё 0 — из справочников (в разделах с автоматическим ФОТ — только у введённых вручную)
     mod_type = await get_module_type_by_id(session, module_type_id)
+    auto = bool(mod_type and mod_type.slug in AUTO_FOT_SECTIONS)
     for calc in calcs:
+        if auto and not (calc.fot_manual and calc.overhead_manual):
+            continue
         if mod_type and mod_type.fot_item and float(calc.fot) == 0 and float(mod_type.fot_item.cost) > 0:
             calc.fot = float(mod_type.fot_item.cost)
         if mod_type and mod_type.overhead_item and float(calc.overhead) == 0 and float(mod_type.overhead_item.cost) > 0:

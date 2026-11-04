@@ -40,7 +40,7 @@
         <div class="form-row" style="grid-template-columns: 1fr 1fr 1fr 1fr;">
             <div class="form-group">
                 <label>Цена</label>
-                <input type="number" name="price" value="{{ mat.price }}" step="0.01" min="0" style="width:100%;min-width:0">
+                <input type="number" name="price" value="{{ mat.price }}" step="0.01" min="0" style="width:100%;min-width:0{% if not mat.price %};border-color:#ef4444;background:#fef2f2;color:#c62828{% endif %}"{% if not mat.price %} title="Цена 0"{% endif %}>
             </div>
             <div class="form-group">
                 <label>Код 1С</label>

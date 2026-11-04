@@ -237,6 +237,33 @@ async def get_module_prices(session: AsyncSession) -> dict[int, float]:
     return prices
 
 
+async def get_zero_price_modules(session: AsyncSession) -> set[int]:
+    """Модули с нулевой ценой: пустые, с нулевой суммой или с материалом (в т.ч. в подмодулях) с ценой 0."""
+    tree, materials = await load_tree(session)
+    zero: dict[int, bool] = {}
+
+    def is_zero(module_id: int, stack: frozenset) -> bool:
+        if module_id in zero:
+            return zero[module_id]
+        if module_id in stack:
+            return False
+        items = tree.get(module_id, [])
+        result = not items
+        for material_id, sub_module_id, _qty in items:
+            if (
+                material_id is not None
+                and materials.get(material_id, (0.0, 0))[0] <= 0
+                or sub_module_id is not None
+                and is_zero(sub_module_id, stack | {module_id})
+            ):
+                result = True
+        zero[module_id] = result
+        return result
+
+    ids = await session.execute(select(Module.id))
+    return {module_id for (module_id,) in ids.all() if is_zero(module_id, frozenset())}
+
+
 async def recalc_nom_tok(session: AsyncSession) -> None:
     """Пересчитывает ном. ток модулей без ручного значения: максимум из материалов состава (с подмодулями)."""
     tree, materials = await load_tree(session)
@@ -352,7 +379,7 @@ async def sort_modules(session: AsyncSession, modules: list[Module], attrs: dict
     order = {
         name: i
         for i, name in enumerate(
-            (await session.execute(select(AccuracyClass.name).order_by(AccuracyClass.id))).scalars().all()
+            (await session.execute(select(AccuracyClass.name).order_by(AccuracyClass.name))).scalars().all()
         )
     }
 

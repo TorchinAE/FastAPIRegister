@@ -5,6 +5,8 @@ import logging
 from sqlalchemy import text
 from sqlalchemy.ext.asyncio import AsyncConnection
 
+from scr.constants import OLD_SETTING_TEMPLATE_FOLDER, SETTING_TEMPLATE_FOLDER
+
 logger = logging.getLogger(__name__)
 
 # (таблица, колонка, DDL-тип) — добавляются, если отсутствуют
@@ -30,6 +32,13 @@ ADD_COLUMNS = [
     ("requests", "power_transformer_cost", "NUMERIC(12, 2) DEFAULT 0"),
     ("requests", "mounting_cost", "NUMERIC(12, 2) DEFAULT 0"),
     ("request_calcs", "template_id", "INTEGER REFERENCES module_type_templates(id) ON DELETE SET NULL"),
+    ("organizations", "full_name", "VARCHAR(300)"),
+    ("organizations", "basis", "VARCHAR(200)"),
+    ("organizations", "requisites", "TEXT"),
+    ("contract_specs", "specification_date", "DATETIME"),
+    ("module_type_slots", "color", "VARCHAR(20)"),
+    ("request_calcs", "fot_manual", "BOOLEAN NOT NULL DEFAULT 1"),
+    ("request_calcs", "overhead_manual", "BOOLEAN NOT NULL DEFAULT 1"),
 ]
 
 # Существующие блоки КСО: всё количество — на 1СШ
@@ -57,6 +66,9 @@ WHERE material_type_id IS NULL AND (
     WHERE mi.module_id = modules.id AND m.type_id IS NOT NULL
 ) = 1
 """
+
+# Настройка tkp_template_folder переименована в template_folder (папка всех шаблонов)
+RENAME_SETTINGS = [(OLD_SETTING_TEMPLATE_FOLDER, SETTING_TEMPLATE_FOLDER)]
 
 # Устаревшие колонки, которых нет в модели. NOT NULL без DEFAULT ломает INSERT — удаляем.
 DROP_COLUMNS = [
@@ -100,6 +112,21 @@ async def run_startup_migrations(conn: AsyncConnection) -> None:
                 await conn.execute(text(FILL_MODULE_MATERIAL_TYPE))
             if (table, column) == ("request_calcs", "qty_1sh"):
                 await conn.execute(text(FILL_KSO_QTY_1SH))
+    for old_key, new_key in RENAME_SETTINGS:
+        old = await conn.execute(text("SELECT value FROM settings WHERE key = :k"), {"k": old_key})
+        old_value = old.scalar_one_or_none()
+        if old_value is None:
+            continue
+        new = await conn.execute(text("SELECT value FROM settings WHERE key = :k"), {"k": new_key})
+        new_value = new.scalar_one_or_none()
+        if new_value is None:
+            await conn.execute(
+                text("INSERT INTO settings (key, value) VALUES (:k, :v)"), {"k": new_key, "v": old_value}
+            )
+        elif not new_value and old_value:
+            await conn.execute(text("UPDATE settings SET value = :v WHERE key = :k"), {"k": new_key, "v": old_value})
+        await conn.execute(text("DELETE FROM settings WHERE key = :k"), {"k": old_key})
+        logger.info("Настройка %s переименована в %s", old_key, new_key)
     for table, column in DROP_COLUMNS:
         if column in await _columns(conn, table):
             try:

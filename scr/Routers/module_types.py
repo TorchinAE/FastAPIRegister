@@ -761,9 +761,11 @@ async def export_tkp_kit_excel(req_id: int, session: AsyncSession = Depends(db_h
 
     from fastapi.responses import Response
 
+    from scr.constants import TKP_TEMPLATE
     from scr.dbase import crud_requests, crud_settings
     from scr.dbase.crud_tkp import build_tkp_kit
     from scr.utils.declension import fio_dative, position_dative
+    from scr.utils.doc_templates import read_template
     from scr.utils.tkp_excel import TkpData, TkpRow, build_tkp_xlsx
 
     req = await crud_requests.get_request_by_id(session, req_id)
@@ -815,7 +817,7 @@ async def export_tkp_kit_excel(req_id: int, session: AsyncSession = Depends(db_h
     )
     filename = f"ТКП-{req.tkp_num or req.id}.xlsx"
     return Response(
-        build_tkp_xlsx(data),
+        build_tkp_xlsx(data, await read_template(session, TKP_TEMPLATE)),
         media_type="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
         headers={"Content-Disposition": f"attachment; filename*=UTF-8''{quote(filename)}"},
     )

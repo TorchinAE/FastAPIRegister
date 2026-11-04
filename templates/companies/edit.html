@@ -43,6 +43,20 @@
                 <a href="/reg/directors/{{ org.director_id }}?back_to=/companies/{{ org.id }}/edit" id="editDirectorLink" class="btn btn-ghost btn-sm" style="margin-top:0.35rem;font-size:0.8rem">Изменить данные директора</a>
             </div>
         </div>
+        <div class="form-row" style="grid-template-columns: 2fr 1fr;">
+            <div class="form-group">
+                <label>Полное наименование (для договора)</label>
+                <input type="text" name="full_name" value="{{ org.full_name or '' }}" placeholder="Общество с ограниченной ответственностью «…»" style="width:100%;min-width:0">
+            </div>
+            <div class="form-group">
+                <label>Действует на основании</label>
+                <input type="text" name="basis" value="{{ org.basis or '' }}" placeholder="Устава" style="width:100%;min-width:0">
+            </div>
+        </div>
+        <div class="form-group">
+            <label>Реквизиты</label>
+            <textarea name="requisites" rows="10" placeholder="ИНН / КПП, ОГРН, юридический и почтовый адрес, р/с, банк, к/с, БИК, телефон, email" style="width:100%;min-width:0;font-family:inherit;resize:vertical">{{ org.requisites or '' }}</textarea>
+        </div>
         <div class="actions">
             <button type="submit" class="btn btn-primary">Сохранить</button>
         </div>
@@ -100,6 +114,9 @@ document.getElementById('editCompanyForm').addEventListener('submit', async func
         server_address_slug: fd.get('server_address_slug'),
         profitability: parseFloat(fd.get('profitability')) || 0,
         director_id: parseInt(fd.get('director_id')),
+        full_name: fd.get('full_name') || null,
+        basis: fd.get('basis') || null,
+        requisites: fd.get('requisites') || null,
     };
     const resp = await fetch('/reg/api/companies/', {
         method: 'PATCH',

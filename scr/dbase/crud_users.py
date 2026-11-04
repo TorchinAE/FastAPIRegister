@@ -22,7 +22,7 @@ def verify_password(password: str, hashed: str) -> bool:
 async def get_users(
     session: AsyncSession, search: str | None = None, page: int = 1, per_page: int = 20
 ) -> tuple[list[User], int]:
-    stmt = select(User).order_by(User.id)
+    stmt = select(User).order_by(User.name)
     count_stmt = select(func.count(User.id))
     if search:
         filter_cond = User.name.ilike(f"%{search}%") | User.email.ilike(f"%{search}%")

@@ -64,7 +64,7 @@
 <div class="card" style="margin-top:1rem;">
     <div style="display:flex;justify-content:space-between;align-items:center;gap:1rem;margin-bottom:0.75rem;flex-wrap:wrap;">
         <h2 style="margin:0;">Комплектация</h2>
-        <a href="/reg/api/requests/{{ req.id }}/tkp-kit/export-excel" class="btn btn-primary btn-sm" download>Скачать Excel</a>
+        <a href="/reg/api/requests/{{ req.id }}/tkp-kit/export-excel" class="btn btn-excel btn-sm" download>Скачать Excel</a>
     </div>
     <div class="table-wrap">
         <table class="tkp-kit">
@@ -85,11 +85,11 @@
                 {% endif %}
                 {% for block in section.blocks %}
                 {% set ns.n = ns.n + 1 %}
-                <tr>
+                <tr{% if block.has_zero %} class="zero-price" title="В блоке есть модуль или материал с ценой 0"{% endif %}>
                     <td>{{ ns.n }}</td>
                     <td>
-                        <strong>{{ block.title }}</strong>
-                        {% for line in block.lines %}<div class="tkp-kit-line">{{ line }}</div>{% endfor %}
+                        <strong>{{ block.title }}</strong>{% if block.has_zero %} <span class="zero-cell">⚠ цена 0</span>{% endif %}
+                        {% for line in block.lines %}<div class="tkp-kit-line{% if loop.index0 in block.zero_lines %} zero-cell{% endif %}">{{ line }}</div>{% endfor %}
                     </td>
                     <td style="text-align:right;">{{ block.quantity }}</td>
                     <td style="text-align:right;white-space:nowrap;">{{ block.price|money }}</td>

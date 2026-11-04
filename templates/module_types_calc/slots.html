@@ -21,7 +21,7 @@
     </div>
     {% if mt %}
     <div style="display:flex;gap:0.5rem;flex-wrap:wrap;">
-        <a href="/reg/module-types-calc/{{ mt.id }}/defaults" class="btn btn-ghost">Шаблоны по умолчанию: {{ mt.name }}</a>
+        <a href="/reg/module-types-calc/{{ mt.id }}/defaults" class="btn btn-nav">Шаблоны по умолчанию: {{ mt.name }}</a>
     </div>
     {% endif %}
 </div>
@@ -54,6 +54,7 @@
                 <th>Название строки</th>
                 <th>Типы модулей</th>
                 <th title="Фильтры выбора модуля строки в шаблонах по умолчанию">Фильтр модулей</th>
+                <th title="Цвет строки в шаблонах по умолчанию и в расчёте">Цвет</th>
                 <th title="Не отображать в расчёте, но учитывать в стоимости">Не отображать</th>
                 <th style="width:90px">Порядок</th>
                 <th style="width:50px"></th>
@@ -66,6 +67,7 @@
     Тип модуля задаётся на странице модуля. Если типы не выбраны — в строку подходит любой модуль.
     В комплектации ТКП модуль строки выводится как «Название строки: модуль».
     Отмеченные фильтры показываются у строки в шаблонах по умолчанию.
+    Цвет строки — подсветка строки в шаблонах по умолчанию и в расчёте.
     Скрытая строка не показывается в расчёте, её модуль всегда берётся из модулей по умолчанию и учитывается в стоимости.
 </div>
 {% else %}
@@ -116,7 +118,7 @@ const sameSet = (a, b) => a.length === b.length && a.every(x => b.includes(x));
 function render() {
     const body = document.getElementById('slotsBody');
     if (!slots.length) {
-        body.innerHTML = '<tr><td colspan="7" style="text-align:center;color:var(--text-muted);padding:1.5rem;">Нет обязательных строк</td></tr>';
+        body.innerHTML = '<tr><td colspan="8" style="text-align:center;color:var(--text-muted);padding:1.5rem;">Нет обязательных строк</td></tr>';
         return;
     }
     body.innerHTML = '';
@@ -128,6 +130,10 @@ function render() {
             <td><input type="text" class="cell-input f-name" value="${esc(slot.name)}" maxlength="200" style="width:100%;min-width:180px;"></td>
             <td class="f-types"></td>
             <td class="f-filters"></td>
+            <td style="white-space:nowrap;">
+                <input type="color" class="f-color" value="${esc(slot.color || '#ffffff')}" title="Цвет строки">
+                <button type="button" class="btn btn-ghost btn-sm btn-icon f-color-reset" title="Без подсветки" ${slot.color ? '' : 'disabled'}>&#8856;</button>
+            </td>
             <td style="text-align:center"><input type="checkbox" class="f-hidden" ${slot.hidden ? 'checked' : ''}></td>
             <td>
                 <button type="button" class="btn btn-ghost btn-sm f-up" title="Выше" ${i === 0 ? 'disabled' : ''}>&uarr;</button>
@@ -140,6 +146,9 @@ function render() {
             patch(slot, {name});
         });
         tr.querySelector('.f-hidden').addEventListener('change', e => patch(slot, {hidden: e.target.checked}));
+        tr.querySelector('.f-color').addEventListener('change', e => patch(slot, {color: e.target.value}));
+        tr.querySelector('.f-color-reset').addEventListener('click', () => patch(slot, {color: null}));
+        if (slot.color) tr.querySelector('td').style.boxShadow = `inset 4px 0 0 ${slot.color}`;
         tr.querySelector('.f-types').appendChild(checkList(
             typesSummary(slot), slot.type_names.join(', '),
             materialTypes.map(t => ({value: t.id, label: t.name, checked: slot.type_ids.includes(t.id)})),

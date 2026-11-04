@@ -3,10 +3,13 @@
 // и подсветка модулей цветом их типа материала (цвет задаётся на странице «Типы материалов»).
 // Фильтр — общий (renderBar) или свой у строки (slotFilters: какие фильтры — выбираются в «Обязательных строках»).
 // Модули приходят уже отсортированными: ном. ток, класс точности, название.
+// Модуль с ценой 0 или с материалом с ценой 0 (m.zero) подсвечивается красным.
+// Текстовый фильтр по названию — search(input, select).
 const ModulePicker = (() => {
     const FLAGS = [['stats', 'стац'], ['vtych', 'втыч'], ['vykat', 'выкат'], ['ruchn', 'ручн'], ['el_priv', 'эл.прив']];
     const FILTERS = [['nom_tok', 'Ном Ток'], ['voltage', 'Напряж.'], ['accuracy_class', 'Кл. точн.'], ...FLAGS];
     const filters = {};
+    const ZERO_COLOR = '#c62828';
     const configs = new WeakMap();
     let modules = [];
     let byId = new Map();
@@ -46,11 +49,14 @@ const ModulePicker = (() => {
         select.innerHTML = '';
         select.add(new Option(cfg.placeholder, ''));
         let hidden = 0;
+        const text = (cfg.text || '').toLowerCase();
         modules.forEach(m => {
             if (!cfg.allow(m, current)) return;
-            if (!passes(m, cfg.filters) && String(m.id) !== current) { hidden++; return; }
-            const opt = new Option(optionLabel(m), m.id);
+            const byText = !text || m.name.toLowerCase().includes(text);
+            if ((!passes(m, cfg.filters) || !byText) && String(m.id) !== current) { hidden++; return; }
+            const opt = new Option((m.zero ? '⚠ ' : '') + optionLabel(m), m.id);
             paint(opt, m.color);
+            if (m.zero) { opt.style.color = ZERO_COLOR; opt.style.fontWeight = '600'; }
             select.add(opt);
         });
         select.value = current;
@@ -61,6 +67,23 @@ const ModulePicker = (() => {
     function paintSelect(select) {
         const m = byId.get(parseInt(select.value));
         paint(select, m ? m.color : '');
+        select.classList.toggle('mp-zero', !!(m && m.zero));
+    }
+
+    // Модуль с нулевой ценой (сам или материал состава)
+    function isZero(moduleId) {
+        const m = byId.get(moduleId);
+        return !!(m && m.zero);
+    }
+
+    // Текстовый фильтр по названию для select (выбранный модуль остаётся в списке)
+    function search(input, select) {
+        const cfg = configs.get(select);
+        input.addEventListener('input', () => {
+            cfg.text = input.value.trim();
+            fill(select);
+            input.classList.toggle('active', !!cfg.text);
+        });
     }
 
     function attach(select, {placeholder = '-- Модуль --', allow = () => true} = {}) {
@@ -145,5 +168,5 @@ const ModulePicker = (() => {
         renderBar(bar);
     }
 
-    return {init, attach, slotFilters, refreshAll, color, paint};
+    return {init, attach, slotFilters, search, refreshAll, color, paint, isZero};
 })();

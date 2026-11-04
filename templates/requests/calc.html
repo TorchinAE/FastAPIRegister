@@ -13,7 +13,7 @@
     <div style="display:flex;gap:2rem;align-items:flex-start;">
         <!-- Left: vertical buttons -->
         <div style="min-width:260px;display:flex;flex-direction:column;gap:0.5rem;">
-            <button class="btn btn-success" style="justify-content:flex-start;text-align:left;" onclick="openFolder()">
+            <button class="btn btn-folder" style="justify-content:flex-start;text-align:left;" onclick="openFolder()">
                 Открыть папку
             </button>
             <div style="height:0.5rem;"></div>
@@ -59,28 +59,31 @@
         <div class="tkp-totals">
             <div class="tkp-totals-head">
                 <h3>Сводно по ТКП</h3>
-                <a href="/reg/api/requests/{{ req.id }}/kit/export-excel" class="btn btn-primary btn-sm" download>Выгрузить комплектацию</a>
+                <a href="/reg/api/requests/{{ req.id }}/kit/export-excel" class="btn btn-excel btn-sm" download>Выгрузить комплектацию</a>
             </div>
+            {# 1 ряд: Комплектация, ФОТ, Накладные; 2: Себестоимость, Прибыль, Итого без НДС;
+               3: Средняя рентабельность, Итого с НДС #}
             {% set kpis = [
-                ('Комплектация', totals.comp, false),
-                ('ФОТ', totals.fot, false),
-                ('Накладные', totals.overhead, false),
-                ('Себестоимость', totals.cost, false),
-                ('Прибыль', totals.profit, false),
-                ('Итого без НДС', totals.final, true),
-                ('Итого с НДС ' ~ ('%g'|format(nds_percent)) ~ '%', totals.final_nds, false),
+                ('Комплектация', totals.comp, false, false),
+                ('ФОТ', totals.fot, false, false),
+                ('Накладные', totals.overhead, false, false),
+                ('Себестоимость', totals.cost, false, false),
+                ('Прибыль', totals.profit, false, false),
+                ('Итого без НДС', totals.final, true, false),
+                ('Средняя рентабельность', totals.profit_percent, false, true),
+                ('Итого с НДС ' ~ ('%g'|format(nds_percent)) ~ '%', totals.final_nds, true, false),
             ] %}
             <div class="tkp-totals-grid">
-                {% for label, value, strong in kpis %}
+                {% for label, value, strong, percent in kpis %}
                 <div class="tkp-total{% if strong %} strong{% endif %}">
                     <span class="tkp-total-label">{{ label }}</span>
+                    {% if percent %}
+                    <span class="tkp-total-value">{{ "%.2f"|format(value) }} %</span>
+                    {% else %}
                     <span class="tkp-total-value calc-cost" data-raw="{{ value }}">{{ "%.2f"|format(value) }}</span>
+                    {% endif %}
                 </div>
                 {% endfor %}
-                <div class="tkp-total">
-                    <span class="tkp-total-label">Средняя рентабельность</span>
-                    <span class="tkp-total-value">{{ "%.2f"|format(totals.profit_percent) }} %</span>
-                </div>
             </div>
             <div class="tkp-totals-hint">По всем разделам с учётом количества блоков. Рентабельность = прибыль / себестоимость.</div>
         </div>

@@ -113,7 +113,10 @@ async def build_request_kso204(session: AsyncSession, req: Request) -> tuple[byt
     header.bus_current = max((it.module.nom_tok or 0 for c in calcs for it in c.items if it.module), default=0) or None
     header.k_fot = await _setting_float(session, SETTING_K_FOT, DEFAULT_K_FOT)
     header.k_nakl = await _setting_float(session, SETTING_K_NAKL, DEFAULT_K_NAKL)
-    return kso204.build_kso204(header, blocks)
+    from scr.constants import KSO204_TEMPLATE
+    from scr.utils.doc_templates import read_template
+
+    return kso204.build_kso204(header, blocks, await read_template(session, KSO204_TEMPLATE))
 
 
 async def save_request_kso204(session: AsyncSession, req: Request) -> tuple[Path, list[str]]:
@@ -186,8 +189,10 @@ async def load_request_kso204(session: AsyncSession, req: Request, data: bytes) 
                 session, RequestCalcItemCreateSchema(calc_id=calc.id, module_id=mod.id, quantity=qty)
             )
 
+        # ФОТ и накладные — как в книге: введёнными вручную
         calc.fot = pb.fot
         calc.overhead = pb.overhead
+        calc.fot_manual = calc.overhead_manual = True
         calc.profitability_percent = pb.profit_percent if pb.profit_percent is not None else default_profit
         calc.qty_1sh, calc.qty_2sh = pb.qty_1sh, pb.qty_2sh
         calc.purpose = pb.purpose if pb.purpose in KSO_PURPOSES else None

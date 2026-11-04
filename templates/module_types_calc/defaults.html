@@ -7,7 +7,7 @@
         <div class="subtitle">Slug: {{ mt.slug }} &middot; новый блок расчёта создаётся из выбранного шаблона &middot; изменения сохраняются сразу</div>
     </div>
     <div style="display:flex;gap:0.5rem;flex-wrap:wrap;">
-        <a href="/reg/module-type-slots?type={{ mt.slug }}" class="btn btn-ghost">Обязательные строки</a>
+        <a href="/reg/module-type-slots?type={{ mt.slug }}" class="btn btn-nav">Обязательные строки</a>
         <a href="/reg/module-types-calc" class="btn btn-ghost">&larr; Назад</a>
     </div>
 </div>
@@ -114,6 +114,7 @@ function renderTemplate(tpl) {
         </div>` : ''}
         <div class="calc-items f-slots"></div>
         <div class="calc-add-row">
+            <input type="search" class="f-module-search" placeholder="Поиск модуля по названию…">
             <select class="f-module"></select>
             <div class="calc-add-row-bottom">
                 <input type="number" class="f-module-qty" value="1" min="1" title="Кол-во">
@@ -123,13 +124,14 @@ function renderTemplate(tpl) {
         <div class="calc-items f-items"></div>
         <div class="calc-items-total">Модули: <strong class="f-total">0,00</strong></div>
         <div class="calc-block-actions" style="gap:0.35rem;">
-            <a class="btn btn-ghost btn-sm" href="/reg/api/module-types/${typeId}/defaults/export-excel?template_id=${tpl.id}" download>Excel ↓</a>
-            <button type="button" class="btn btn-ghost btn-sm f-import">Excel ↑</button>
+            <a class="btn btn-excel btn-sm" href="/reg/api/module-types/${typeId}/defaults/export-excel?template_id=${tpl.id}" download>Excel ↓</a>
+            <button type="button" class="btn btn-excel-outline btn-sm f-import">Excel ↑</button>
         </div>`;
 
     SLOTS.forEach(slot => appendSlot(el, slot, tpl.slots[slot.id]));
     renderItems(el, tpl.items);
     ModulePicker.attach(el.querySelector('.f-module'));
+    ModulePicker.search(el.querySelector('.f-module-search'), el.querySelector('.f-module'));
 
     let nameTimer;
     el.querySelector('.f-name').addEventListener('input', e => {
@@ -155,6 +157,7 @@ function renderTemplate(tpl) {
 function appendSlot(el, slot, value) {
     const row = document.createElement('div');
     row.className = 'calc-item calc-slot';
+    paintSlot(row, slot);
     row.innerHTML = `
         <div class="calc-item-main">
             <div class="calc-slot-name" title="${esc(slot.type_names.join(', '))}">${esc(slot.name)}${slot.hidden ? ' · скрыта' : ''}</div>
@@ -202,6 +205,13 @@ function appendSlot(el, slot, value) {
     el.querySelector('.f-slots').appendChild(row);
 }
 
+// Цвет обязательной строки (задаётся в «Обязательных строках») — фон строки
+function paintSlot(row, slot) {
+    if (!slot.color) return;
+    row.classList.add('slot-colored');
+    row.style.setProperty('--slot-color', slot.color);
+}
+
 function renderItems(el, items) {
     const list = el.querySelector('.f-items');
     list.innerHTML = '';
@@ -211,6 +221,7 @@ function renderItems(el, items) {
         row.dataset.itemId = item.id;
         row.dataset.price = item.module_price;
         row.style.borderLeftColor = ModulePicker.color(item.module_id) || '';
+        row.classList.toggle('zero-price', ModulePicker.isZero(item.module_id));
         row.innerHTML = `
             <div class="calc-item-main">
                 <div class="calc-item-qty"><input type="number" class="f-item-qty" min="1" value="${item.quantity}"> шт.</div>
@@ -246,6 +257,7 @@ function recalc(el) {
         row.querySelector('.calc-item-sum').textContent = has ? '= ' + formatFinancial(price * qty) : '';
         if (select) {
             row.classList.toggle('empty', !has);
+            row.classList.toggle('zero-price', has && ModulePicker.isZero(parseInt(select.value)));
             row.style.borderLeftColor = (has && ModulePicker.color(parseInt(select.value))) || '';
         }
         if (has) total += price * qty;

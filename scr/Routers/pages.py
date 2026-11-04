@@ -6,11 +6,13 @@ from fastapi.templating import Jinja2Templates
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from scr.constants import (
+    DOC_TEMPLATES,
     LIST_ALL_ROWS,
     MOUNTING_SECTION,
     PASSWORD_MIN_LENGTH,
     REGISTRATION_DENIED_MSG,
     SECTION_PURPOSES,
+    SETTING_TEMPLATE_FOLDER,
     SLOT_FILTERS,
 )
 from scr.dbase import (
@@ -1036,7 +1038,7 @@ async def request_calc_page(
     import shutil
 
     adres_server = await crud_settings.get_setting(session, "adres_server") or ""
-    tkp_template_folder = await crud_settings.get_setting(session, "tkp_template_folder") or ""
+    template_folder = await crud_settings.get_setting(session, SETTING_TEMPLATE_FOLDER) or ""
 
     from scr.dbase.crud_kso204 import tkp_folder_path
 
@@ -1050,9 +1052,12 @@ async def request_calc_page(
                 ),
                 exist_ok=True,
             )
-            if tkp_template_folder and os.path.isdir(tkp_template_folder):
-                for item in os.listdir(tkp_template_folder):
-                    src = os.path.join(tkp_template_folder, item)
+            # Файлы папки шаблонов — в папку ТКП (кроме шаблонов документов: КСО204, ТКП, договор, спецификация)
+            if template_folder and os.path.isdir(template_folder):
+                for item in os.listdir(template_folder):
+                    if item in DOC_TEMPLATES:
+                        continue
+                    src = os.path.join(template_folder, item)
                     dst = os.path.join(folder_path, item)
                     if os.path.isfile(src) and not os.path.exists(dst):
                         shutil.copy2(src, dst)
@@ -1226,6 +1231,7 @@ async def request_calc_page_by_section(
     default_profit = await crud_module_types.default_profitability(session, req_id)
     slots = await crud_module_slots.get_slots(session, mt.id)
     blocks = [crud_module_types.calc_block_data(c, prices, default_profit, slots) for c in calcs]
+    fot_rule = await crud_module_types.get_fot_rule(session, mt)
     return templates.TemplateResponse(
         request,
         "requests/calc_module.html",
@@ -1244,13 +1250,19 @@ async def request_calc_page_by_section(
             "works": works,
             "cells": cells,
             "templates_list": [{"id": t.id, "name": t.name, "purpose": t.purpose or ""} for t in tpls],
+            "fot_rule": fot_rule.as_json() if fot_rule else None,
             "active_page": "requests",
         },
     )
 
 
-def _modules_data(modules_list, prices: dict[int, float], attrs: dict[int, dict]) -> list[dict]:
-    """Модули для выпадающих списков расчёта: тип (подбор в строку и цвет подсветки) и характеристики для фильтров."""
+def _modules_data(
+    modules_list, prices: dict[int, float], attrs: dict[int, dict], zero: set[int] | None = None
+) -> list[dict]:
+    """Модули для выпадающих списков расчёта: тип (подбор в строку и цвет подсветки) и характеристики для фильтров.
+
+    zero — модуль с нулевой ценой или с материалом с ценой 0 (подсвечивается красным)."""
+    zero = zero or set()
     return [
         {
             "id": m.id,
@@ -1260,6 +1272,7 @@ def _modules_data(modules_list, prices: dict[int, float], attrs: dict[int, dict]
             "color": m.material_type.color if m.material_type else None,
             "price": prices.get(m.id, 0.0),
             "nom_tok": m.nom_tok or 0,
+            "zero": m.id in zero,
             **attrs.get(m.id, {}),
         }
         for m in modules_list
@@ -1272,7 +1285,8 @@ async def _sorted_modules(session) -> tuple[list, dict[int, float], list[dict]]:
     attrs = await crud_modules.get_module_attrs(session)
     modules_list = await crud_modules.sort_modules(session, modules_list, attrs)
     prices = await crud_modules.get_module_prices(session)
-    return modules_list, prices, _modules_data(modules_list, prices, attrs)
+    zero = await crud_modules.get_zero_price_modules(session)
+    return modules_list, prices, _modules_data(modules_list, prices, attrs, zero)
 
 
 # --- Nominal Currents ---
@@ -1877,6 +1891,7 @@ async def modules_detail_page(
     bom_items = _bom_flat(mod)
     bom_total = sum(bi["price"] * bi["quantity"] for bi in bom_items)
     prices = await crud_modules.get_module_prices(session)
+    zero = await crud_modules.get_zero_price_modules(session)
     from scr.dbase import crud_nominal_currents
 
     nom_tok_values = await crud_nominal_currents.get_values(session)
@@ -1914,6 +1929,7 @@ async def modules_detail_page(
             "bom_items": bom_items,
             "bom_total": bom_total,
             "prices": prices,
+            "zero": zero,
             "nom_tok_values": nom_tok_values,
             "material_types": material_types,
             "back_to": back_to,

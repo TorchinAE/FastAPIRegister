@@ -34,9 +34,24 @@ SETTING_K_FOT = "k_fot"
 SETTING_K_NAKL = "k_nakl"
 DEFAULT_K_FOT = 0.21
 DEFAULT_K_NAKL = 1.6
+# Разделы с автоматическим ФОТ и накладными (как на листе «расчет» КСО204):
+# ФОТ = min(Кфот × Комплектация, ФОТ макс), Накладные = min(Кнакл × ФОТ, Накладные макс);
+# «макс» — записи справочников ФОТ / Накладные раздела, не заданы — без ограничения
+AUTO_FOT_SECTIONS = CELL_SECTIONS
 
 # Папка договоров: {contract_folder}/{номер договора}_{организация}, спецификации договора — в ней же
 SETTING_CONTRACT_FOLDER = "contract_folder"
+# Папка всех шаблонов (КСО204.xlsx, ТКП.xlsx, Contract.docx, Contract_specification.docx, ...): шаблон из неё
+# заменяет встроенный из xlsx_templates/. Остальные файлы папки копируются в новую папку ТКП
+SETTING_TEMPLATE_FOLDER = "template_folder"
+# Прежнее имя настройки — значение переносится при старте
+OLD_SETTING_TEMPLATE_FOLDER = "tkp_template_folder"
+KSO204_TEMPLATE = "КСО204.xlsx"
+TKP_TEMPLATE = "ТКП.xlsx"
+CONTRACT_TEMPLATE = "Contract.docx"
+SPECIFICATION_TEMPLATE = "Contract_specification.docx"
+# Шаблоны документов не копируются в папку ТКП
+DOC_TEMPLATES = {KSO204_TEMPLATE, TKP_TEMPLATE, CONTRACT_TEMPLATE, SPECIFICATION_TEMPLATE}
 
 # Вероятности ТКП по умолчанию: (id, название, значение)
 DEFAULT_PROBABILITIES = [

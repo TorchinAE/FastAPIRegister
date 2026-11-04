@@ -80,6 +80,9 @@ class OrganizationAddSchema(BaseModel):
     address: str | None = None
     server_address_slug: str = "/02_сторонние_заказчики"
     profitability: float = 15
+    full_name: str | None = None
+    basis: str | None = None
+    requisites: str | None = None
     director_id: int
 
 
@@ -92,6 +95,9 @@ class OrganizationUpdateSchema(BaseModel):
     address: str | None = None
     server_address_slug: str | None = None
     profitability: float | None = None
+    full_name: str | None = None
+    basis: str | None = None
+    requisites: str | None = None
     director_id: int | None = None
 
 
@@ -104,6 +110,9 @@ class OrganizationResponseSchema(BaseModel):
     address: str | None = None
     server_address_slug: str
     profitability: float = 0
+    full_name: str | None = None
+    basis: str | None = None
+    requisites: str | None = None
     director_id: int
     created_by: str | None = None
 
@@ -684,6 +693,8 @@ class ContractSpecCreateSchema(BaseModel):
     request_id: int | None = None
     contract_number: int | None = None
     contract_date: datetime | None = None
+    specification_number: int | None = None
+    specification_date: datetime | None = None
     new_contract: bool = False
 
 
@@ -696,6 +707,7 @@ class ContractSpecResponseSchema(BaseModel):
     contract_number: int
     contract_date: datetime
     specification_number: int
+    specification_date: datetime | None = None
     created_by: str | None = None
 
 
@@ -820,6 +832,7 @@ class ModuleTypeSlotCreateSchema(BaseModel):
     hidden: bool = False
     material_type_ids: list[int] = []
     filters: list[str] = []
+    color: str | None = Field(None, max_length=20)
 
 
 class ModuleTypeSlotUpdateSchema(BaseModel):
@@ -829,6 +842,8 @@ class ModuleTypeSlotUpdateSchema(BaseModel):
     hidden: bool | None = None
     material_type_ids: list[int] | None = None
     filters: list[str] | None = None
+    # Цвет строки (#rrggbb); передан null — без подсветки
+    color: str | None = Field(None, max_length=20)
 
 
 class SlotModuleSchema(BaseModel):
@@ -884,6 +899,8 @@ class RequestCalcUpdateSchema(BaseModel):
     works_cost: float | None = Field(None, ge=0)
     purpose: str | None = Field(None, max_length=20)
     name: str | None = Field(None, max_length=200)
+    fot_manual: bool | None = None
+    overhead_manual: bool | None = None
 
 
 class RequestCalcItemCreateSchema(BaseModel):

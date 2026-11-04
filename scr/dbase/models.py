@@ -92,10 +92,15 @@ class Organization(BaseID):
     address: Mapped[str | None] = mapped_column(String(200), nullable=True)
     server_address_slug: Mapped[str] = mapped_column(String(200), nullable=False, default="/02_сторонние_заказчики")
     profitability: Mapped[float] = mapped_column(Numeric(5, 2), default=15)
+    # Для договора: полное наименование («Общество с ограниченной ответственностью «…»»),
+    # основание полномочий руководителя («Устава», «доверенности № … от …»), реквизиты (ИНН, КПП, банк, …)
+    full_name: Mapped[str | None] = mapped_column(String(300), nullable=True)
+    basis: Mapped[str | None] = mapped_column(String(200), nullable=True)
+    requisites: Mapped[str | None] = mapped_column(Text, nullable=True)
     director_id: Mapped[int] = mapped_column(ForeignKey("directors.id"), nullable=False)
 
     director: Mapped["Directors"] = relationship(back_populates="organizations")
-    counterparties: Mapped[list["Counterparty"]] = relationship(back_populates="company")
+    counterparties: Mapped[list["Counterparty"]] = relationship(back_populates="company", order_by="Counterparty.name")
 
     def __repr__(self) -> str:
         director_name = self.director.name if self.director else "None"
@@ -116,7 +121,7 @@ class Directors(BaseID):
     position_id: Mapped[int] = mapped_column(ForeignKey("positions.id"))
 
     position: Mapped["Positions"] = relationship(back_populates="directors")
-    organizations: Mapped[list["Organization"]] = relationship(back_populates="director")
+    organizations: Mapped[list["Organization"]] = relationship(back_populates="director", order_by="Organization.name")
 
     @property
     def short_name(self) -> str:
@@ -141,7 +146,7 @@ class Directors(BaseID):
 class Positions(BaseID):
     __tablename__ = "positions"
     name: Mapped[str] = mapped_column(String(100), unique=True, nullable=False)
-    directors: Mapped[list["Directors"]] = relationship(back_populates="position")
+    directors: Mapped[list["Directors"]] = relationship(back_populates="position", order_by="Directors.name")
 
     def __repr__(self) -> str:
         return f"Positions(id={self.id}, name='{self.name}')"
@@ -295,6 +300,8 @@ class ContractSpec(BaseID):
     contract_number: Mapped[int] = mapped_column(Integer, nullable=False)
     contract_date: Mapped[datetime] = mapped_column(DateTime, default=lambda: datetime.now(UTC))
     specification_number: Mapped[int] = mapped_column(Integer, nullable=False)
+    # Дата спецификации; None — как у договора (старые записи)
+    specification_date: Mapped[datetime | None] = mapped_column(DateTime, nullable=True)
 
     company: Mapped["Organization"] = relationship(foreign_keys=[company_id])
     request: Mapped[Optional["Request"]] = relationship(foreign_keys=[request_id])
@@ -511,6 +518,8 @@ class ModuleTypeSlot(Base):
     hidden: Mapped[bool] = mapped_column(default=False, server_default="0", nullable=False)
     # Фильтры модулей строки в шаблонах блоков: ключи SLOT_FILTERS через запятую
     filters: Mapped[str | None] = mapped_column(String(200), nullable=True)
+    # Цвет подсветки строки в шаблонах блоков (#rrggbb), None — без подсветки
+    color: Mapped[str | None] = mapped_column(String(20), nullable=True)
 
     module_type: Mapped["ModuleType"] = relationship(back_populates="slots")
     material_types: Mapped[list["MaterialType"]] = relationship(
@@ -580,6 +589,10 @@ class RequestCalc(BaseID):
     )
     # Себестоимость работ (Шеф-инженер, СМР, ПНР) — вместо модулей
     works_cost: Mapped[float] = mapped_column(Numeric(12, 2), default=0, server_default="0", nullable=False)
+    # ФОТ / Накладные введены вручную; False — считаются автоматически (AUTO_FOT_SECTIONS).
+    # Старые блоки — вручную (server_default), чтобы не менять сохранённые значения
+    fot_manual: Mapped[bool] = mapped_column(default=False, server_default="1", nullable=False)
+    overhead_manual: Mapped[bool] = mapped_column(default=False, server_default="1", nullable=False)
 
     request: Mapped["Request"] = relationship(foreign_keys=[request_id])
     module_type: Mapped["ModuleType"] = relationship(foreign_keys=[module_type_id])

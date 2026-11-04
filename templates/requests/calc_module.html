@@ -9,12 +9,12 @@
     </div>
     <div style="display:flex;gap:0.5rem;flex-wrap:wrap;">
         {% if not works %}
-        <a href="/reg/module-types-calc/{{ mt.id }}/defaults" class="btn btn-ghost">По умолчанию</a>
+        <a href="/reg/module-types-calc/{{ mt.id }}/defaults" class="btn btn-nav">По умолчанию</a>
         {% endif %}
-        <a href="/reg/api/requests/{{ req.id }}/calc/{{ mt.slug }}/export-excel" class="btn btn-ghost">Скачать Excel</a>
+        <a href="/reg/api/requests/{{ req.id }}/calc/{{ mt.slug }}/export-excel" class="btn btn-excel">Скачать Excel</a>
         {% if mt.slug == 'kso' %}
         <button type="button" class="btn btn-primary" id="saveKsoBtn" onclick="saveKso204()" title="Выгрузка расчёта в КСО204-ткп{{ req.tkp_num or req.id }}.xlsx в папку ТКП">Сохранить на диск</button>
-        <a href="/reg/api/requests/{{ req.id }}/kso204/export-excel" class="btn btn-ghost" title="Скачать КСО204 без сохранения в папку ТКП">Скачать КСО204</a>
+        <a href="/reg/api/requests/{{ req.id }}/kso204/export-excel" class="btn btn-excel-outline" title="Скачать КСО204 без сохранения в папку ТКП">Скачать КСО204</a>
         {% endif %}
         <a href="/reg/requests/{{ req.id }}/calc" class="btn btn-ghost">&larr; Назад к расчёту</a>
     </div>
@@ -72,6 +72,8 @@ const initialBlocks = {{ blocks | tojson }};
 // Обязательные строки раздела (видимые) и модули для выбора в них
 const SLOTS = Object.fromEntries({{ slots | tojson }}.map(s => [s.id, s]));
 const modulesData = {{ modules_data | tojson }};
+// Автоматический ФОТ и накладные (КСО, КРУ, ЩО): {k_fot, k_nakl, fot_max, overhead_max}; null — вручную
+const FOT_RULE = {{ fot_rule | tojson }};
 const SAVE_DELAY = 700;
 
 const blocksEl = document.getElementById('blocks');
@@ -113,6 +115,7 @@ function renderBlock(data, index) {
         </div>` : `
         <div class="calc-items f-slots"></div>
         <div class="calc-add-row">
+            <input type="search" class="f-module-search" placeholder="Поиск модуля по названию…">
             <select class="f-module"></select>
             <div class="calc-add-row-bottom">
                 <input type="number" class="f-module-qty" value="1" min="1" title="Кол-во">
@@ -144,11 +147,11 @@ function renderBlock(data, index) {
         ${modulesPart}
         <div class="calc-fields">
             <div class="form-group">
-                <label>ФОТ</label>
+                <label>ФОТ ${FOT_RULE ? howHtml('fot') : ''}</label>
                 ${moneyInput('f-fot', data.fot)}
             </div>
             <div class="form-group">
-                <label>Накладные</label>
+                <label>Накладные ${FOT_RULE ? howHtml('overhead') : ''}</label>
                 ${moneyInput('f-overhead', data.overhead)}
             </div>
             <div class="form-group">
@@ -194,8 +197,11 @@ function renderBlock(data, index) {
         </div>`;
 
     const changed = mode => { recalc(el, mode); scheduleSave(el); };
+    el.dataset.fotManual = data.fot_manual ? '1' : '';
+    el.dataset.overheadManual = data.overhead_manual ? '1' : '';
     if (!WORKS) {
         ModulePicker.attach(el.querySelector('.f-module'));
+        ModulePicker.search(el.querySelector('.f-module-search'), el.querySelector('.f-module'));
         el.querySelector('.f-name').addEventListener('input', () => scheduleSave(el));
         el.dataset.hiddenTotal = data.hidden_total || 0;
         data.slots.forEach(s => appendSlot(el, SLOTS[s.slot_id], s.item));
@@ -204,8 +210,13 @@ function renderBlock(data, index) {
     } else {
         bindMoney(el.querySelector('.f-works'), () => changed());
     }
-    bindMoney(el.querySelector('.f-fot'), () => changed());
-    bindMoney(el.querySelector('.f-overhead'), () => changed());
+    // Ввод ФОТ / Накладных — вручную; «авто» — снова по формуле
+    bindMoney(el.querySelector('.f-fot'), () => { el.dataset.fotManual = '1'; changed(); });
+    bindMoney(el.querySelector('.f-overhead'), () => { el.dataset.overheadManual = '1'; changed(); });
+    el.querySelectorAll('.f-how-auto').forEach(btn => btn.addEventListener('click', () => {
+        el.dataset[btn.dataset.kind === 'fot' ? 'fotManual' : 'overheadManual'] = '';
+        changed();
+    }));
     bindMoney(el.querySelector('.f-profit-rub'), () => changed('rub'));
     bindMoney(el.querySelector('.f-final'), () => changed('final'));
     el.querySelector('.f-profit-pct').addEventListener('input', () => changed());
@@ -250,6 +261,7 @@ function appendItem(el, item) {
     }
     row.dataset.price = item.module_price;
     row.style.borderLeftColor = ModulePicker.color(item.module_id) || '';
+    row.classList.toggle('zero-price', ModulePicker.isZero(item.module_id));
     row.querySelector('.f-item-qty').value = item.quantity;
     row.querySelector('.calc-item-price').textContent = formatFinancial(item.module_price);
 }
@@ -259,6 +271,10 @@ function appendSlot(el, slot, item) {
     const row = document.createElement('div');
     row.className = 'calc-item calc-slot';
     row.dataset.slotId = slot.id;
+    if (slot.color) {
+        row.classList.add('slot-colored');
+        row.style.setProperty('--slot-color', slot.color);
+    }
     row.innerHTML = `
         <div class="calc-item-main">
             <div class="calc-slot-name" title="${esc(slot.type_names.join(', '))}">${esc(slot.name)}</div>
@@ -293,6 +309,7 @@ function setSlotItem(row, item) {
     select.value = item ? item.module_id : '';
     select.dispatchEvent(new Event('picker-paint'));
     row.style.borderLeftColor = (item && ModulePicker.color(item.module_id)) || '';
+    row.classList.toggle('zero-price', !!item && ModulePicker.isZero(item.module_id));
     row.querySelector('.f-item-qty').value = item ? item.quantity : 1;
     row.querySelector('.calc-item-price').textContent = item ? formatFinancial(item.module_price) : '';
     row.classList.toggle('empty', !item);
@@ -317,6 +334,41 @@ async function saveSlot(el, row, moduleId) {
     scheduleSave(el);
 }
 
+const fmtK = k => String(k).replace('.', ',');
+
+function howHtml(kind) {
+    return `<span class="calc-how f-how-${kind}"></span>` +
+        `<button type="button" class="calc-how-auto f-how-auto" data-kind="${kind}" title="Считать автоматически" hidden>авто</button>`;
+}
+
+// ФОТ = min(Кфот × Комп, ФОТ макс), Накладные = min(Кнакл × ФОТ, Накладные макс); введённые вручную — как есть
+function applyFotRule(el, comp) {
+    if (!FOT_RULE) return;
+    const parts = [
+        ['fot', el.querySelector('.f-fot'), el.dataset.fotManual, FOT_RULE.k_fot, FOT_RULE.fot_max, 'Комп', () => comp],
+        ['overhead', el.querySelector('.f-overhead'), el.dataset.overheadManual, FOT_RULE.k_nakl, FOT_RULE.overhead_max,
+            'ФОТ', () => moneyVal(el.querySelector('.f-fot'))],
+    ];
+    for (const [kind, input, manual, k, max, baseName, base] of parts) {
+        const how = el.querySelector('.f-how-' + kind);
+        el.querySelector(`.f-how-auto[data-kind="${kind}"]`).hidden = !manual;
+        if (manual) {
+            how.textContent = 'Вручную';
+            how.title = 'Значение введено вручную';
+            continue;
+        }
+        const value = base() * k;
+        const capped = max > 0 && value > max;
+        const result = Math.round((capped ? max : value) * 100) / 100;
+        if (document.activeElement !== input) input.value = formatFinancial(result);
+        else input.value = String(result).replace('.', ',');
+        how.textContent = capped ? 'MAX' : `${fmtK(k)}*${baseName}`;
+        how.title = capped
+            ? `Максимальное значение из справочника: ${formatFinancial(max)} (${fmtK(k)}*${baseName} = ${formatFinancial(value)})`
+            : `${fmtK(k)} × ${baseName}` + (max > 0 ? `, не больше ${formatFinancial(max)}` : '');
+    }
+}
+
 function modulesSum(el) {
     if (WORKS) return moneyVal(el.querySelector('.f-works'));
     // Скрытые строки не выводятся, но входят в стоимость
@@ -332,7 +384,9 @@ function modulesSum(el) {
 
 // mode: 'pct' — от процента, 'rub' — от рентабельности в рублях, 'final' — от общей стоимости
 function recalc(el, mode = 'pct') {
-    const totalCost = modulesSum(el) + moneyVal(el.querySelector('.f-fot')) + moneyVal(el.querySelector('.f-overhead'));
+    const comp = modulesSum(el);
+    applyFotRule(el, comp);
+    const totalCost = comp + moneyVal(el.querySelector('.f-fot')) + moneyVal(el.querySelector('.f-overhead'));
     const pctEl = el.querySelector('.f-profit-pct');
     const rubEl = el.querySelector('.f-profit-rub');
     const finalEl = el.querySelector('.f-final');
@@ -397,6 +451,10 @@ function blockPayload(el) {
         total_cost: Math.max(0, parseFloat(el.dataset.totalCost) || 0),
         final_price: Math.max(0, parseFloat(el.dataset.finalPrice) || 0),
     };
+    if (FOT_RULE) {
+        payload.fot_manual = !!el.dataset.fotManual;
+        payload.overhead_manual = !!el.dataset.overheadManual;
+    }
     if (WORKS) payload.works_cost = Math.max(0, moneyVal(el.querySelector('.f-works')));
     else payload.name = el.querySelector('.f-name').value.trim() || null;
     if (MULTI) payload.quantity = Math.max(0, parseInt(el.querySelector('.f-qty').value) || 0);
@@ -559,6 +617,7 @@ async function clearBlock(el) {
     }
     el.querySelector('.f-fot').value = formatFinancial(0);
     el.querySelector('.f-overhead').value = formatFinancial(0);
+    el.dataset.fotManual = el.dataset.overheadManual = '';
     el.querySelector('.f-profit-pct').value = '0';
     if (WORKS) el.querySelector('.f-works').value = formatFinancial(0);
     if (MULTI) el.querySelector('.f-qty').value = '1';

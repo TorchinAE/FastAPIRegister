@@ -7,7 +7,7 @@
         <span class="subtitle">Всего: {{ total }}</span>
     </div>
     <div style="display:flex;gap:0.5rem;">
-        <button type="button" class="btn btn-primary" onclick="exportFilteredExcel()" title="Выгружаются материалы, видимые с учётом фильтров">Скачать Excel</button>
+        <button type="button" class="btn btn-excel" onclick="exportFilteredExcel()" title="Выгружаются материалы, видимые с учётом фильтров">Скачать Excel</button>
         <label class="btn btn-primary" style="cursor:pointer;">
             Загрузить Excel
             <input type="file" accept=".xlsx,.xls" style="display:none" id="excelInput" onchange="importExcel(this)">
@@ -164,6 +164,7 @@ const allData = [
         typeId: {{ item.type_id or 'null' }},
         name: '{{ item.name|e }}',
         price: '{{ item.price|money }}',
+        zero: {{ 'false' if item.price else 'true' }},
         unit: '{{ (item.unit or "шт")|e }}',
         accuracy: '{{ (item.accuracy_class or "")|e }}',
         date: '{{ item.date.strftime("%d.%m.%Y") if item.date else "" }}',
@@ -210,11 +211,11 @@ function renderTable() {
     const pageData = filteredData.slice(start, start + PER_PAGE);
 
     tbody.innerHTML = pageData.map(m =>
-        `<tr style="cursor:pointer" onclick="location.href='/reg/materials/${m.id}'">
+        `<tr style="cursor:pointer" onclick="location.href='/reg/materials/${m.id}'"${m.zero ? ' class="zero-price" title="Цена 0"' : ''}>
             <td><strong>${m.id}</strong></td>
             <td>${m.typeId ? '<a href="/reg/material-types/' + m.typeId + '" onclick="event.stopPropagation()">' + m.type + '</a>' : ''}</td>
             <td>${m.name}</td>
-            <td>${m.price}</td>
+            <td${m.zero ? ' class="zero-cell"' : ''}>${m.price}</td>
             <td>${m.unit}</td>
             <td>${m.date}</td>
             <td>${m.nomTok}</td>
