@@ -193,8 +193,8 @@ async def test_module_attrs_and_sort(db_session):
     assert attrs[mods[0].id]["accuracy_class"] == "0.2-sort"
     assert attrs[mods[0].id]["vykat"] is True and attrs[mods[0].id]["el_priv"] is False
     ordered = await crud_modules.sort_modules(s, mods, attrs)
-    # Ток, затем класс точности по справочнику (0.5S-sort раньше 0.2-sort), затем название
-    assert [m.name for m in ordered] == ["Сорт Б", "Сорт Я", "Сорт А"]
+    # Ток, затем класс точности по справочнику (по названию: 0.2-sort раньше 0.5S-sort), затем название
+    assert [m.name for m in ordered] == ["Сорт Я", "Сорт Б", "Сорт А"]
 
 
 async def test_material_type_color(client):

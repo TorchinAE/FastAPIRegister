@@ -210,9 +210,11 @@ async def test_kso_split_qty_and_calc_excel(client, db_session):
     assert rows["CalcMat2"][:3] == (ids["mat"], "CalcMat2", 100)
     assert rows["CalcMat2"][4:8] == (6, 600, 30, 3000)
     assert rows["Итого материалы"][5] == 600 and rows["Итого материалы"][7] == 3000
-    assert rows["Конечная цена за блок"][5] == 660
+    # КСО — автоматический ФОТ и накладные: ФОТ = 600 × 0.21 = 126, Накладные = 126 × 1.6 = 201.6;
+    # (600 + 126 + 201.6) × 1.1 = 1020.36
+    assert rows["Конечная цена за блок"][5] == 1020.36
     assert rows["Количество блоков"][4] == 5
-    assert rows["Конечная цена × кол-во"][7] == 3300
+    assert rows["Конечная цена × кол-во"][7] == 5101.8
 
     # Модули по умолчанию: ID — первая колонка, внизу общая стоимость
     resp = await client.get(f"/reg/api/module-types/{ids['mt']}/defaults/export-excel")
