@@ -355,6 +355,8 @@ form { background: var(--surface); padding: 1.5rem; border-radius: var(--radius)
 /* Блок объединённых строк: общие фильтры сверху действуют на все строки блока */
 .calc-slot-group { display: flex; flex-direction: column; gap: 0.3rem; padding: 0.3rem; border: 1px dashed #a5b4fc; border-radius: 6px; background: #f8f9ff; }
 .calc-group-filters { margin: 0 0 0.1rem; }
+.calc-slot-group-bar { display: flex; align-items: center; justify-content: space-between; gap: 0.3rem; font-size: 0.7rem; font-weight: 600; color: #4338ca; }
+.calc-slot-group-bar .btn { padding: 0.1rem 0.4rem; font-size: 0.7rem; }
 .calc-group-filters .mp-filter select { width: 100%; min-width: 0; margin: 0; padding: 0.05rem 0.2rem; font-size: 0.72rem; }
 .calc-slot-filters .f-filters { display: contents; }
 .calc-slot select { width: 100%; min-width: 0; margin: 0.15rem 0; padding: 0.15rem 0.25rem; font-size: 0.78rem; border: 1px solid #e2e8f0; border-radius: 4px; background: #fff; }

@@ -402,11 +402,24 @@ async def move_slot(slot_id: int, data: dict, session: AsyncSession = Depends(db
 
 
 @mt_calc_router.post("/api/module-type-slots/{slot_id}/copy-group")
-async def copy_slot_group(slot_id: int, session: AsyncSession = Depends(db_helper.session_dependency)):
-    """Копия блока объединённых строк (или одной строки) — сразу за ним."""
-    copies = await crud_module_slots.copy_slot_group(session, slot_id)
+async def copy_slot_group(
+    slot_id: int,
+    calc_id: int | None = Query(None),
+    session: AsyncSession = Depends(db_helper.session_dependency),
+):
+    """Копия блока объединённых строк (или одной строки) — сразу за ним. calc_id — копия из блока расчёта:
+    модули строк этого расчёта копируются в новые строки, стоимость блока пересчитывается."""
+    copies = await crud_module_slots.copy_slot_group(session, slot_id, calc_id)
     if copies is None:
         raise HTTPException(status_code=404, detail="Строка не найдена")
+    if calc_id is not None:
+        calc = await crud_module_types.get_calc_by_id(session, calc_id)
+        if calc:
+            session.expire(calc, ["items"])
+            calc = await crud_module_types.get_calc_by_id(session, calc_id)
+            mod_type = await crud_module_types.get_module_type_by_id(session, calc.module_type_id)
+            await crud_module_types.recalc_calc_totals(session, calc, mod_type)
+            await crud_module_types.recalc_section_cost(session, calc.request_id, calc.module_type_id)
     await session.commit()
     return {"ids": [c.id for c in copies]}
 

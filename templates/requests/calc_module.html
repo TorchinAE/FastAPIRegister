@@ -209,6 +209,7 @@ function renderBlock(data, index, after = null) {
             el.querySelector('.f-slots'),
             data.slots.map(s => ({slot: SLOTS[s.slot_id], item: s.item})),
             (e, target, keys) => appendSlot(el, e.slot, e.item, target, keys),
+            slot => copySlotGroup(el, slot),
         );
         data.items.forEach(item => appendItem(el, item));
         el.querySelector('.f-add-module').addEventListener('click', () => addModule(el));
@@ -577,6 +578,15 @@ async function copyBlock(el) {
     } finally {
         btn.disabled = false;
     }
+}
+
+// Копия блока объединённых строк: строки добавляются в раздел (во все шаблоны и расчёты),
+// в этом расчёте — с выбранными модулями; страница перезагружается
+async function copySlotGroup(el, slot) {
+    if (!confirm('Добавить в раздел копию строк этого блока? Новые строки появятся во всех шаблонах и расчётах раздела.')) return;
+    await flushSaves();
+    const resp = await fetch(`/reg/api/module-type-slots/${slot.id}/copy-group?calc_id=${el.dataset.id}`, {method: 'POST'});
+    if (resp.ok) location.reload(); else showToast('Ошибка копирования');
 }
 
 async function deleteBlock(el) {

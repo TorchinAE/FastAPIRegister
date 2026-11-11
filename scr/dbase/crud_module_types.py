@@ -225,7 +225,7 @@ async def create_calc(
     calc = await get_calc_by_id(session, calc.id)
     # Итоги блока сразу, чтобы стоимость раздела учитывала новый блок без нажатия «Сохранить»
     calc.profitability_percent = await default_profitability(session, request_id)
-    await _recalc_totals(session, calc, mod_type)
+    await recalc_calc_totals(session, calc, mod_type)
     return calc
 
 
@@ -243,7 +243,7 @@ async def _add_template_items(session: AsyncSession, calc: RequestCalc, tpl, fil
     await session.flush()
 
 
-async def _recalc_totals(session: AsyncSession, calc: RequestCalc, mod_type: ModuleType | None) -> None:
+async def recalc_calc_totals(session: AsyncSession, calc: RequestCalc, mod_type: ModuleType | None) -> None:
     """Себестоимость и общая стоимость блока по текущим ценам модулей и рентабельности блока."""
     from scr.dbase.crud_modules import get_module_prices
 
@@ -288,7 +288,7 @@ async def fill_empty_from_template(session: AsyncSession, calcs: list[RequestCal
         await _add_template_items(session, calc, tpl, {it.slot_id for it in calc.items if it.slot_id is not None})
         session.expire(calc, ["items"])
         calc = await get_calc_by_id(session, calc.id)
-        await _recalc_totals(session, calc, mod_type)
+        await recalc_calc_totals(session, calc, mod_type)
         await recalc_section_cost(session, calc.request_id, calc.module_type_id)
         result.append(calc)
     return result

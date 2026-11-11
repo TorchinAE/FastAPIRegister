@@ -199,7 +199,8 @@ const ModulePicker = (() => {
     // Обязательные строки по блокам объединения (подряд идущие с одним slot.group).
     // entries — [{slot, ...}]; append(entry, target, ownFilters) добавляет строку в target и возвращает её select.
     // Блок из нескольких строк — рамка с общим фильтром «Ном Ток» сверху, остальные фильтры — у каждой строки.
-    function renderSlotGroups(target, entries, append) {
+    // onCopy(slot первой строки) — кнопка «Копировать блок» в шапке блока
+    function renderSlotGroups(target, entries, append, onCopy = null) {
         for (let i = 0; i < entries.length;) {
             let j = i + 1;
             while (j < entries.length && entries[j].slot.group === entries[i].slot.group) j++;
@@ -209,6 +210,14 @@ const ModulePicker = (() => {
             } else {
                 const box = document.createElement('div');
                 box.className = 'calc-slot-group';
+                if (onCopy) {
+                    const bar = document.createElement('div');
+                    bar.className = 'calc-slot-group-bar';
+                    bar.innerHTML = `<span>Блок строк: ${run.length}</span>
+                        <button type="button" class="btn btn-ghost btn-sm" title="Добавить в раздел копию строк блока сразу за ним">&#10697; Копировать блок</button>`;
+                    bar.querySelector('button').addEventListener('click', () => onCopy(run[0].slot));
+                    box.appendChild(bar);
+                }
                 const head = document.createElement('div');
                 head.className = 'calc-slot-filters calc-group-filters';
                 box.appendChild(head);

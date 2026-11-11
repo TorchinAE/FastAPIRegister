@@ -60,7 +60,7 @@
                 <th title="Не отображать в расчёте, но учитывать в стоимости">Не отображать</th>
                 <th title="Объединить с предыдущей строкой в один блок: фильтры первой строки блока действуют на все его строки">Объединить с предыдущей</th>
                 <th style="width:90px">Порядок</th>
-                <th style="width:80px"></th>
+                <th style="width:170px"></th>
             </tr>
         </thead>
         <tbody id="slotsBody"></tbody>
@@ -150,7 +150,9 @@ function render() {
                 <button type="button" class="btn btn-ghost btn-sm f-down" title="Ниже" ${i === slots.length - 1 ? 'disabled' : ''}>&darr;</button>
             </td>
             <td style="white-space:nowrap;">
-                ${joined ? '' : `<button type="button" class="btn btn-ghost btn-sm btn-icon f-copy" title="${groupSize > 1 ? `Скопировать блок (${groupSize} строки)` : 'Скопировать строку'}: копия встанет сразу за ним">&#10697;</button>`}
+                ${joined ? '' : groupSize > 1
+                    ? `<button type="button" class="btn btn-success btn-sm f-copy" title="Скопировать блок (${groupSize} строки): копия встанет сразу за ним">&#10697; Копировать блок</button>`
+                    : `<button type="button" class="btn btn-ghost btn-sm btn-icon f-copy" title="Скопировать строку: копия встанет сразу за ней">&#10697;</button>`}
                 <button type="button" class="btn btn-danger btn-sm btn-icon f-del" title="Удалить">&#10005;</button>
             </td>`;
         tr.querySelector('.f-name').addEventListener('change', e => {

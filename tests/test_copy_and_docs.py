@@ -299,3 +299,21 @@ async def test_slot_groups_share_first_slot_filters(client, db_session):
         await db_session.execute(select(ModuleTypeDefault).where(ModuleTypeDefault.slot_id == slots[4]["id"]))
     ).scalar_one()
     assert (copied.module_id, copied.quantity, copied.template_id) == (ids["mod"], 2, ids["tpl"])
+
+
+async def test_copy_slot_group_from_calc_keeps_calc_modules(client, db_session):
+    """Копия блока строк из расчёта: модули строк этого расчёта переносятся в новые строки, стоимость растёт."""
+    ids = await _setup(db_session, "i", "sho-i")
+    block = (
+        await client.post("/reg/api/request-calcs/", json={"request_id": ids["req"], "module_type_id": ids["mt"]})
+    ).json()["block"]
+    await client.put(
+        f"/reg/api/request-calcs/{block['id']}/slots/{ids['slot']}", json={"module_id": ids["mod"], "quantity": 2}
+    )
+    resp = await client.post(f"/reg/api/module-type-slots/{ids['slot']}/copy-group?calc_id={block['id']}")
+    new_id = resp.json()["ids"][0]
+    calc = await crud_module_types.get_calc_by_id(db_session, block["id"])
+    await db_session.refresh(calc, ["items"])
+    assert sorted((it.slot_id, it.quantity) for it in calc.items) == sorted([(ids["slot"], 2), (new_id, 2)])
+    data = (await client.get(f"/reg/api/request-calcs/{block['id']}")).json()
+    assert float(data["total_cost"]) >= 400

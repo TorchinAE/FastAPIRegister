@@ -100,9 +100,12 @@ async def move_slot(session: AsyncSession, slot_id: int, direction: int) -> Modu
     return slot
 
 
-async def copy_slot_group(session: AsyncSession, slot_id: int) -> list[ModuleTypeSlot] | None:
+async def copy_slot_group(
+    session: AsyncSession, slot_id: int, calc_id: int | None = None
+) -> list[ModuleTypeSlot] | None:
     """Копия блока объединённых строк (или одной строки) сразу за блоком: настройки строк и их модули
-    во всех шаблонах. Названия — «… (копия)», при совпадении — с номером."""
+    во всех шаблонах. Названия — «… (копия)», при совпадении — с номером.
+    calc_id — копия сделана из блока расчёта: модули строк этого расчёта тоже копируются в новые строки."""
     slot = await session.get(ModuleTypeSlot, slot_id)
     if not slot:
         return None
@@ -153,6 +156,24 @@ async def copy_slot_group(session: AsyncSession, slot_id: int) -> list[ModuleTyp
                 quantity=d.quantity,
             )
         )
+    if calc_id is not None:
+        items = (
+            (
+                await session.execute(
+                    select(RequestCalcItem).where(
+                        RequestCalcItem.calc_id == calc_id, RequestCalcItem.slot_id.in_([s.id for s in group])
+                    )
+                )
+            )
+            .scalars()
+            .all()
+        )
+        for it in items:
+            session.add(
+                RequestCalcItem(
+                    calc_id=calc_id, module_id=it.module_id, quantity=it.quantity, slot_id=copy_of[it.slot_id]
+                )
+            )
     order = slots[:end] + copies + slots[end:]
     for i, s in enumerate(order, start=1):
         s.sort_order = i

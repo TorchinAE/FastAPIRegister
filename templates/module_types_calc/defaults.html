@@ -133,6 +133,7 @@ function renderTemplate(tpl, after = null) {
         el.querySelector('.f-slots'),
         SLOTS.map(slot => ({slot, value: tpl.slots[slot.id]})),
         (e, target, keys) => appendSlot(el, e.slot, e.value, target, keys),
+        slot => copySlotGroup(slot),
     );
     renderItems(el, tpl.items);
     ModulePicker.attach(el.querySelector('.f-module'));
@@ -315,6 +316,12 @@ async function copyTemplate(el) {
         copy.scrollIntoView({behavior: 'smooth', inline: 'nearest', block: 'nearest'});
         showToast('Шаблон скопирован');
     }
+}
+
+// Копия блока объединённых строк: строки с модулями во всех шаблонах раздела; страница перезагружается
+async function copySlotGroup(slot) {
+    if (!confirm('Добавить в раздел копию строк этого блока? Новые строки появятся во всех шаблонах и расчётах раздела.')) return;
+    if (await api(`/reg/api/module-type-slots/${slot.id}/copy-group`, 'POST')) location.reload();
 }
 
 async function deleteTemplate(el) {
