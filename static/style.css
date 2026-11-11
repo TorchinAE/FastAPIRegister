@@ -370,9 +370,10 @@ form { background: var(--surface); padding: 1.5rem; border-radius: var(--radius)
 .calc-block-add:hover { border-color: var(--sidebar-active); color: var(--sidebar-active); background: rgba(79, 70, 229, 0.04); }
 .calc-block-add:disabled { opacity: 0.5; cursor: wait; }
 /* Разделы работ (Шеф-инженер, СМР, ПНР, Монтаж) и доставка — поля столбиком в одном блоке */
-.calc-blocks.single.works .calc-block { flex: 0 0 var(--calc-block-w, 280px); width: var(--calc-block-w, 280px); max-width: 100%; }
+/* блок на всю ширину страницы, как карточка на странице расчёта ТКП; поля — столбиком */
+.calc-blocks.single.works .calc-block { flex: 1 1 auto; width: 100%; }
 .calc-blocks.single.works .calc-fields { grid-template-columns: 1fr; gap: 0.5rem; }
-.calc-works-card { width: var(--calc-block-w, 280px); max-width: 100%; padding: 0.75rem; }
+.calc-works-card { width: 100%; }
 .calc-works-card form { padding: 0; box-shadow: none; }
 .calc-works-card .form-row { gap: 0.5rem; }
 @media (max-width: 900px) { .calc-blocks.single:not(.works) .calc-fields { grid-template-columns: 1fr 1fr; } }
