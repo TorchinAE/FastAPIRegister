@@ -41,7 +41,7 @@
                     <th>Дата договора</th>
                     <th>Спецификация №</th>
                     <th>ТКП</th>
-                    <th style="width:90px;"></th>
+                    <th ></th>
                 </tr>
             </thead>
             <tbody id="specsBody">
@@ -52,6 +52,8 @@
                     <td>{{ spec.specification_number }}</td>
                     <td>{% if spec.request_id %}#{{ spec.request_id }}{% if spec.request %} — {{ spec.request.tkp_num or '' }}{% endif %}{% else %}-{% endif %}</td>
                     <td style="text-align:center;white-space:nowrap;">
+                        <a class="btn btn-ghost btn-sm" href="/reg/api/contract-specs/{{ spec.id }}/contract-docx" onclick="event.stopPropagation()" title="Открыть договор №{{ spec.contract_number }} (Word)">Договор</a>
+                        <a class="btn btn-ghost btn-sm" href="/reg/api/contract-specs/{{ spec.id }}/spec-docx" onclick="event.stopPropagation()" title="Открыть спецификацию №{{ spec.specification_number }} (Word)">Спецификация</a>
                         <button class="btn btn-ghost btn-sm btn-icon" onclick="event.stopPropagation();openContractFolder({{ spec.id }})" title="Открыть папку договора №{{ spec.contract_number }}">&#128193;</button>
                         <button class="btn btn-danger btn-sm btn-icon" onclick="event.stopPropagation();deleteSpec({{ spec.id }})" title="Удалить">&#10005;</button>
                     </td>
@@ -104,7 +106,7 @@ async function openContractFolder(specId) {
     const resp = await fetch('/reg/api/contract-specs/' + specId + '/folder', {method: 'POST'});
     const data = await resp.json().catch(() => ({}));
     if (!resp.ok) { showToast('Ошибка: ' + (data.detail || resp.status)); return; }
-    window.open(data.path, '_blank');
+    openFolderPath(data.path);
 }
 
 function showNewSpecForm() {

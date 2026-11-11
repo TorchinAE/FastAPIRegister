@@ -7,7 +7,7 @@
         <span class="subtitle">Всего: {{ total }}</span>
     </div>
     <div style="display:flex;gap:0.5rem;">
-        <a href="/reg/api/modules/export-excel" class="btn btn-excel" download>Скачать Excel</a>
+        <button type="button" class="btn btn-excel" onclick="exportFilteredExcel()" title="Выгружаются модули, прошедшие фильтры">Скачать Excel</button>
         <label class="btn btn-primary" style="cursor:pointer;">
             Загрузить Excel
             <input type="file" accept=".xlsx,.xls" style="display:none" onchange="importExcel(this)">
@@ -41,7 +41,7 @@
         <tbody>
             {% for item in items %}
             {% set is_zero = attrs[item.id].zero if item.id in attrs else false %}
-            <tr style="cursor:pointer" onclick="location.href='/reg/modules/{{ item.id }}'"{% if is_zero %} class="zero-price" title="Цена 0 или в составе материал с ценой 0"{% endif %}>
+            <tr data-id="{{ item.id }}" style="cursor:pointer" onclick="location.href='/reg/modules/{{ item.id }}'"{% if is_zero %} class="zero-price" title="Цена 0 или в составе материал с ценой 0"{% endif %}>
                 <td><strong>{{ item.id }}</strong></td>
                 <td>{{ item.name }}</td>
                 <td>{{ item.material_type.name if item.material_type else '' }}</td>
@@ -63,6 +63,28 @@
 
 {% block scripts %}
 <script>
+// Выгрузка — строки, прошедшие фильтр (на всех страницах), а не только видимые
+async function exportFilteredExcel() {
+    const ids = [...document.querySelectorAll('#dataTable tbody tr[data-id]')]
+        .filter(r => r.dataset.matched !== '0')
+        .map(r => parseInt(r.dataset.id));
+    if (!ids.length) { showToast('Нет модулей для выгрузки'); return; }
+    const resp = await fetch('/reg/api/modules/export-excel', {
+        method: 'POST',
+        headers: {'Content-Type': 'application/json'},
+        body: JSON.stringify({ids}),
+    });
+    if (!resp.ok) { showToast('Ошибка выгрузки'); return; }
+    const blob = await resp.blob();
+    const d = new Date();
+    const stamp = d.getFullYear() + String(d.getMonth() + 1).padStart(2, '0') + String(d.getDate()).padStart(2, '0');
+    const a = document.createElement('a');
+    a.href = URL.createObjectURL(blob);
+    a.download = 'modules_' + stamp + '.xlsx';
+    a.click();
+    URL.revokeObjectURL(a.href);
+}
+
 async function deleteMod(id, btn) {
     if (!confirm('Удалить модуль?')) return;
     const resp = await fetch(`/reg/api/modules/${id}`, {method: 'DELETE'});

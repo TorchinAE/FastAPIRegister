@@ -39,6 +39,7 @@ ADD_COLUMNS = [
     ("module_type_slots", "color", "VARCHAR(20)"),
     ("request_calcs", "fot_manual", "BOOLEAN NOT NULL DEFAULT 1"),
     ("request_calcs", "overhead_manual", "BOOLEAN NOT NULL DEFAULT 1"),
+    ("request_calcs", "sort_order", "INTEGER NOT NULL DEFAULT 0"),
 ]
 
 # Существующие блоки КСО: всё количество — на 1СШ

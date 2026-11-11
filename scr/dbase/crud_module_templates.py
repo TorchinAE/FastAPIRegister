@@ -91,6 +91,25 @@ async def add_template(
     return await get_template(session, tpl.id)
 
 
+async def copy_template(session: AsyncSession, template_id: int) -> ModuleTypeTemplate | None:
+    """Копия шаблона (название, назначение, модули) — сразу после исходного."""
+    src = await get_template(session, template_id)
+    if not src:
+        return None
+    copy = await add_template(session, src.module_type_id, f"{src.name} (копия)", src.purpose, copy_from=src.id)
+    order = []
+    for t in await get_templates(session, src.module_type_id):
+        if t.id == copy.id:
+            continue
+        order.append(t)
+        if t.id == src.id:
+            order.append(copy)
+    for i, t in enumerate(order, start=1):
+        t.sort_order = i
+    await session.flush()
+    return copy
+
+
 async def update_template(
     session: AsyncSession, template_id: int, name: str | None = None, purpose: str | None = None, set_purpose=False
 ) -> ModuleTypeTemplate | None:

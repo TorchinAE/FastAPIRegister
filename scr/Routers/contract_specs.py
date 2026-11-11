@@ -1,3 +1,5 @@
+import asyncio
+
 from fastapi import APIRouter, Depends, HTTPException, Query
 from pydantic import BaseModel
 from sqlalchemy.ext.asyncio import AsyncSession
@@ -79,3 +81,56 @@ async def delete_spec(spec_id: int, session: AsyncSession = Depends(db_helper.se
         raise HTTPException(status_code=404, detail="Спецификация не найдена")
     await session.commit()
     return {"message": "Удалено"}
+
+
+async def _spec_or_404(session: AsyncSession, spec_id: int):
+    spec = await crud_contract_specs.get_spec_by_id(session, spec_id)
+    if not spec:
+        raise HTTPException(status_code=404, detail="Спецификация не найдена")
+    return spec
+
+
+def _docx_response(content: bytes, filename: str):
+    from urllib.parse import quote
+
+    from fastapi.responses import Response
+
+    return Response(
+        content,
+        media_type="application/vnd.openxmlformats-officedocument.wordprocessingml.document",
+        headers={"Content-Disposition": f"attachment; filename*=UTF-8''{quote(filename)}"},
+    )
+
+
+async def _save_to_folder(session: AsyncSession, spec, content: bytes, filename: str) -> None:
+    """Копия документа — в папку договора (если она доступна с сервера)."""
+    from pathlib import Path
+
+    path, created = await crud_contract_specs.ensure_contract_folder(session, spec)
+    if path and created:
+        try:
+            await asyncio.to_thread((Path(path) / filename).write_bytes, content)
+        except OSError:
+            pass
+
+
+@cs_router.get("/{spec_id}/contract-docx")
+async def download_contract(spec_id: int, session: AsyncSession = Depends(db_helper.session_dependency)):
+    """Договор в Word по шаблону Contract.docx (копия сохраняется в папку договора)."""
+    from scr.dbase import crud_contract_docs
+
+    spec = await _spec_or_404(session, spec_id)
+    content, filename = await crud_contract_docs.build_contract(session, spec)
+    await _save_to_folder(session, spec, content, filename)
+    return _docx_response(content, filename)
+
+
+@cs_router.get("/{spec_id}/spec-docx")
+async def download_specification(spec_id: int, session: AsyncSession = Depends(db_helper.session_dependency)):
+    """Спецификация в Word по шаблону Contract_specification.docx и комплектации ТКП (копия — в папку договора)."""
+    from scr.dbase import crud_contract_docs
+
+    spec = await _spec_or_404(session, spec_id)
+    content, filename = await crud_contract_docs.build_specification(session, spec)
+    await _save_to_folder(session, spec, content, filename)
+    return _docx_response(content, filename)

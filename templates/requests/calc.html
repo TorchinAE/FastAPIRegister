@@ -110,16 +110,9 @@ document.querySelectorAll('.calc-cost').forEach(el => {
 });
 
 function openFolder() {
-    const path = '{{ folder_path | e }}';
-    if (path) {
-        navigator.clipboard.writeText(path).then(() => {
-            showToast('Путь скопирован: ' + path);
-        }).catch(() => {
-            showToast('Путь: ' + path);
-        });
-    } else {
-        showToast('Папка не создана (нет настроек адреса сервера или компании)');
-    }
+    const path = {{ folder_path | tojson }};
+    if (!path) { showToast('Папка не создана (нет настроек адреса сервера или компании)'); return; }
+    openFolderPath(path);
 }
 
 async function clearCost(field) {

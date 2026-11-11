@@ -57,6 +57,7 @@ scr/
     crud_module_slots.py    # Обязательные строки разделов расчёта (одна строка — один модуль)
     crud_module_templates.py # Шаблоны блоков «по умолчанию» (несколько на раздел)
     crud_tkp.py             # Сводная таблица ТКП: разделы расчёта, доставка, услуги
+    crud_contract_docs.py   # Данные договора и спецификации для Word (scr/utils/contract_docx.py)
     startup_migrations.py   # ADD COLUMN / пересоздание таблиц при старте (create_all колонки не добавляет)
   utils/
     excel.py                # Общие помощники импорта/экспорта Excel (MONEY_FMT)
@@ -107,5 +108,9 @@ alembic/                    # Migrations
 - Списки (`<table data-filter-table data-per-page>`) грузятся целиком, фильтр и пагинация — на клиенте в `static/table-filter.js`; выгрузки берут строки с `data-matched != "0"`, а не видимые.
 - Выпадающие списки модулей в расчётах — через `ModulePicker` (`static/module-picker.js`): фильтр по характеристикам материалов, цвет типа материала (`MaterialType.color`). Порядок модулей — `crud_modules.sort_modules` (ток, класс точности, название).
 - Новый блок расчёта создаётся из шаблона (`ModuleTypeTemplate`): название, назначение, модули строк и добавленные модули. Скрытые строки синхронизируются с шаблоном блока.
+- Папки (ТКП, ЗЗ, договор) браузер не открывает (`file://` со страницы сайта блокируется) — `openFolderPath(path)` из `base.html` копирует путь в буфер и показывает его.
+- Фильтры, страница и прокрутка списков сохраняются в `sessionStorage` (`ListState` в `static/table-filter.js`) — возврат из карточки на тот же список.
+- Порядок блоков расчёта — `RequestCalc.sort_order`, затем `id` (копия блока встаёт рядом с исходным). Пустой блок при открытии раздела заполняется из своего шаблона.
+- Модуль без своего типа подходит в строку раздела по типам материалов состава (`ModulePicker.typeMatch`, `crud_module_slots.allowed_module`).
 - Деньги в Excel — `scr.utils.excel.MONEY_FMT` (`#,##0.00`), не литеральный пробел.
 - Ruff ignores: `B008` (Depends in function args), `F401` (unused imports), `DTZ005` (datetime.utcnow).

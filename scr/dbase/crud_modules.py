@@ -358,9 +358,12 @@ async def get_module_attrs(session: AsyncSession) -> dict[int, dict]:
         ids: set[int] = set()
         collect(module_id, ids, frozenset())
         rows = [materials[i] for i in ids if i in materials]
+        # Типы материалов состава — для подбора в строку модуля без своего типа
+        mat_types = sorted({r[1] for r in rows if r[1] is not None})
         own = [r for r in rows if type_id is not None and r[1] == type_id]
         rows = own or rows
         data = {
+            "mat_type_ids": mat_types,
             "voltage": ", ".join(sorted({r[2] for r in rows if r[2]})),
             "accuracy_class": ", ".join(sorted({r[3] for r in rows if r[3]})),
         }

@@ -183,10 +183,8 @@
 
 <script>
 const REQ_ID = {{ req.id }};
-const SERVER_ADDR = '{{ settings.get("адрес_сервера", "") }}';
-const SLUG = '{{ req.company.server_address_slug if req.company else "" }}';
-const REQ_YEAR = '{{ req.request_date.strftime("%Y") if req.request_date else "" }}';
-const ORG_NAME = '{{ req.company.name if req.company else "" }}';
+const SERVER_ADDR = {{ (settings.get("adres_server") or "") | tojson }};
+const TKP_FOLDER = {{ tkp_folder | tojson }};
 
 // === Number formatting ===
 function parseNum(s) {
@@ -347,25 +345,20 @@ window.addEventListener('focus', () => {
     if (pendingAdd) { pendingAdd = false; location.reload(); }
 });
 
+// Папка ТКП — тот же путь, что создаёт сервер: {adres_server}/01_ТКП/01_ТКП_{год}/{slug}/{id}_{организация}
 function openFolderTKP() {
-    if (!SERVER_ADDR) { alert('Не задан адрес_сервера в настройках'); return; }
-    const tmp = document.createElement('textarea');
-    tmp.innerHTML = ORG_NAME;
-    let org = tmp.value.replace(/[^a-zA-Zа-яА-ЯёЁ0-9]/g, '_').replace(/_+/g, '_').replace(/^_|_$/g, '');
-    const base = SERVER_ADDR.replace(/\/+$/, '');
-    const slug = SLUG.replace(/^\/+/, '').replace(/\/+$/, '');
-    const path = base + '/' + slug + '/' + REQ_YEAR + '/' + REQ_ID + '_' + org;
-    window.open(path, '_blank');
+    if (!TKP_FOLDER) { alert('Не задан adres_server в настройках или не выбрана организация'); return; }
+    openFolderPath(TKP_FOLDER);
 }
 
 function openFolderZZ() {
-    if (!SERVER_ADDR) { alert('Не задан адрес_сервера в настройках'); return; }
+    if (!SERVER_ADDR) { alert('Не задан adres_server в настройках'); return; }
     const orderNum = document.getElementById('factory-order-num').value.trim();
     if (!orderNum) { alert('Не введён номер заказа'); return; }
-    const base = SERVER_ADDR.replace(/\/+$/, '');
+    const sep = SERVER_ADDR.includes('\\') ? '\\' : '/';
+    const base = SERVER_ADDR.replace(/[\/\\]+$/, '');
     const year = '20' + orderNum.substring(0, 2);
-    const path = base + '/производство/' + year + '/' + orderNum;
-    window.open(path, '_blank');
+    openFolderPath([base, 'производство', year, orderNum].join(sep));
 }
 
 function toggleZZButton() {

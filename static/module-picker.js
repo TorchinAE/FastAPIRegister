@@ -161,6 +161,14 @@ const ModulePicker = (() => {
         bindFilters(container, cfg.filters, () => fill(select));
     }
 
+    // Подходит ли модуль в строку с типами материалов typeIds: по типу модуля, а модуль без типа —
+    // по типам материалов состава (тип ставится автоматически, только если у всех материалов он один)
+    function typeMatch(m, typeIds) {
+        if (!typeIds.length) return true;
+        if (m.type_id) return typeIds.includes(m.type_id);
+        return (m.mat_type_ids || []).some(t => typeIds.includes(t));
+    }
+
     function init(data, bar, priceFormatter) {
         modules = data;
         byId = new Map(data.map(m => [m.id, m]));
@@ -168,5 +176,5 @@ const ModulePicker = (() => {
         renderBar(bar);
     }
 
-    return {init, attach, slotFilters, search, refreshAll, color, paint, isZero};
+    return {init, attach, slotFilters, search, refreshAll, color, paint, isZero, typeMatch};
 })();

@@ -8,6 +8,7 @@ from sqlalchemy.ext.asyncio import AsyncSession
 from scr.dbase import crud_modules
 from scr.dbase.database import db_helper
 from scr.dbase.schemas.schemas import (
+    MaterialIdsSchema,
     MaterialResponseSchema,
     ModuleCreateSchema,
     ModuleFullResponseSchema,
@@ -100,11 +101,24 @@ def _auto_fit_columns(ws):
 async def export_modules_excel(
     session: AsyncSession = Depends(db_helper.session_dependency),
 ):
+    return await _modules_excel(session, await crud_modules.get_all_modules(session=session))
+
+
+@mod_router.post("/export-excel")
+async def export_modules_excel_filtered(
+    data: MaterialIdsSchema,
+    session: AsyncSession = Depends(db_helper.session_dependency),
+):
+    """Выгрузка только переданных модулей (прошедших фильтры списка), в том же порядке."""
+    by_id = {m.id: m for m in await crud_modules.get_all_modules(session=session)}
+    return await _modules_excel(session, [by_id[i] for i in data.ids if i in by_id])
+
+
+async def _modules_excel(session: AsyncSession, modules: list):
     from datetime import datetime as dt
 
     from openpyxl.styles import Border, Font, PatternFill, Side
 
-    modules = await crud_modules.get_all_modules(session=session)
     wb = Workbook()
 
     header_font = Font(bold=True)

@@ -181,7 +181,7 @@ async def get_calcs(session: AsyncSession, request_id: int, module_type_id: int)
         select(RequestCalc)
         .where(RequestCalc.request_id == request_id, RequestCalc.module_type_id == module_type_id)
         .options(_calc_options())
-        .order_by(RequestCalc.id)
+        .order_by(RequestCalc.sort_order, RequestCalc.id)
     )
     result = await session.execute(stmt)
     return list(result.scalars().all())
@@ -192,13 +192,19 @@ async def create_calc(
 ) -> RequestCalc:
     """Новый блок расчёта из шаблона (не задан — основной): ФОТ/Накладные из справочников, модули шаблона,
     название и назначение блока — из шаблона."""
-    from scr.dbase.crud_module_slots import get_slots
     from scr.dbase.crud_module_templates import resolve_template
 
     mod_type = await get_module_type_by_id(session, module_type_id)
     works = bool(mod_type and mod_type.slug in WORKS_SECTIONS)
     tpl = None if works else await resolve_template(session, module_type_id, template_id)
+    # Новый блок — в конец раздела
+    max_order = await session.execute(
+        select(func.max(RequestCalc.sort_order)).where(
+            RequestCalc.request_id == request_id, RequestCalc.module_type_id == module_type_id
+        )
+    )
     calc = RequestCalc(
+        sort_order=(max_order.scalar() or 0) + 1,
         request_id=request_id,
         module_type_id=module_type_id,
         fot=float(mod_type.fot_item.cost) if mod_type and mod_type.fot_item else 0,
@@ -214,26 +220,106 @@ async def create_calc(
     await session.flush()
 
     if tpl:
-        # Состав нового блока — модули шаблона: обязательные строки и добавленные модули
-        slot_ids = {s.id for s in await get_slots(session, module_type_id)}
-        for d in tpl.defaults:
-            slot_id = d.slot_id if d.slot_id in slot_ids else None
-            session.add(RequestCalcItem(calc_id=calc.id, module_id=d.module_id, quantity=d.quantity, slot_id=slot_id))
-        await session.flush()
+        await _add_template_items(session, calc, tpl)
 
     calc = await get_calc_by_id(session, calc.id)
     # Итоги блока сразу, чтобы стоимость раздела учитывала новый блок без нажатия «Сохранить»
+    calc.profitability_percent = await default_profitability(session, request_id)
+    await _recalc_totals(session, calc, mod_type)
+    return calc
+
+
+async def _add_template_items(session: AsyncSession, calc: RequestCalc, tpl, filled: set[int] = frozenset()) -> None:
+    """Состав блока — модули шаблона: обязательные строки и добавленные модули.
+    filled — строки, уже заполненные в блоке (скрытые строки после sync_hidden_slots), не трогаются."""
+    from scr.dbase.crud_module_slots import get_slots
+
+    slot_ids = {s.id for s in await get_slots(session, calc.module_type_id)}
+    for d in tpl.defaults:
+        slot_id = d.slot_id if d.slot_id in slot_ids else None
+        if slot_id is not None and slot_id in filled:
+            continue
+        session.add(RequestCalcItem(calc_id=calc.id, module_id=d.module_id, quantity=d.quantity, slot_id=slot_id))
+    await session.flush()
+
+
+async def _recalc_totals(session: AsyncSession, calc: RequestCalc, mod_type: ModuleType | None) -> None:
+    """Себестоимость и общая стоимость блока по текущим ценам модулей и рентабельности блока."""
     from scr.dbase.crud_modules import get_module_prices
 
     prices = await get_module_prices(session)
-    profit = await default_profitability(session, request_id)
+    profit = float(calc.profitability_percent or 0)
     apply_fot_rule(calc, prices, await get_fot_rule(session, mod_type))
     total = calc_base_cost(calc, prices, works=bool(mod_type and mod_type.slug in WORKS_SECTIONS))
-    calc.profitability_percent = profit
     calc.total_cost = round(total, 2)
     calc.final_price = round(total * (1 + profit / 100), 2)
     await session.flush()
-    return calc
+
+
+async def fill_empty_from_template(session: AsyncSession, calcs: list[RequestCalc]) -> list[RequestCalc]:
+    """Пустые блоки (без модулей) заполняются из своего шаблона (нет — основной шаблон раздела).
+
+    Блок раздела с одним блоком (КТП, ПКУ, ПУС) создаётся при первом открытии страницы — если шаблон
+    тогда был пуст или заполнен позже, блок остался бы пустым.
+    """
+    from scr.dbase.crud_module_slots import get_slots
+    from scr.dbase.crud_module_templates import resolve_template
+
+    result = []
+    for calc in calcs:
+        mod_type = await get_module_type_by_id(session, calc.module_type_id)
+        if not mod_type or mod_type.slug in WORKS_SECTIONS:
+            result.append(calc)
+            continue
+        # Скрытые строки заполняются из шаблона всегда (sync_hidden_slots) — пустой блок тот, где нет других модулей
+        hidden = {sl.id for sl in await get_slots(session, calc.module_type_id) if sl.hidden}
+        if any(it.slot_id not in hidden for it in calc.items):
+            result.append(calc)
+            continue
+        tpl = await resolve_template(session, calc.module_type_id, calc.template_id)
+        if not tpl or not tpl.defaults:
+            result.append(calc)
+            continue
+        calc.template_id = tpl.id
+        if not calc.name:
+            calc.name = tpl.name
+        if not calc.purpose:
+            calc.purpose = tpl.purpose
+        await _add_template_items(session, calc, tpl, {it.slot_id for it in calc.items if it.slot_id is not None})
+        session.expire(calc, ["items"])
+        calc = await get_calc_by_id(session, calc.id)
+        await _recalc_totals(session, calc, mod_type)
+        await recalc_section_cost(session, calc.request_id, calc.module_type_id)
+        result.append(calc)
+    return result
+
+
+async def copy_calc(session: AsyncSession, calc_id: int) -> RequestCalc | None:
+    """Копия блока со всеми введёнными данными и модулями; встаёт сразу после исходного блока."""
+    src = await get_calc_by_id(session, calc_id)
+    if not src:
+        return None
+    siblings = await get_calcs(session, src.request_id, src.module_type_id)
+    fields = (
+        "request_id", "module_type_id", "fot", "overhead", "profitability_percent", "total_cost", "final_price",
+        "quantity", "qty_1sh", "qty_2sh", "purpose", "name", "template_id", "works_cost", "fot_manual",
+        "overhead_manual",
+    )  # fmt: skip
+    copy = RequestCalc(**{f: getattr(src, f) for f in fields})
+    session.add(copy)
+    await session.flush()
+    for it in src.items:
+        session.add(RequestCalcItem(calc_id=copy.id, module_id=it.module_id, quantity=it.quantity, slot_id=it.slot_id))
+    # Порядок раздела: копия сразу за исходным
+    order = []
+    for c in siblings:
+        order.append(c)
+        if c.id == src.id:
+            order.append(copy)
+    for i, c in enumerate(order, start=1):
+        c.sort_order = i
+    await session.flush()
+    return await get_calc_by_id(session, copy.id)
 
 
 async def default_profitability(session: AsyncSession, request_id: int) -> float:
@@ -364,6 +450,7 @@ async def get_or_create_calcs(session: AsyncSession, request_id: int, module_typ
     calcs = await get_calcs(session, request_id, module_type_id)
     if not calcs:
         return [await create_calc(session, request_id, module_type_id)]
+    calcs = await fill_empty_from_template(session, calcs)
 
     # ФОТ/Накладные ещё 0 — из справочников (в разделах с автоматическим ФОТ — только у введённых вручную)
     mod_type = await get_module_type_by_id(session, module_type_id)

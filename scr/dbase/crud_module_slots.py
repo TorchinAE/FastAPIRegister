@@ -109,10 +109,15 @@ async def delete_slot(session: AsyncSession, slot_id: int) -> ModuleTypeSlot | N
     return slot
 
 
-def allowed_module(slot: ModuleTypeSlot, module: Module) -> bool:
-    """Модуль подходит в строку, если его тип среди выбранных (типы не выбраны — подходит любой)."""
+def allowed_module(slot: ModuleTypeSlot, module: Module, mat_type_ids: set[int] | None = None) -> bool:
+    """Модуль подходит в строку, если его тип среди выбранных (типы не выбраны — подходит любой).
+    Модуль без типа — по типам материалов состава mat_type_ids (как ModulePicker.typeMatch)."""
     type_ids = {t.id for t in slot.material_types}
-    return not type_ids or module.material_type_id in type_ids
+    if not type_ids:
+        return True
+    if module.material_type_id is not None:
+        return module.material_type_id in type_ids
+    return bool(type_ids & (mat_type_ids or set()))
 
 
 def slot_json(slot: ModuleTypeSlot) -> dict:
@@ -142,7 +147,12 @@ async def _check_module(session: AsyncSession, slot: ModuleTypeSlot, module_id: 
     module = await session.get(Module, module_id)
     if not module:
         raise ValueError("Модуль не найден")
-    if not allowed_module(slot, module):
+    mat_type_ids = None
+    if module.material_type_id is None:
+        from scr.dbase.crud_modules import get_module_attrs
+
+        mat_type_ids = set((await get_module_attrs(session)).get(module.id, {}).get("mat_type_ids", []))
+    if not allowed_module(slot, module, mat_type_ids):
         raise ValueError("Модуль не подходит по типу для этой строки")
     return module
 

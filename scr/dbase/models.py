@@ -593,6 +593,8 @@ class RequestCalc(BaseID):
     # Старые блоки — вручную (server_default), чтобы не менять сохранённые значения
     fot_manual: Mapped[bool] = mapped_column(default=False, server_default="1", nullable=False)
     overhead_manual: Mapped[bool] = mapped_column(default=False, server_default="1", nullable=False)
+    # Порядок блоков в разделе (копия блока встаёт рядом с исходным); при равенстве — по id
+    sort_order: Mapped[int] = mapped_column(Integer, default=0, server_default="0", nullable=False)
 
     request: Mapped["Request"] = relationship(foreign_keys=[request_id])
     module_type: Mapped["ModuleType"] = relationship(foreign_keys=[module_type_id])

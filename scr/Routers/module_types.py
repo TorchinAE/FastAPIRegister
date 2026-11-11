@@ -467,6 +467,16 @@ async def create_template(
     return await _template_json(session, tpl.id)
 
 
+@mt_calc_router.post("/api/module-type-templates/{template_id}/copy")
+async def copy_template(template_id: int, session: AsyncSession = Depends(db_helper.session_dependency)):
+    """Копия шаблона с модулями — рядом с исходным."""
+    tpl = await crud_module_templates.copy_template(session, template_id)
+    if not tpl:
+        raise HTTPException(status_code=404, detail="Шаблон не найден")
+    await session.commit()
+    return await _template_json(session, tpl.id)
+
+
 @mt_calc_router.patch("/api/module-type-templates/{template_id}")
 async def update_template(
     template_id: int,
@@ -560,6 +570,23 @@ async def create_calc(
     prices = await crud_modules.get_module_prices(session)
     default_profit = await crud_module_types.default_profitability(session, data.request_id)
     slots = await crud_module_slots.get_slots(session, data.module_type_id)
+    return {
+        "block": crud_module_types.calc_block_data(calc, prices, default_profit, slots),
+        "section_cost": section_cost,
+    }
+
+
+@mt_calc_router.post("/api/request-calcs/{calc_id}/copy")
+async def copy_calc(calc_id: int, session: AsyncSession = Depends(db_helper.session_dependency)):
+    """Копия блока с введёнными данными — рядом с исходным. Возвращает данные блока для страницы."""
+    calc = await crud_module_types.copy_calc(session, calc_id)
+    if not calc:
+        raise HTTPException(status_code=404, detail="Расчёт не найден")
+    section_cost = await crud_module_types.recalc_section_cost(session, calc.request_id, calc.module_type_id)
+    await session.commit()
+    prices = await crud_modules.get_module_prices(session)
+    default_profit = await crud_module_types.default_profitability(session, calc.request_id)
+    slots = await crud_module_slots.get_slots(session, calc.module_type_id)
     return {
         "block": crud_module_types.calc_block_data(calc, prices, default_profit, slots),
         "section_cost": section_cost,

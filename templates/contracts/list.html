@@ -20,7 +20,7 @@
                 <th>Дата спецификации</th>
                 <th>ТКП</th>
                 <th>Сумма</th>
-                <th style="width:90px;"></th>
+                <th ></th>
             </tr>
             <tr class="table-filter">
                 <th><input type="text" data-col="0" placeholder="Название..." class="tf-input"></th>
@@ -43,7 +43,9 @@
                 <td>{{ spec.contract_date.strftime('%d.%m.%Y') if spec.contract_date else '-' }}</td>
                 <td>{% if spec.request_id %}#{{ spec.request_id }}{% if spec.request %} — {{ spec.request.tkp_num or '' }}{% endif %}{% else %}-{% endif %}</td>
                 <td style="text-align:right;">{{ spec.request.cost|money if spec.request and spec.request.cost else '-' }}</td>
-                <td style="text-align:center;width:90px;white-space:nowrap;">
+                <td style="text-align:center;white-space:nowrap;">
+                    <a class="btn btn-ghost btn-sm" href="/reg/api/contract-specs/{{ spec.id }}/contract-docx" onclick="event.stopPropagation()" title="Открыть договор №{{ spec.contract_number }} (Word)">Договор</a>
+                    <a class="btn btn-ghost btn-sm" href="/reg/api/contract-specs/{{ spec.id }}/spec-docx" onclick="event.stopPropagation()" title="Открыть спецификацию №{{ spec.specification_number }} (Word)">Спецификация</a>
                     <button class="btn btn-ghost btn-sm btn-icon" title="Открыть папку договора №{{ spec.contract_number }}" onclick="event.stopPropagation(); openContractFolder({{ spec.id }})">&#128193;</button>
                     <button class="btn btn-danger btn-sm btn-icon" title="Удалить" onclick="event.stopPropagation(); deleteSpec({{ spec.id }}, this)">&#10005;</button>
                 </td>
@@ -68,7 +70,7 @@ async function openContractFolder(specId) {
     const resp = await fetch('/reg/api/contract-specs/' + specId + '/folder', {method: 'POST'});
     const data = await resp.json().catch(() => ({}));
     if (!resp.ok) { showToast('Ошибка: ' + (data.detail || resp.status)); return; }
-    window.open(data.path, '_blank');
+    openFolderPath(data.path);
 }
 
 async function deleteSpec(specId, btn) {

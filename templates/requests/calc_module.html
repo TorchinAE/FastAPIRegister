@@ -33,7 +33,7 @@
 {% endif %}
 
 {# Корпуса, КТП, ПКУ, ПУС — один блок, но поля вертикально, как в КСО #}
-<div id="blocks" class="calc-blocks {{ 'multi' if multi or not works else 'single' }}">
+<div id="blocks" class="calc-blocks {{ 'multi' if multi or not works else 'single works' }}">
     {% if multi %}
     <div class="calc-block-add-wrap">
         <button type="button" class="calc-block-add" id="addBlockBtn" onclick="addBlock()">
@@ -103,7 +103,7 @@ function bindMoney(input, onInput) {
     input.addEventListener('blur', () => { input.value = formatFinancial(moneyVal(input)); });
 }
 
-function renderBlock(data, index) {
+function renderBlock(data, index, after = null) {
     const el = document.createElement('div');
     el.className = 'card calc-block';
     el.dataset.id = data.id;
@@ -129,6 +129,7 @@ function renderBlock(data, index) {
         <div class="calc-block-head">
             <span class="calc-block-title">${MULTI ? 'Блок ' + index : ''}</span>
             <span class="calc-save-status f-status" title="Автосохранение"></span>
+            ${MULTI ? '<button type="button" class="calc-block-copy f-copy-block" title="Скопировать блок: копия с введёнными данными встанет рядом">&#10697;</button>' : ''}
             ${MULTI ? '<button type="button" class="calc-block-del f-delete-block" title="Удалить блок">&#10005;</button>' : ''}
         </div>
         ${!WORKS ? `
@@ -166,7 +167,7 @@ function renderBlock(data, index) {
                 <label>Рентабельность</label>
                 ${moneyInput('f-profit-rub', 0)}
             </div>
-            <div class="calc-final-row">
+            <div class="calc-final-row${SPLIT ? ' split' : ''}">
                 <div class="form-group">
                     <label>Общая стоимость</label>
                     ${moneyInput('f-final calc-strong', 0)}
@@ -229,10 +230,13 @@ function renderBlock(data, index) {
     if (MULTI) {
         el.querySelector('.f-qty').addEventListener('input', () => changed());
         el.querySelector('.f-delete-block').addEventListener('click', () => deleteBlock(el));
+        el.querySelector('.f-copy-block').addEventListener('click', () => copyBlock(el));
     }
     el.querySelector('.f-clear').addEventListener('click', () => clearBlock(el));
 
-    if (addTarget) blocksEl.insertBefore(el, addTarget); else blocksEl.appendChild(el);
+    if (after) after.after(el);
+    else if (addTarget) blocksEl.insertBefore(el, addTarget);
+    else blocksEl.appendChild(el);
     recalc(el);
     return el;
 }
@@ -293,7 +297,7 @@ function appendSlot(el, slot, item) {
     select.value = item ? item.module_id : '';
     ModulePicker.attach(select, {
         placeholder: '— не выбран —',
-        allow: (m, current) => !slot.type_ids.length || slot.type_ids.includes(m.type_id) || String(m.id) === current,
+        allow: (m, current) => ModulePicker.typeMatch(m, slot.type_ids) || String(m.id) === current,
     });
     if (slot.filters.length) ModulePicker.slotFilters(row.querySelector('.f-filters'), select, slot.filters);
     select.addEventListener('change', () => saveSlot(el, row));
@@ -544,6 +548,26 @@ async function createBlock(templateId) {
         addBtn.scrollIntoView({behavior: 'smooth', inline: 'end', block: 'nearest'});
     } finally {
         addBtn.disabled = false;
+    }
+}
+
+// Копия блока с введёнными данными — сразу за исходным (несохранённые правки сначала сохраняются)
+async function copyBlock(el) {
+    const btn = el.querySelector('.f-copy-block');
+    btn.disabled = true;
+    try {
+        await saveNow(el);
+        const resp = await fetch('/reg/api/request-calcs/' + el.dataset.id + '/copy', {method: 'POST'});
+        if (!resp.ok) { showToast('Ошибка копирования блока'); return; }
+        const data = await resp.json();
+        const copy = renderBlock(data.block, 0, el);
+        renumberBlocks();
+        updateSectionTotal();
+        setStatus(copy, '✓ сохранено', 'ok');
+        copy.scrollIntoView({behavior: 'smooth', inline: 'nearest', block: 'nearest'});
+        showToast('Блок скопирован');
+    } finally {
+        btn.disabled = false;
     }
 }
 

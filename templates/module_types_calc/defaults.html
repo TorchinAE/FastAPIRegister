@@ -90,7 +90,7 @@ async function api(url, method, body) {
     return data;
 }
 
-function renderTemplate(tpl) {
+function renderTemplate(tpl, after = null) {
     const el = document.createElement('div');
     el.className = 'card calc-block';
     el.dataset.id = tpl.id;
@@ -98,6 +98,7 @@ function renderTemplate(tpl) {
         <div class="calc-block-head">
             <span class="calc-block-title">Шаблон</span>
             <span class="calc-save-status f-status"></span>
+            <button type="button" class="calc-block-copy f-copy" title="Скопировать шаблон: копия с модулями встанет рядом">&#10697;</button>
             <button type="button" class="calc-block-del f-delete" title="Удалить шаблон">&#10005;</button>
         </div>
         <div class="form-group">
@@ -143,12 +144,13 @@ function renderTemplate(tpl) {
         el.querySelector('.f-purpose').addEventListener('change', e => saveTemplate(el, {purpose: e.target.value || null}));
     }
     el.querySelector('.f-delete').addEventListener('click', () => deleteTemplate(el));
+    el.querySelector('.f-copy').addEventListener('click', () => copyTemplate(el));
     el.querySelector('.f-add-module').addEventListener('click', () => addItem(el));
     el.querySelector('.f-import').addEventListener('click', () => {
         importTemplateId = tpl.id;
         document.getElementById('importFile').click();
     });
-    tplsEl.insertBefore(el, addTplBtn);
+    if (after) after.after(el); else tplsEl.insertBefore(el, addTplBtn);
     recalc(el);
     return el;
 }
@@ -178,7 +180,7 @@ function appendSlot(el, slot, value) {
     }
     ModulePicker.attach(select, {
         placeholder: '— не выбран —',
-        allow: (m, current) => !slot.type_ids.length || slot.type_ids.includes(m.type_id) || String(m.id) === current,
+        allow: (m, current) => ModulePicker.typeMatch(m, slot.type_ids) || String(m.id) === current,
     });
     if (slot.filters.length) ModulePicker.slotFilters(row.querySelector('.f-filters'), select, slot.filters);
     const qtyEl = row.querySelector('.f-item-qty');
@@ -293,6 +295,17 @@ async function addTemplate() {
     if (tpl) {
         renderTemplate(tpl);
         addTplBtn.scrollIntoView({behavior: 'smooth', inline: 'end', block: 'nearest'});
+    }
+}
+
+// Копия шаблона с модулями — сразу за исходным
+async function copyTemplate(el) {
+    const tpl = await api(`/reg/api/module-type-templates/${el.dataset.id}/copy`, 'POST');
+    if (tpl) {
+        const copy = renderTemplate(tpl, el);
+        setStatus(copy, '✓ сохранено', 'ok');
+        copy.scrollIntoView({behavior: 'smooth', inline: 'nearest', block: 'nearest'});
+        showToast('Шаблон скопирован');
     }
 }
 

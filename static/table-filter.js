@@ -4,6 +4,33 @@
 //   input.tf-input[data-col]                  — подстрока, без учёта регистра; data-num — без пробелов (тысячи)
 //   input.tf-date[data-col][data-type=date-from|date-to] — период по атрибуту data-sort ячейки (ГГГГММДД)
 //   select.tf-select[data-col]                — точное совпадение текста ячейки, "__none__" — пустая/«-»
+// Состояние списка (значения фильтров, страница, прокрутка) хранится в sessionStorage вкладки по адресу страницы:
+// перешли в карточку и вернулись (ссылкой или «Назад») — тот же фильтр и та же страница. ListState — и для списков
+// со своим фильтром (материалы).
+window.ListState = (function () {
+    const key = name => 'list-state:' + location.pathname + (name ? ':' + name : '');
+    function load(name) {
+        try { return JSON.parse(sessionStorage.getItem(key(name)) || 'null'); } catch (e) { return null; }
+    }
+    function save(name, state) {
+        try { sessionStorage.setItem(key(name), JSON.stringify(state)); } catch (e) { /* хранилище недоступно */ }
+    }
+    // Значения полей фильтра: {индекс поля: значение}
+    function readInputs(fields) {
+        const values = {};
+        fields.forEach((el, i) => { if (el.value) values[i] = el.value; });
+        return values;
+    }
+    function writeInputs(fields, values) {
+        fields.forEach((el, i) => { if (values && values[i] !== undefined) el.value = values[i]; });
+    }
+    // Прокрутка восстанавливается после отрисовки списка
+    function restoreScroll(state) {
+        if (state && state.scroll) requestAnimationFrame(() => window.scrollTo(0, state.scroll));
+    }
+    return {load, save, readInputs, writeInputs, restoreScroll};
+})();
+
 (function () {
     function cellText(row, col) {
         const cell = row.cells[col];
@@ -54,6 +81,9 @@
         const perPage = parseInt(table.dataset.perPage) || 0;
         const rows = Array.from(tbody.rows).filter(r => !r.classList.contains('empty-row'));
         const wrap = table.closest('.table-wrap') || table;
+        const tables = Array.from(document.querySelectorAll('table[data-filter-table]'));
+        const stateName = 't' + tables.indexOf(table);
+        const fields = Array.from(table.querySelectorAll('.table-filter input, .table-filter select'));
         const pager = document.createElement('div');
         pager.className = 'pagination';
         wrap.after(pager);
@@ -85,7 +115,12 @@
                 r.style.display = visible.has(r) ? '' : 'none';
             });
             renderPager(pages);
+            saveState();
             table.dispatchEvent(new CustomEvent('table-filtered', {detail: {matched}}));
+        }
+
+        function saveState() {
+            ListState.save(stateName, {filters: ListState.readInputs(fields), page, scroll: window.scrollY});
         }
 
         function apply() {
@@ -107,7 +142,12 @@
             // Строки, прошедшие фильтр (на всех страницах)
             matchedRows: () => matched.filter(r => r.isConnected),
         };
+        const saved = ListState.load(stateName);
+        if (saved) ListState.writeInputs(fields, saved.filters);
         apply();
+        if (saved && saved.page > 1) { page = saved.page; render(); }
+        ListState.restoreScroll(saved);
+        window.addEventListener('pagehide', saveState);
     }
 
     document.addEventListener('DOMContentLoaded', () => {

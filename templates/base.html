@@ -61,6 +61,56 @@
             document.getElementById('sidebar').classList.toggle('open');
             document.getElementById('overlay').classList.toggle('open');
         }
+        // Браузер не открывает папки (file://) со страницы сайта — путь копируется в буфер обмена,
+        // его вставляют в адресную строку проводника (Win+E, Ctrl+L, Ctrl+V)
+        function openFolderPath(path) {
+            if (!path) { alert('Путь к папке не задан — проверьте настройки'); return; }
+            const done = ok => showFolderPath(path, ok);
+            if (navigator.clipboard && window.isSecureContext) {
+                navigator.clipboard.writeText(path).then(() => done(true), () => done(copyFallback(path)));
+            } else {
+                done(copyFallback(path));
+            }
+        }
+        function copyFallback(text) {
+            const ta = document.createElement('textarea');
+            ta.value = text;
+            ta.style.position = 'fixed';
+            ta.style.opacity = '0';
+            document.body.appendChild(ta);
+            ta.select();
+            let ok = false;
+            try { ok = document.execCommand('copy'); } catch (e) { ok = false; }
+            ta.remove();
+            return ok;
+        }
+        function showFolderPath(path, copied) {
+            let box = document.getElementById('folder-path-box');
+            if (!box) {
+                box = document.createElement('div');
+                box.id = 'folder-path-box';
+                box.className = 'folder-path-box';
+                document.body.appendChild(box);
+            }
+            box.innerHTML = '';
+            const title = document.createElement('div');
+            title.className = 'folder-path-title';
+            title.textContent = copied
+                ? 'Путь к папке скопирован. Откройте проводник (Win+E), нажмите Ctrl+L и вставьте путь (Ctrl+V).'
+                : 'Скопируйте путь и вставьте его в адресную строку проводника:';
+            const input = document.createElement('input');
+            input.type = 'text';
+            input.readOnly = true;
+            input.value = path;
+            input.addEventListener('focus', () => input.select());
+            const close = document.createElement('button');
+            close.type = 'button';
+            close.className = 'btn btn-ghost btn-sm';
+            close.textContent = 'Закрыть';
+            close.onclick = () => box.remove();
+            box.append(title, input, close);
+            input.focus();
+        }
         document.addEventListener('keydown', e => {
             if (e.key === 'Escape') {
                 document.getElementById('sidebar').classList.remove('open');

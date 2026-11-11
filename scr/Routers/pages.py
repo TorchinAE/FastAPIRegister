@@ -335,6 +335,9 @@ async def request_detail_page(
     await session.commit()
     all_settings = await crud_settings.get_all_settings(session)
     settings_dict = {s.key: s.value for s in all_settings}
+    from scr.dbase.crud_kso204 import tkp_folder_path
+
+    tkp_folder = tkp_folder_path(settings_dict.get("adres_server") or "", req) or ""
     probs_result = await session.execute(sa_select(Probability).order_by(Probability.id))
     probabilities = list(probs_result.scalars().all())
     return templates.TemplateResponse(
@@ -354,6 +357,7 @@ async def request_detail_page(
             "invoices": invoices,
             "payment_items": payment_items,
             "settings": settings_dict,
+            "tkp_folder": tkp_folder,
             "probabilities": probabilities,
             "active_page": "requests",
         },

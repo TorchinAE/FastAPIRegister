@@ -36,6 +36,12 @@ def _row(slug: str, name: str, qty, comp, fot, overhead, cost, final) -> dict:
     }
 
 
+def delivery_title(delivery: Delivery) -> str:
+    """«Доставка: {адрес}» (адрес не задан — «Доставка»)."""
+    address = (delivery.address or "").strip()
+    return f"Доставка: {address}" if address else "Доставка"
+
+
 async def build_tkp_summary(session: AsyncSession, req: Request) -> dict:
     """Строки по разделам и итоги. Стоимости блоков умножаются на их количество."""
     nds_val = await crud_settings.get_setting(session, "nds_percent")
@@ -45,7 +51,7 @@ async def build_tkp_summary(session: AsyncSession, req: Request) -> dict:
         select(RequestCalc)
         .where(RequestCalc.request_id == req.id)
         .options(selectinload(RequestCalc.module_type))
-        .order_by(RequestCalc.module_type_id, RequestCalc.id)
+        .order_by(RequestCalc.module_type_id, RequestCalc.sort_order, RequestCalc.id)
     )
     calcs = list((await session.execute(stmt)).scalars().all())
 
@@ -81,7 +87,16 @@ async def build_tkp_summary(session: AsyncSession, req: Request) -> dict:
     if delivery and float(delivery.final_price or 0) > 0:
         d_cost = float(delivery.cost_per_truck or 0) * (delivery.trucks_count or 0)
         rows.append(
-            _row("delivery", "Доставка", delivery.trucks_count or 0, 0.0, 0.0, 0.0, d_cost, float(delivery.final_price))
+            _row(
+                "delivery",
+                delivery_title(delivery),
+                delivery.trucks_count or 0,
+                0.0,
+                0.0,
+                0.0,
+                d_cost,
+                float(delivery.final_price),
+            )
         )
 
     # Старые расчёты услуг — только если по разделу нет нового расчёта
@@ -119,7 +134,7 @@ async def build_kit(session: AsyncSession, req: Request) -> dict:
             selectinload(RequestCalc.module_type),
             selectinload(RequestCalc.items).selectinload(RequestCalcItem.module),
         )
-        .order_by(RequestCalc.module_type_id, RequestCalc.id)
+        .order_by(RequestCalc.module_type_id, RequestCalc.sort_order, RequestCalc.id)
     )
     calcs = list((await session.execute(stmt)).scalars().all())
     prices = await crud_modules.get_module_prices(session)
@@ -214,7 +229,7 @@ async def build_tkp_kit(session: AsyncSession, req: Request) -> list[dict]:
             selectinload(RequestCalc.module_type),
             selectinload(RequestCalc.items).selectinload(RequestCalcItem.module),
         )
-        .order_by(RequestCalc.module_type_id, RequestCalc.id)
+        .order_by(RequestCalc.module_type_id, RequestCalc.sort_order, RequestCalc.id)
     )
     calcs = list((await session.execute(stmt)).scalars().all())
     by_type: dict[int, list[RequestCalc]] = {}
@@ -274,7 +289,7 @@ async def build_tkp_kit(session: AsyncSession, req: Request) -> list[dict]:
     delivery = (await session.execute(select(Delivery).where(Delivery.request_id == req.id))).scalars().first()
     if delivery and float(delivery.final_price or 0) > 0:
         price = float(delivery.final_price)
-        block = {"title": "Доставка", "lines": [], "quantity": 1, "price": price, "sum": price}
+        block = {"title": delivery_title(delivery), "lines": [], "quantity": 1, "price": price, "sum": price}
         sections.append({"slug": "delivery", "name": "Доставка", "header": False, "blocks": [block]})
     # Старые расчёты услуг — как в сводной: только если по разделу нет нового расчёта
     present = {s["slug"] for s in sections} | {c.module_type.slug for c in calcs}

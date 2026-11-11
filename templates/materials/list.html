@@ -258,7 +258,15 @@ function goPage(p) {
     currentPage = p;
     renderTable();
     window.scrollTo(0, 0);
+    saveListState();
 }
+
+// Фильтры и страница сохраняются: из карточки материала — обратно к тому же списку
+const filterFields = Array.from(document.querySelectorAll('.tf-input, .tf-select'));
+function saveListState() {
+    ListState.save('materials', {filters: ListState.readInputs(filterFields), page: currentPage, scroll: window.scrollY});
+}
+window.addEventListener('pagehide', saveListState);
 
 function applyFilters() {
     const filters = [];
@@ -295,6 +303,7 @@ function applyFilters() {
     }
     currentPage = 1;
     renderTable();
+    saveListState();
 }
 
 document.querySelectorAll('.tf-input').forEach(input => input.addEventListener('input', applyFilters));
@@ -428,6 +437,15 @@ document.getElementById('nom_tok_new').addEventListener('input', function() {
 });
 
 // Initial render
-renderTable();
+// Восстановление фильтров и страницы списка
+(function () {
+    const saved = ListState.load('materials');
+    if (!saved) { renderTable(); return; }
+    ListState.writeInputs(filterFields, saved.filters);
+    applyFilters();
+    const pages = Math.max(1, Math.ceil(filteredData.length / PER_PAGE));
+    if (saved.page > 1) { currentPage = Math.min(saved.page, pages); renderTable(); }
+    ListState.restoreScroll(saved);
+})();
 </script>
 {% endblock %}
