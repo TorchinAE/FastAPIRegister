@@ -271,4 +271,31 @@ async def test_slot_groups_share_first_slot_filters(client, db_session):
 
     slots = (await client.get(f"/reg/api/module-types/{mt}/slots")).json()
     assert [s["group"] for s in slots] == [first["id"]] * 3 + [fourth["id"]]
-    assert [s["group_filters"] for s in slots] == [["nom_tok"]] * 3 + [[]]
+
+    # Копия блока — сразу за ним, с объединением и модулями в шаблонах
+    db_session.add(
+        ModuleTypeDefault(
+            module_type_id=mt, module_id=ids["mod"], quantity=2, slot_id=second["id"], template_id=ids["tpl"]
+        )
+    )
+    await db_session.commit()
+    resp = await client.post(f"/reg/api/module-type-slots/{second['id']}/copy-group")
+    assert resp.status_code == 200
+    slots = (await client.get(f"/reg/api/module-types/{mt}/slots")).json()
+    assert [s["name"] for s in slots] == [
+        "Строка",
+        "Автомат 2",
+        "Автомат 3",
+        "Строка (копия)",
+        "Автомат 2 (копия)",
+        "Автомат 3 (копия)",
+        "Корпус",
+    ]
+    assert [s["join_prev"] for s in slots[3:6]] == [False, True, True]
+    assert slots[3]["filters"] == ["nom_tok"]
+    from sqlalchemy import select
+
+    copied = (
+        await db_session.execute(select(ModuleTypeDefault).where(ModuleTypeDefault.slot_id == slots[4]["id"]))
+    ).scalar_one()
+    assert (copied.module_id, copied.quantity, copied.template_id) == (ids["mod"], 2, ids["tpl"])

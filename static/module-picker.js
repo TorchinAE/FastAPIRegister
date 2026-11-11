@@ -33,6 +33,7 @@ const ModulePicker = (() => {
     }
 
     function passes(m, f) {
+        if (f.type_id && !typeMatch(m, [parseInt(f.type_id)])) return false;
         if (f.nom_tok && String(m.nom_tok) !== f.nom_tok) return false;
         if (f.voltage && !split(m.voltage).includes(f.voltage)) return false;
         if (f.accuracy_class && !split(m.accuracy_class).includes(f.accuracy_class)) return false;
@@ -154,11 +155,19 @@ const ModulePicker = (() => {
         });
     }
 
-    // Свои фильтры у select строки: keys — какие показать, значения — из модулей, подходящих в строку
-    function slotFilters(container, select, keys) {
+    // Фильтр «Тип» строки с несколькими типами модулей: types — [{id, name}]
+    function typeFilterHtml(types) {
+        return `<label class="mp-filter"><span>Тип</span><select data-filter="type_id"><option value="">—</option>${
+            types.map(t => `<option value="${t.id}">${esc(t.name)}</option>`).join('')}</select></label>`;
+    }
+
+    // Свои фильтры у select строки: keys — какие показать, значения — из модулей, подходящих в строку;
+    // types — типы модулей строки (больше одного — фильтр «Тип»)
+    function slotFilters(container, select, keys, types = []) {
         const cfg = configs.get(select);
         cfg.filters = {};
-        container.innerHTML = filtersHtml(keys, modules.filter(m => cfg.allow(m, '')));
+        container.innerHTML = (types.length > 1 ? typeFilterHtml(types) : '')
+            + filtersHtml(keys, modules.filter(m => cfg.allow(m, '')));
         bindFilters(container, cfg.filters, () => fill(select));
     }
 
@@ -170,26 +179,33 @@ const ModulePicker = (() => {
         return (m.mat_type_ids || []).some(t => typeIds.includes(t));
     }
 
-    // Общие фильтры блока объединённых строк: один набор фильтров на все select блока
+    // Общие фильтры блока объединённых строк: значение пишется в фильтры каждой строки блока
+    // (у строк остаются и свои фильтры)
     function groupFilters(container, selects, keys) {
         const state = {};
-        selects.forEach(s => { configs.get(s).filters = state; });
+        // У строки без своих фильтров — свой объект (не общий фильтр страницы)
+        selects.forEach(sel => { const c = configs.get(sel); if (c.filters === filters) c.filters = {}; });
         const allowed = modules.filter(m => selects.some(s => configs.get(s).allow(m, '')));
         container.innerHTML = filtersHtml(keys, allowed);
-        bindFilters(container, state, () => selects.forEach(fill));
+        bindFilters(container, state, () => selects.forEach(sel => {
+            Object.assign(configs.get(sel).filters, state);
+            fill(sel);
+        }));
     }
+
+    // Общий фильтр блока объединённых строк
+    const GROUP_FILTERS = ['nom_tok'];
 
     // Обязательные строки по блокам объединения (подряд идущие с одним slot.group).
     // entries — [{slot, ...}]; append(entry, target, ownFilters) добавляет строку в target и возвращает её select.
-    // Одиночная строка — свои фильтры (фильтры её блока); блок из нескольких строк — рамка с общими фильтрами сверху.
+    // Блок из нескольких строк — рамка с общим фильтром «Ном Ток» сверху, остальные фильтры — у каждой строки.
     function renderSlotGroups(target, entries, append) {
         for (let i = 0; i < entries.length;) {
             let j = i + 1;
             while (j < entries.length && entries[j].slot.group === entries[i].slot.group) j++;
             const run = entries.slice(i, j);
-            const keys = run[0].slot.group_filters || run[0].slot.filters || [];
             if (run.length === 1) {
-                append(run[0], target, keys);
+                append(run[0], target, run[0].slot.filters);
             } else {
                 const box = document.createElement('div');
                 box.className = 'calc-slot-group';
@@ -197,8 +213,8 @@ const ModulePicker = (() => {
                 head.className = 'calc-slot-filters calc-group-filters';
                 box.appendChild(head);
                 target.appendChild(box);
-                const selects = run.map(e => append(e, box, []));
-                if (keys.length) groupFilters(head, selects, keys); else head.remove();
+                const selects = run.map(e => append(e, box, e.slot.filters.filter(k => !GROUP_FILTERS.includes(k))));
+                groupFilters(head, selects, GROUP_FILTERS);
             }
             i = j;
         }

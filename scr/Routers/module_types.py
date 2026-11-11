@@ -401,6 +401,16 @@ async def move_slot(slot_id: int, data: dict, session: AsyncSession = Depends(db
     return {"ok": True}
 
 
+@mt_calc_router.post("/api/module-type-slots/{slot_id}/copy-group")
+async def copy_slot_group(slot_id: int, session: AsyncSession = Depends(db_helper.session_dependency)):
+    """Копия блока объединённых строк (или одной строки) — сразу за ним."""
+    copies = await crud_module_slots.copy_slot_group(session, slot_id)
+    if copies is None:
+        raise HTTPException(status_code=404, detail="Строка не найдена")
+    await session.commit()
+    return {"ids": [c.id for c in copies]}
+
+
 @mt_calc_router.delete("/api/module-type-slots/{slot_id}")
 async def delete_slot(slot_id: int, session: AsyncSession = Depends(db_helper.session_dependency)):
     if not await crud_module_slots.delete_slot(session, slot_id):

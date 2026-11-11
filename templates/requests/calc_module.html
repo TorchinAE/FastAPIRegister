@@ -303,7 +303,10 @@ function appendSlot(el, slot, item, target, filterKeys) {
         placeholder: '— не выбран —',
         allow: (m, current) => ModulePicker.typeMatch(m, slot.type_ids) || String(m.id) === current,
     });
-    if (filterKeys.length) ModulePicker.slotFilters(row.querySelector('.f-filters'), select, filterKeys);
+    // Свои фильтры строки; несколько типов модулей — ещё фильтр «Тип»
+    if (filterKeys.length || slot.type_ids.length > 1) {
+        ModulePicker.slotFilters(row.querySelector('.f-filters'), select, filterKeys, slot.type_ids.map((id, k) => ({id, name: slot.type_names[k]})));
+    }
     select.addEventListener('change', () => saveSlot(el, row));
     row.querySelector('.f-item-qty').addEventListener('change', () => { if (select.value) saveSlot(el, row); });
     target.appendChild(row);

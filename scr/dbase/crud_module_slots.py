@@ -100,6 +100,66 @@ async def move_slot(session: AsyncSession, slot_id: int, direction: int) -> Modu
     return slot
 
 
+async def copy_slot_group(session: AsyncSession, slot_id: int) -> list[ModuleTypeSlot] | None:
+    """Копия блока объединённых строк (или одной строки) сразу за блоком: настройки строк и их модули
+    во всех шаблонах. Названия — «… (копия)», при совпадении — с номером."""
+    slot = await session.get(ModuleTypeSlot, slot_id)
+    if not slot:
+        return None
+    slots = await get_slots(session, slot.module_type_id)
+    idx = next(i for i, s in enumerate(slots) if s.id == slot_id)
+    start = idx
+    while start > 0 and slots[start].join_prev:
+        start -= 1
+    end = idx + 1
+    while end < len(slots) and slots[end].join_prev:
+        end += 1
+    group = slots[start:end]
+
+    names = {s.name.strip().lower() for s in slots}
+    copies: list[ModuleTypeSlot] = []
+    for i, src in enumerate(group):
+        name, n = f"{src.name} (копия)", 2
+        while name.lower() in names:
+            name, n = f"{src.name} (копия {n})", n + 1
+        names.add(name.lower())
+        copy = ModuleTypeSlot(
+            module_type_id=src.module_type_id,
+            name=name,
+            hidden=src.hidden,
+            filters=src.filters,
+            color=src.color,
+            join_prev=i > 0,
+        )
+        copy.material_types = list(src.material_types)
+        session.add(copy)
+        copies.append(copy)
+    await session.flush()
+
+    # Модули строк в шаблонах по умолчанию
+    defaults = (
+        (await session.execute(select(ModuleTypeDefault).where(ModuleTypeDefault.slot_id.in_([s.id for s in group]))))
+        .scalars()
+        .all()
+    )
+    copy_of = {src.id: copy.id for src, copy in zip(group, copies, strict=True)}
+    for d in defaults:
+        session.add(
+            ModuleTypeDefault(
+                module_type_id=d.module_type_id,
+                template_id=d.template_id,
+                slot_id=copy_of[d.slot_id],
+                module_id=d.module_id,
+                quantity=d.quantity,
+            )
+        )
+    order = slots[:end] + copies + slots[end:]
+    for i, s in enumerate(order, start=1):
+        s.sort_order = i
+    await session.flush()
+    return copies
+
+
 async def delete_slot(session: AsyncSession, slot_id: int) -> ModuleTypeSlot | None:
     """Удаляет строку и её модуль по умолчанию; в расчётах модули строки остаются обычными строками."""
     slot = await session.get(ModuleTypeSlot, slot_id)
@@ -136,8 +196,8 @@ def slot_json(slot: ModuleTypeSlot) -> dict:
 
 
 def slots_json(slots: list[ModuleTypeSlot]) -> list[dict]:
-    """Строки раздела по порядку с блоками объединения: group — id первой строки блока,
-    group_filters — фильтры блока (заданы у первой строки, действуют на все строки блока)."""
+    """Строки раздела по порядку с блоками объединения: group — id первой строки блока
+    (у блока общий фильтр «Ном Ток», остальные фильтры — у каждой строки)."""
     result = []
     head: ModuleTypeSlot | None = None
     for slot in slots:
@@ -145,7 +205,6 @@ def slots_json(slots: list[ModuleTypeSlot]) -> list[dict]:
             head = slot
         data = slot_json(slot)
         data["group"] = head.id
-        data["group_filters"] = head.filters.split(",") if head.filters else []
         result.append(data)
     return result
 

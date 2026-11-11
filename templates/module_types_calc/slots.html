@@ -60,7 +60,7 @@
                 <th title="Не отображать в расчёте, но учитывать в стоимости">Не отображать</th>
                 <th title="Объединить с предыдущей строкой в один блок: фильтры первой строки блока действуют на все его строки">Объединить с предыдущей</th>
                 <th style="width:90px">Порядок</th>
-                <th style="width:50px"></th>
+                <th style="width:80px"></th>
             </tr>
         </thead>
         <tbody id="slotsBody"></tbody>
@@ -72,8 +72,9 @@
     Отмеченные фильтры показываются у строки в шаблонах по умолчанию.
     Цвет строки — подсветка строки в шаблонах по умолчанию и в расчёте.
     Скрытая строка не показывается в расчёте, её модуль всегда берётся из модулей по умолчанию и учитывается в стоимости.
-    «Объединить с предыдущей» — строки подряд образуют один блок: фильтры задаются у первой строки блока и в шаблонах и расчёте
-    показываются один раз над блоком, выбор в них действует на все строки блока.
+    «Объединить с предыдущей» — строки подряд образуют один блок: в шаблонах и расчёте у блока общий фильтр «Ном Ток»,
+    остальные фильтры — у каждой строки. Блок копируется кнопкой у его первой строки (копия — сразу за блоком).
+    Если у строки несколько типов модулей, у неё есть фильтр «Тип».
 </div>
 {% else %}
 <div class="card slot-muted">Нет разделов расчёта с модулями</div>
@@ -129,9 +130,9 @@ function render() {
     body.innerHTML = '';
     slots.forEach((slot, i) => {
         const tr = document.createElement('tr');
-        // Строка блока объединения (не первая): фильтры — как у первой строки блока
+        // Строка блока объединения (не первая); у первой строки блока — кнопка копирования блока
         const joined = i > 0 && slot.join_prev;
-        const headNo = slots.findIndex(s => s.id === slot.group) + 1;
+        const groupSize = slots.filter(s => s.group === slot.group).length;
         tr.className = [slot.hidden ? 'slot-row-hidden' : '', joined ? 'slot-row-joined' : ''].join(' ').trim();
         tr.innerHTML = `
             <td>${i + 1}</td>
@@ -148,7 +149,10 @@ function render() {
                 <button type="button" class="btn btn-ghost btn-sm f-up" title="Выше" ${i === 0 ? 'disabled' : ''}>&uarr;</button>
                 <button type="button" class="btn btn-ghost btn-sm f-down" title="Ниже" ${i === slots.length - 1 ? 'disabled' : ''}>&darr;</button>
             </td>
-            <td><button type="button" class="btn btn-danger btn-sm btn-icon f-del" title="Удалить">&#10005;</button></td>`;
+            <td style="white-space:nowrap;">
+                ${joined ? '' : `<button type="button" class="btn btn-ghost btn-sm btn-icon f-copy" title="${groupSize > 1 ? `Скопировать блок (${groupSize} строки)` : 'Скопировать строку'}: копия встанет сразу за ним">&#10697;</button>`}
+                <button type="button" class="btn btn-danger btn-sm btn-icon f-del" title="Удалить">&#10005;</button>
+            </td>`;
         tr.querySelector('.f-name').addEventListener('change', e => {
             const name = e.target.value.trim();
             if (!name) { e.target.value = slot.name; showToast('Название не может быть пустым'); return; }
@@ -167,9 +171,7 @@ function render() {
                 if (!sameSet(ids, slot.type_ids)) patch(slot, {material_type_ids: ids});
             },
         ));
-        if (joined) {
-            tr.querySelector('.f-filters').innerHTML = `<span class="slot-muted" title="Фильтры блока задаются у первой строки блока">как у строки ${headNo}</span>`;
-        } else tr.querySelector('.f-filters').appendChild(checkList(
+        tr.querySelector('.f-filters').appendChild(checkList(
             filtersSummary(slot), slot.filters.map(k => slotFilters[k] || k).join(', '),
             Object.entries(slotFilters).map(([k, label]) => ({value: k, label, checked: slot.filters.includes(k)})),
             keys => { if (!sameSet(keys, slot.filters)) patch(slot, {filters: keys}); },
@@ -177,6 +179,7 @@ function render() {
         tr.querySelector('.f-up').addEventListener('click', () => move(slot, -1));
         tr.querySelector('.f-down').addEventListener('click', () => move(slot, 1));
         tr.querySelector('.f-del').addEventListener('click', () => removeSlot(slot));
+        if (!joined) tr.querySelector('.f-copy').addEventListener('click', () => copyGroup(slot));
         body.appendChild(tr);
     });
 }
@@ -212,6 +215,12 @@ async function move(slot, direction) {
         body: JSON.stringify({direction}),
     });
     if (resp.ok) reload(); else showToast('Ошибка');
+}
+
+// Копия блока объединённых строк (или одной строки) с настройками и модулями в шаблонах
+async function copyGroup(slot) {
+    const resp = await fetch('/reg/api/module-type-slots/' + slot.id + '/copy-group', {method: 'POST'});
+    if (resp.ok) { await reload(); showToast('Скопировано'); } else showToast('Ошибка копирования');
 }
 
 async function removeSlot(slot) {
