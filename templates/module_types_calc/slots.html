@@ -12,6 +12,8 @@
 .slot-types-list label:hover { background: #f1f5f9; }
 .slot-muted { color: var(--text-muted); }
 .slot-row-hidden td { background: #f8fafc; }
+.slot-row-joined td:first-child { box-shadow: inset 4px 0 0 #a5b4fc; }
+.slot-row-joined td { border-top-style: dashed; }
 </style>
 
 <div class="page-header">
@@ -56,6 +58,7 @@
                 <th title="Фильтры выбора модуля строки в шаблонах по умолчанию">Фильтр модулей</th>
                 <th title="Цвет строки в шаблонах по умолчанию и в расчёте">Цвет</th>
                 <th title="Не отображать в расчёте, но учитывать в стоимости">Не отображать</th>
+                <th title="Объединить с предыдущей строкой в один блок: фильтры первой строки блока действуют на все его строки">Объединить с предыдущей</th>
                 <th style="width:90px">Порядок</th>
                 <th style="width:50px"></th>
             </tr>
@@ -69,6 +72,8 @@
     Отмеченные фильтры показываются у строки в шаблонах по умолчанию.
     Цвет строки — подсветка строки в шаблонах по умолчанию и в расчёте.
     Скрытая строка не показывается в расчёте, её модуль всегда берётся из модулей по умолчанию и учитывается в стоимости.
+    «Объединить с предыдущей» — строки подряд образуют один блок: фильтры задаются у первой строки блока и в шаблонах и расчёте
+    показываются один раз над блоком, выбор в них действует на все строки блока.
 </div>
 {% else %}
 <div class="card slot-muted">Нет разделов расчёта с модулями</div>
@@ -118,13 +123,16 @@ const sameSet = (a, b) => a.length === b.length && a.every(x => b.includes(x));
 function render() {
     const body = document.getElementById('slotsBody');
     if (!slots.length) {
-        body.innerHTML = '<tr><td colspan="8" style="text-align:center;color:var(--text-muted);padding:1.5rem;">Нет обязательных строк</td></tr>';
+        body.innerHTML = '<tr><td colspan="9" style="text-align:center;color:var(--text-muted);padding:1.5rem;">Нет обязательных строк</td></tr>';
         return;
     }
     body.innerHTML = '';
     slots.forEach((slot, i) => {
         const tr = document.createElement('tr');
-        tr.className = slot.hidden ? 'slot-row-hidden' : '';
+        // Строка блока объединения (не первая): фильтры — как у первой строки блока
+        const joined = i > 0 && slot.join_prev;
+        const headNo = slots.findIndex(s => s.id === slot.group) + 1;
+        tr.className = [slot.hidden ? 'slot-row-hidden' : '', joined ? 'slot-row-joined' : ''].join(' ').trim();
         tr.innerHTML = `
             <td>${i + 1}</td>
             <td><input type="text" class="cell-input f-name" value="${esc(slot.name)}" maxlength="200" style="width:100%;min-width:180px;"></td>
@@ -135,6 +143,7 @@ function render() {
                 <button type="button" class="btn btn-ghost btn-sm btn-icon f-color-reset" title="Без подсветки" ${slot.color ? '' : 'disabled'}>&#8856;</button>
             </td>
             <td style="text-align:center"><input type="checkbox" class="f-hidden" ${slot.hidden ? 'checked' : ''}></td>
+            <td style="text-align:center"><input type="checkbox" class="f-join" ${joined ? 'checked' : ''} ${i === 0 ? 'disabled' : ''} title="Объединить с предыдущей строкой"></td>
             <td>
                 <button type="button" class="btn btn-ghost btn-sm f-up" title="Выше" ${i === 0 ? 'disabled' : ''}>&uarr;</button>
                 <button type="button" class="btn btn-ghost btn-sm f-down" title="Ниже" ${i === slots.length - 1 ? 'disabled' : ''}>&darr;</button>
@@ -146,6 +155,7 @@ function render() {
             patch(slot, {name});
         });
         tr.querySelector('.f-hidden').addEventListener('change', e => patch(slot, {hidden: e.target.checked}));
+        tr.querySelector('.f-join').addEventListener('change', e => patch(slot, {join_prev: e.target.checked}));
         tr.querySelector('.f-color').addEventListener('change', e => patch(slot, {color: e.target.value}));
         tr.querySelector('.f-color-reset').addEventListener('click', () => patch(slot, {color: null}));
         if (slot.color) tr.querySelector('td').style.boxShadow = `inset 4px 0 0 ${slot.color}`;
@@ -157,7 +167,9 @@ function render() {
                 if (!sameSet(ids, slot.type_ids)) patch(slot, {material_type_ids: ids});
             },
         ));
-        tr.querySelector('.f-filters').appendChild(checkList(
+        if (joined) {
+            tr.querySelector('.f-filters').innerHTML = `<span class="slot-muted" title="Фильтры блока задаются у первой строки блока">как у строки ${headNo}</span>`;
+        } else tr.querySelector('.f-filters').appendChild(checkList(
             filtersSummary(slot), slot.filters.map(k => slotFilters[k] || k).join(', '),
             Object.entries(slotFilters).map(([k, label]) => ({value: k, label, checked: slot.filters.includes(k)})),
             keys => { if (!sameSet(keys, slot.filters)) patch(slot, {filters: keys}); },
@@ -186,8 +198,7 @@ async function patch(slot, data) {
         body: JSON.stringify(data),
     });
     if (resp.ok) {
-        Object.assign(slot, await resp.json());
-        render();
+        await reload();  // блоки объединения пересчитываются по всем строкам
         showToast('Сохранено');
     } else {
         showToast('Ошибка сохранения');

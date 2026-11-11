@@ -170,6 +170,40 @@ const ModulePicker = (() => {
         return (m.mat_type_ids || []).some(t => typeIds.includes(t));
     }
 
+    // Общие фильтры блока объединённых строк: один набор фильтров на все select блока
+    function groupFilters(container, selects, keys) {
+        const state = {};
+        selects.forEach(s => { configs.get(s).filters = state; });
+        const allowed = modules.filter(m => selects.some(s => configs.get(s).allow(m, '')));
+        container.innerHTML = filtersHtml(keys, allowed);
+        bindFilters(container, state, () => selects.forEach(fill));
+    }
+
+    // Обязательные строки по блокам объединения (подряд идущие с одним slot.group).
+    // entries — [{slot, ...}]; append(entry, target, ownFilters) добавляет строку в target и возвращает её select.
+    // Одиночная строка — свои фильтры (фильтры её блока); блок из нескольких строк — рамка с общими фильтрами сверху.
+    function renderSlotGroups(target, entries, append) {
+        for (let i = 0; i < entries.length;) {
+            let j = i + 1;
+            while (j < entries.length && entries[j].slot.group === entries[i].slot.group) j++;
+            const run = entries.slice(i, j);
+            const keys = run[0].slot.group_filters || run[0].slot.filters || [];
+            if (run.length === 1) {
+                append(run[0], target, keys);
+            } else {
+                const box = document.createElement('div');
+                box.className = 'calc-slot-group';
+                const head = document.createElement('div');
+                head.className = 'calc-slot-filters calc-group-filters';
+                box.appendChild(head);
+                target.appendChild(box);
+                const selects = run.map(e => append(e, box, []));
+                if (keys.length) groupFilters(head, selects, keys); else head.remove();
+            }
+            i = j;
+        }
+    }
+
     function init(data, bar, priceFormatter) {
         modules = data;
         byId = new Map(data.map(m => [m.id, m]));
@@ -177,5 +211,5 @@ const ModulePicker = (() => {
         renderBar(bar);
     }
 
-    return {init, attach, slotFilters, search, refreshAll, color, paint, isZero, typeMatch};
+    return {init, attach, slotFilters, groupFilters, renderSlotGroups, search, refreshAll, color, paint, isZero, typeMatch};
 })();

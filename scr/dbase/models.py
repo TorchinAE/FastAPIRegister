@@ -520,6 +520,8 @@ class ModuleTypeSlot(Base):
     filters: Mapped[str | None] = mapped_column(String(200), nullable=True)
     # Цвет подсветки строки в шаблонах блоков (#rrggbb), None — без подсветки
     color: Mapped[str | None] = mapped_column(String(20), nullable=True)
+    # Объединена с предыдущей строкой в один блок: фильтры блока — у первой строки, действуют на все строки блока
+    join_prev: Mapped[bool] = mapped_column(default=False, server_default="0", nullable=False)
 
     module_type: Mapped["ModuleType"] = relationship(back_populates="slots")
     material_types: Mapped[list["MaterialType"]] = relationship(

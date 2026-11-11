@@ -205,7 +205,11 @@ function renderBlock(data, index, after = null) {
         ModulePicker.search(el.querySelector('.f-module-search'), el.querySelector('.f-module'));
         el.querySelector('.f-name').addEventListener('input', () => scheduleSave(el));
         el.dataset.hiddenTotal = data.hidden_total || 0;
-        data.slots.forEach(s => appendSlot(el, SLOTS[s.slot_id], s.item));
+        ModulePicker.renderSlotGroups(
+            el.querySelector('.f-slots'),
+            data.slots.map(s => ({slot: SLOTS[s.slot_id], item: s.item})),
+            (e, target, keys) => appendSlot(el, e.slot, e.item, target, keys),
+        );
         data.items.forEach(item => appendItem(el, item));
         el.querySelector('.f-add-module').addEventListener('click', () => addModule(el));
     } else {
@@ -271,7 +275,7 @@ function appendItem(el, item) {
 }
 
 // Обязательная строка: название, количество, фильтры строки и выбор модуля подходящего типа (как в шаблонах)
-function appendSlot(el, slot, item) {
+function appendSlot(el, slot, item, target, filterKeys) {
     const row = document.createElement('div');
     row.className = 'calc-item calc-slot';
     row.dataset.slotId = slot.id;
@@ -299,11 +303,12 @@ function appendSlot(el, slot, item) {
         placeholder: '— не выбран —',
         allow: (m, current) => ModulePicker.typeMatch(m, slot.type_ids) || String(m.id) === current,
     });
-    if (slot.filters.length) ModulePicker.slotFilters(row.querySelector('.f-filters'), select, slot.filters);
+    if (filterKeys.length) ModulePicker.slotFilters(row.querySelector('.f-filters'), select, filterKeys);
     select.addEventListener('change', () => saveSlot(el, row));
     row.querySelector('.f-item-qty').addEventListener('change', () => { if (select.value) saveSlot(el, row); });
-    el.querySelector('.f-slots').appendChild(row);
+    target.appendChild(row);
     setSlotItem(row, item);
+    return select;
 }
 
 function setSlotItem(row, item) {

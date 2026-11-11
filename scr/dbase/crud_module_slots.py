@@ -78,6 +78,8 @@ async def update_slot(session: AsyncSession, slot_id: int, data: ModuleTypeSlotU
         slot.filters = _filters(data.filters)
     if "color" in data.model_fields_set:
         slot.color = data.color or None
+    if data.join_prev is not None:
+        slot.join_prev = data.join_prev
     await session.flush()
     return slot
 
@@ -127,9 +129,25 @@ def slot_json(slot: ModuleTypeSlot) -> dict:
         "hidden": bool(slot.hidden),
         "filters": slot.filters.split(",") if slot.filters else [],
         "color": slot.color,
+        "join_prev": bool(slot.join_prev),
         "type_ids": [t.id for t in slot.material_types],
         "type_names": [t.name for t in slot.material_types],
     }
+
+
+def slots_json(slots: list[ModuleTypeSlot]) -> list[dict]:
+    """Строки раздела по порядку с блоками объединения: group — id первой строки блока,
+    group_filters — фильтры блока (заданы у первой строки, действуют на все строки блока)."""
+    result = []
+    head: ModuleTypeSlot | None = None
+    for slot in slots:
+        if head is None or not slot.join_prev:
+            head = slot
+        data = slot_json(slot)
+        data["group"] = head.id
+        data["group_filters"] = head.filters.split(",") if head.filters else []
+        result.append(data)
+    return result
 
 
 def order_by_slots(items: list, slots: list[ModuleTypeSlot]) -> list:

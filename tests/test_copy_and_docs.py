@@ -246,3 +246,29 @@ async def test_module_attrs_keep_decimal_comma(db_session):
     attrs = (await crud_modules.get_module_attrs(db_session))[mod.id]
     assert attrs["accuracy_class"] == "0,2S; 0,5/10P"
     assert attrs["voltage"] == "0,4"
+
+
+async def test_slot_groups_share_first_slot_filters(client, db_session):
+    """Строки, объединённые с предыдущей, — один блок: фильтры блока берутся у первой строки."""
+    ids = await _setup(db_session, "h", "sho-h")
+    mt = ids["mt"]
+    db_session.add_all(
+        [
+            ModuleTypeSlot(module_type_id=mt, name="Автомат 2", sort_order=2),
+            ModuleTypeSlot(module_type_id=mt, name="Автомат 3", sort_order=3),
+            ModuleTypeSlot(module_type_id=mt, name="Корпус", sort_order=4),
+        ]
+    )
+    await db_session.commit()
+    slots = (await client.get(f"/reg/api/module-types/{mt}/slots")).json()
+    first, second, third, fourth = slots
+    assert (
+        await client.patch(f"/reg/api/module-type-slots/{first['id']}", json={"filters": ["nom_tok"]})
+    ).status_code == 200
+    for s in (second, third):
+        resp = await client.patch(f"/reg/api/module-type-slots/{s['id']}", json={"join_prev": True})
+        assert resp.json()["join_prev"] is True
+
+    slots = (await client.get(f"/reg/api/module-types/{mt}/slots")).json()
+    assert [s["group"] for s in slots] == [first["id"]] * 3 + [fourth["id"]]
+    assert [s["group_filters"] for s in slots] == [["nom_tok"]] * 3 + [[]]

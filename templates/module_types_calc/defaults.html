@@ -129,7 +129,11 @@ function renderTemplate(tpl, after = null) {
             <button type="button" class="btn btn-excel-outline btn-sm f-import">Excel ↑</button>
         </div>`;
 
-    SLOTS.forEach(slot => appendSlot(el, slot, tpl.slots[slot.id]));
+    ModulePicker.renderSlotGroups(
+        el.querySelector('.f-slots'),
+        SLOTS.map(slot => ({slot, value: tpl.slots[slot.id]})),
+        (e, target, keys) => appendSlot(el, e.slot, e.value, target, keys),
+    );
     renderItems(el, tpl.items);
     ModulePicker.attach(el.querySelector('.f-module'));
     ModulePicker.search(el.querySelector('.f-module-search'), el.querySelector('.f-module'));
@@ -156,7 +160,7 @@ function renderTemplate(tpl, after = null) {
 }
 
 // Обязательная строка шаблона: название, количество, фильтры строки и выбор модуля подходящего типа
-function appendSlot(el, slot, value) {
+function appendSlot(el, slot, value, target, filterKeys) {
     const row = document.createElement('div');
     row.className = 'calc-item calc-slot';
     paintSlot(row, slot);
@@ -182,7 +186,7 @@ function appendSlot(el, slot, value) {
         placeholder: '— не выбран —',
         allow: (m, current) => ModulePicker.typeMatch(m, slot.type_ids) || String(m.id) === current,
     });
-    if (slot.filters.length) ModulePicker.slotFilters(row.querySelector('.f-filters'), select, slot.filters);
+    if (filterKeys.length) ModulePicker.slotFilters(row.querySelector('.f-filters'), select, filterKeys);
     const qtyEl = row.querySelector('.f-item-qty');
     let saved = {module_id: value ? value.module_id : null, quantity: value ? value.quantity : 1};
     const save = async () => {
@@ -204,7 +208,8 @@ function appendSlot(el, slot, value) {
     };
     select.addEventListener('change', save);
     qtyEl.addEventListener('change', () => { if (select.value) save(); else recalc(el); });
-    el.querySelector('.f-slots').appendChild(row);
+    target.appendChild(row);
+    return select;
 }
 
 // Цвет обязательной строки (задаётся в «Обязательных строках») — фон строки

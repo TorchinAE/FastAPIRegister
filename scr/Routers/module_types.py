@@ -364,7 +364,7 @@ async def _slot_or_404(session: AsyncSession, slot_id: int):
 
 @mt_calc_router.get("/api/module-types/{type_id}/slots")
 async def list_slots(type_id: int, session: AsyncSession = Depends(db_helper.session_dependency)):
-    return [crud_module_slots.slot_json(s) for s in await crud_module_slots.get_slots(session, type_id)]
+    return crud_module_slots.slots_json(await crud_module_slots.get_slots(session, type_id))
 
 
 @mt_calc_router.post("/api/module-types/{type_id}/slots")

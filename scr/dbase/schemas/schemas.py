@@ -844,6 +844,8 @@ class ModuleTypeSlotUpdateSchema(BaseModel):
     filters: list[str] | None = None
     # Цвет строки (#rrggbb); передан null — без подсветки
     color: str | None = Field(None, max_length=20)
+    # Объединить с предыдущей строкой в один блок (общие фильтры)
+    join_prev: bool | None = None
 
 
 class SlotModuleSchema(BaseModel):
