@@ -225,3 +225,24 @@ async def test_empty_block_with_hidden_slot_filled_from_template(db_session):
     got = sorted((it.slot_id, it.quantity) for it in calcs[0].items)
     assert got == sorted([(ids["slot"], 1), (hidden.id, 3)])
     assert float(calcs[0].total_cost) == 400
+
+
+async def test_module_attrs_keep_decimal_comma(db_session):
+    """Класс точности «0,5/10P» не режется по запятой: несколько значений — через «; »."""
+    from scr.dbase import crud_modules
+
+    mod = Module(name="ТТ запятая")
+    m1 = Material(name="ТТ мат 1", price=1, accuracy_class="0,5/10P", voltage="0,4")
+    m2 = Material(name="ТТ мат 2", price=1, accuracy_class="0,2S")
+    db_session.add_all([mod, m1, m2])
+    await db_session.flush()
+    db_session.add_all(
+        [
+            ModuleItem(module_id=mod.id, material_id=m1.id, quantity=1),
+            ModuleItem(module_id=mod.id, material_id=m2.id, quantity=1),
+        ]
+    )
+    await db_session.commit()
+    attrs = (await crud_modules.get_module_attrs(db_session))[mod.id]
+    assert attrs["accuracy_class"] == "0,2S; 0,5/10P"
+    assert attrs["voltage"] == "0,4"

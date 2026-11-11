@@ -16,7 +16,8 @@ const ModulePicker = (() => {
     let fmtPrice = v => v;
 
     const esc = s => String(s ?? '').replace(/[&<>"']/g, c => ({'&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;'}[c]));
-    const split = s => String(s || '').split(',').map(x => x.trim()).filter(Boolean);
+    // Несколько значений характеристики — через «;» (запятая — десятичная: 0,5/10P, 0,4)
+    const split = s => String(s || '').split(';').map(x => x.trim()).filter(Boolean);
 
     // Тёмный фон — белый текст
     function textColor(hex) {

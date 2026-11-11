@@ -319,6 +319,9 @@ async def fill_material_types(session: AsyncSession) -> None:
 
 # ── Характеристики модулей (из материалов состава) для фильтров и сортировки ──
 
+# Разделитель нескольких значений характеристики модуля (запятая — десятичная в «0,5/10P»)
+ATTR_SEP = "; "
+
 MODULE_FLAGS = ("stats", "vtych", "vykat", "ruchn", "el_priv")
 
 
@@ -364,8 +367,9 @@ async def get_module_attrs(session: AsyncSession) -> dict[int, dict]:
         rows = own or rows
         data = {
             "mat_type_ids": mat_types,
-            "voltage": ", ".join(sorted({r[2] for r in rows if r[2]})),
-            "accuracy_class": ", ".join(sorted({r[3] for r in rows if r[3]})),
+            # Через «; »: в значениях бывает десятичная запятая (0,5/10P, 0,4 кВ)
+            "voltage": ATTR_SEP.join(sorted({r[2] for r in rows if r[2]})),
+            "accuracy_class": ATTR_SEP.join(sorted({r[3] for r in rows if r[3]})),
         }
         for i, flag in enumerate(MODULE_FLAGS):
             data[flag] = any(r[4 + i] for r in rows)
@@ -388,7 +392,7 @@ async def sort_modules(session: AsyncSession, modules: list[Module], attrs: dict
 
     def key(m: Module):
         acc = attrs.get(m.id, {}).get("accuracy_class", "")
-        first = acc.split(", ")[0] if acc else ""
+        first = acc.split(ATTR_SEP)[0] if acc else ""
         return (m.nom_tok or 0, first != "", order.get(first, len(order)), first, m.name.lower())
 
     return sorted(modules, key=key)
