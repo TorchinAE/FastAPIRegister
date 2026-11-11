@@ -348,10 +348,10 @@ form { background: var(--surface); padding: 1.5rem; border-radius: var(--radius)
 .calc-slot { padding-right: 0.45rem; border-color: #dfe5f7; background: #f6f8fe; }
 .calc-slot.empty { background: #fff; border-style: dashed; }
 .calc-slot-name { font-size: 0.72rem; font-weight: 600; color: #4338ca; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
-.calc-slot-filters { display: flex; flex-wrap: nowrap; align-items: flex-end; gap: 0.3rem; margin: 0.15rem 0; min-width: 0; }
-/* фильтры строки — в один ряд: поля сжимаются под ширину блока */
-.calc-slot-filters .mp-filter { flex: 1 1 0; min-width: 0; }
-.calc-slot-filters .calc-item-qty { flex: 0 0 auto; }
+/* количество — отдельной строкой, фильтры строки — не более 2 в ряд */
+.calc-slot-filters { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); align-items: end; gap: 0.25rem 0.4rem; margin: 0.15rem 0; min-width: 0; }
+.calc-slot-filters .mp-filter { min-width: 0; }
+.calc-slot-filters .calc-item-qty { grid-column: 1 / -1; }
 .calc-slot-filters .f-filters { display: contents; }
 .calc-slot select { width: 100%; min-width: 0; margin: 0.15rem 0; padding: 0.15rem 0.25rem; font-size: 0.78rem; border: 1px solid #e2e8f0; border-radius: 4px; background: #fff; }
 .calc-items-total { font-size: 0.8rem; text-align: right; color: var(--text-muted); }
