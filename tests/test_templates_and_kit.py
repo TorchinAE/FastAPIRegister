@@ -62,7 +62,8 @@ async def test_templates_and_block_from_template(client, db_session):
         f"/reg/api/module-types/{ids['mt']}/templates", json={"name": "ЩО сх1", "copy_from": main_id}
     )
     tpl = resp.json()
-    assert tpl["slots"][str(ids["breaker"])]["module_id"] == ids["m1"]
+    by_slot = {e["slot_id"]: e["value"] for e in tpl["slots"] if e["copy_no"] == 0}
+    assert by_slot[ids["breaker"]]["module_id"] == ids["m1"]
     await client.patch(f"/reg/api/module-type-templates/{tpl['id']}", json={"purpose": "Ввод"})
     resp = await client.put(
         f"/reg/api/module-type-slots/{ids['breaker']}/default",

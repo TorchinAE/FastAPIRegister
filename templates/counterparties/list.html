@@ -7,7 +7,7 @@
         <span class="subtitle">Всего: {{ total }}</span>
     </div>
 </div>
-<form method="post" action="/reg/counterparties" style="display:flex; gap:0.75rem; align-items:flex-end; margin-bottom:1rem; padding:1rem 1.25rem; flex-wrap:wrap;">
+<form method="post" action="/reg/counterparties" id="cpAddForm" style="display:flex; gap:0.75rem; align-items:flex-end; margin-bottom:1rem; padding:1rem 1.25rem; flex-wrap:wrap;">
     <div class="form-group" style="flex:2; min-width:180px; margin-bottom:0;">
         <label>Имя</label>
         <input type="text" name="name" placeholder="Название контрагента" required>
@@ -20,14 +20,18 @@
         <label>Телефон</label>
         <input type="text" name="phone" placeholder="+7...">
     </div>
-    <div class="form-group" style="flex:1; min-width:140px; margin-bottom:0;">
+    <div class="form-group" style="flex:2; min-width:220px; margin-bottom:0;">
         <label>Компания</label>
-        <select name="company_id" required>
-            <option value="">-- выбрать --</option>
-            {% for c in companies %}
-            <option value="{{ c.id }}">{{ c.name }}</option>
-            {% endfor %}
-        </select>
+        <div style="display:flex; gap:0.35rem;">
+            <input type="search" id="companyFilter" placeholder="Фильтр…" title="Фильтр компаний по названию" style="flex:0 0 9rem;">
+            <select name="company_id" id="companySelect" required style="flex:1; min-width:0;">
+                <option value="">-- выбрать --</option>
+                {% for c in companies %}
+                <option value="{{ c.id }}">{{ c.name }}</option>
+                {% endfor %}
+            </select>
+            <button type="button" class="btn btn-success btn-icon" onclick="newCompany()" title="Новая компания: после создания вернётся сюда и подставится в поле" style="flex-shrink:0;">+</button>
+        </div>
     </div>
     <button type="submit" class="btn btn-success" style="height:38px;">Добавить контрагента</button>
 </form>
@@ -66,9 +70,49 @@
 
 {% block scripts %}
 <script>
+// Фильтр компаний: скрываются несовпадающие, единственная подходящая — выбирается
+const companySelect = document.getElementById('companySelect');
+const companyFilter = document.getElementById('companyFilter');
+companyFilter.addEventListener('input', () => {
+    const text = companyFilter.value.trim().toLowerCase();
+    const shown = [];
+    Array.from(companySelect.options).forEach(opt => {
+        if (!opt.value) return;
+        const ok = !text || opt.text.toLowerCase().includes(text);
+        opt.hidden = !ok;
+        if (ok) shown.push(opt);
+    });
+    if (shown.length === 1) companySelect.value = shown[0].value;
+    else if (companySelect.selectedOptions[0] && companySelect.selectedOptions[0].hidden) companySelect.value = '';
+});
+
+// Новая компания: введённые данные контрагента сохраняются, после создания компании — возврат сюда
+const DRAFT_KEY = 'cp-add-draft';
+const draftFields = ['name', 'email', 'phone'];
+function newCompany() {
+    const form = document.getElementById('cpAddForm');
+    const draft = Object.fromEntries(draftFields.map(f => [f, form.elements[f].value]));
+    try { sessionStorage.setItem(DRAFT_KEY, JSON.stringify(draft)); } catch (e) { /* хранилище недоступно */ }
+    location.href = '/reg/companies/create?back_to=' + encodeURIComponent('/reg/counterparties');
+}
+(function restoreDraft() {
+    const params = new URLSearchParams(location.search);
+    const companyId = params.get('company_id');
+    if (!companyId) return;
+    const form = document.getElementById('cpAddForm');
+    try {
+        const draft = JSON.parse(sessionStorage.getItem(DRAFT_KEY) || 'null');
+        if (draft) draftFields.forEach(f => { if (draft[f]) form.elements[f].value = draft[f]; });
+        sessionStorage.removeItem(DRAFT_KEY);
+    } catch (e) { /* хранилище недоступно */ }
+    companySelect.value = companyId;
+    history.replaceState(null, '', location.pathname);
+    form.elements.name.focus();
+})();
+
 async function deleteCp(id, btn) {
     if (!confirm('Удалить контрагента?')) return;
-    const resp = await fetch(`/counterparties/${id}/delete`, {method: 'DELETE'});
+    const resp = await fetch(`/reg/counterparties/${id}/delete`, {method: 'DELETE'});
     if (resp.ok) { btn.closest('tr').remove(); showToast('Удалён'); } else { showToast('Ошибка удаления'); }
 }
 function showToast(msg) {

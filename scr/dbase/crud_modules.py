@@ -379,16 +379,11 @@ async def get_module_attrs(session: AsyncSession) -> dict[int, dict]:
 
 async def sort_modules(session: AsyncSession, modules: list[Module], attrs: dict[int, dict] | None = None) -> list:
     """Порядок модулей: ном. ток, класс точности (по справочнику), название."""
-    from scr.dbase.models import AccuracyClass
+    from scr.dbase.crud_accuracy_classes import get_names
 
     if attrs is None:
         attrs = await get_module_attrs(session)
-    order = {
-        name: i
-        for i, name in enumerate(
-            (await session.execute(select(AccuracyClass.name).order_by(AccuracyClass.name))).scalars().all()
-        )
-    }
+    order = {name: i for i, name in enumerate(await get_names(session))}
 
     def key(m: Module):
         acc = attrs.get(m.id, {}).get("accuracy_class", "")

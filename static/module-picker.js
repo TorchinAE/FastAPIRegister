@@ -108,7 +108,9 @@ const ModulePicker = (() => {
 
     function distinct(values, numeric) {
         const list = [...new Set(values.filter(v => v !== '' && v !== null && v !== undefined && v !== 0))];
-        return numeric ? list.sort((a, b) => a - b) : list.sort((a, b) => String(a).localeCompare(String(b), 'ru'));
+        // По возрастанию, числа внутри строк — как числа: 0,2 < 0,5 < 1 < 3 < 5P < 10P
+        return numeric ? list.sort((a, b) => a - b)
+            : list.sort((a, b) => String(a).localeCompare(String(b), 'ru', {numeric: true}));
     }
 
     // Значения фильтра из списка модулей; null — флаг (✓/✗)
@@ -196,34 +198,51 @@ const ModulePicker = (() => {
     // Общий фильтр блока объединённых строк
     const GROUP_FILTERS = ['nom_tok'];
 
-    // Обязательные строки по блокам объединения (подряд идущие с одним slot.group).
-    // entries — [{slot, ...}]; append(entry, target, ownFilters) добавляет строку в target и возвращает её select.
+    // Название строки копии блока: «Выключатель 2» (номер блока; сама строка — без номера)
+    const slotLabel = (name, copyNo) => copyNo ? `${name} ${copyNo + 1}` : name;
+
+    // Обязательные строки по блокам объединения (подряд идущие с одним group: «{первая строка}:{копия}»;
+    // без group — slot.group). entries — [{slot, copy_no, group, ...}];
+    // append(entry, target, ownFilters) добавляет строку в target и возвращает её select.
     // Блок из нескольких строк — рамка с общим фильтром «Ном Ток» сверху, остальные фильтры — у каждой строки.
-    // onCopy(slot первой строки) — кнопка «Копировать блок» в шапке блока
-    function renderSlotGroups(target, entries, append, onCopy = null) {
+    // Копия блока (copy_no > 0) — тоже в рамке, с кнопкой удаления копии.
+    // onCopy(slot первой строки, copy_no) — «Копировать блок»; onDeleteCopy(slot, copy_no) — «Удалить копию»
+    function renderSlotGroups(target, entries, append, onCopy = null, onDeleteCopy = null) {
+        const key = e => e.group ?? e.slot.group;
         for (let i = 0; i < entries.length;) {
             let j = i + 1;
-            while (j < entries.length && entries[j].slot.group === entries[i].slot.group) j++;
+            while (j < entries.length && key(entries[j]) === key(entries[i])) j++;
             const run = entries.slice(i, j);
-            if (run.length === 1) {
+            const copyNo = run[0].copy_no || 0;
+            if (run.length === 1 && !copyNo) {
                 append(run[0], target, run[0].slot.filters);
             } else {
                 const box = document.createElement('div');
-                box.className = 'calc-slot-group';
-                if (onCopy) {
+                box.className = 'calc-slot-group' + (copyNo ? ' is-copy' : '');
+                if (onCopy || (copyNo && onDeleteCopy)) {
                     const bar = document.createElement('div');
                     bar.className = 'calc-slot-group-bar';
-                    bar.innerHTML = `<span>Блок строк: ${run.length}</span>
-                        <button type="button" class="btn btn-ghost btn-sm" title="Добавить в раздел копию строк блока сразу за ним">&#10697; Копировать блок</button>`;
-                    bar.querySelector('button').addEventListener('click', () => onCopy(run[0].slot));
+                    bar.innerHTML = `<span>${copyNo ? 'Копия блока ' + (copyNo + 1) : 'Блок строк: ' + run.length}</span>
+                        <span class="calc-slot-group-actions">
+                        ${onCopy ? '<button type="button" class="btn btn-ghost btn-sm f-group-copy" title="Копия блока строк с модулями — только здесь, «Обязательные строки» не меняются">&#10697; Копировать</button>' : ''}
+                        ${copyNo && onDeleteCopy ? '<button type="button" class="btn btn-ghost btn-sm f-group-del" title="Удалить копию блока с её модулями">&#10005;</button>' : ''}
+                        </span>`;
+                    const copyBtn = bar.querySelector('.f-group-copy');
+                    if (copyBtn) copyBtn.addEventListener('click', () => onCopy(run[0].slot, copyNo));
+                    const delBtn = bar.querySelector('.f-group-del');
+                    if (delBtn) delBtn.addEventListener('click', () => onDeleteCopy(run[0].slot, copyNo));
                     box.appendChild(bar);
                 }
-                const head = document.createElement('div');
-                head.className = 'calc-slot-filters calc-group-filters';
-                box.appendChild(head);
                 target.appendChild(box);
-                const selects = run.map(e => append(e, box, e.slot.filters.filter(k => !GROUP_FILTERS.includes(k))));
-                groupFilters(head, selects, GROUP_FILTERS);
+                if (run.length === 1) {
+                    append(run[0], box, run[0].slot.filters);
+                } else {
+                    const head = document.createElement('div');
+                    head.className = 'calc-slot-filters calc-group-filters';
+                    box.appendChild(head);
+                    const selects = run.map(e => append(e, box, e.slot.filters.filter(k => !GROUP_FILTERS.includes(k))));
+                    groupFilters(head, selects, GROUP_FILTERS);
+                }
             }
             i = j;
         }
@@ -236,5 +255,5 @@ const ModulePicker = (() => {
         renderBar(bar);
     }
 
-    return {init, attach, slotFilters, groupFilters, renderSlotGroups, search, refreshAll, color, paint, isZero, typeMatch};
+    return {init, attach, slotFilters, groupFilters, renderSlotGroups, slotLabel, search, refreshAll, color, paint, isZero, typeMatch};
 })();

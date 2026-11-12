@@ -107,7 +107,7 @@ async def build_request_kso204(session: AsyncSession, req: Request) -> tuple[byt
                 # Скрытая строка восстанавливается из «по умолчанию» — в «Дополнительно» не пишем
                 continue
             else:
-                block.slots.append((slot.name, name, it.quantity))
+                block.slots.append((crud_module_slots.slot_label(slot.name, it.copy_no or 0), name, it.quantity))
         blocks.append(block)
     header = _header(req)
     header.bus_current = max((it.module.nom_tok or 0 for c in calcs for it in c.items if it.module), default=0) or None

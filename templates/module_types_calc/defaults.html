@@ -66,6 +66,7 @@
 <script>
 const typeId = {{ mt.id }};
 const SLOTS = {{ slots | tojson }};
+const SLOT_BY_ID = Object.fromEntries(SLOTS.map(s => [s.id, s]));
 const PURPOSES = {{ purposes | tojson }};
 const modulesData = {{ modules_data | tojson }};
 const tplsEl = document.getElementById('templates');
@@ -131,9 +132,11 @@ function renderTemplate(tpl, after = null) {
 
     ModulePicker.renderSlotGroups(
         el.querySelector('.f-slots'),
-        SLOTS.map(slot => ({slot, value: tpl.slots[slot.id]})),
-        (e, target, keys) => appendSlot(el, e.slot, e.value, target, keys),
-        slot => copySlotGroup(slot),
+        tpl.slots.filter(e => SLOT_BY_ID[e.slot_id])
+            .map(e => ({slot: SLOT_BY_ID[e.slot_id], copy_no: e.copy_no, group: e.group, value: e.value})),
+        (e, target, keys) => appendSlot(el, e.slot, e.value, target, keys, e.copy_no),
+        (slot, copyNo) => copySlotGroup(el, slot, copyNo),
+        (slot, copyNo) => deleteSlotCopy(el, slot, copyNo),
     );
     renderItems(el, tpl.items);
     ModulePicker.attach(el.querySelector('.f-module'));
@@ -160,24 +163,21 @@ function renderTemplate(tpl, after = null) {
     return el;
 }
 
-// Обязательная строка шаблона: название, количество, фильтры строки и выбор модуля подходящего типа
-function appendSlot(el, slot, value, target, filterKeys) {
+// Обязательная строка шаблона: название; фильтры строки (по 2 в ряд); количество и модуль подходящего типа
+// в одну строку; под ними — «кол-во × цена = сумма». copyNo — строка копии блока строк этого шаблона
+function appendSlot(el, slot, value, target, filterKeys, copyNo = 0) {
     const row = document.createElement('div');
     row.className = 'calc-item calc-slot';
     paintSlot(row, slot);
+    const label = ModulePicker.slotLabel(slot.name, copyNo);
     row.innerHTML = `
-        <div class="calc-item-main">
-            <div class="calc-slot-name" title="${esc(slot.type_names.join(', '))}">${esc(slot.name)}${slot.hidden ? ' · скрыта' : ''}</div>
-            <div class="calc-slot-filters">
-                <div class="calc-item-qty"><input type="number" class="f-item-qty" min="1" value="${value ? value.quantity : 1}"> шт.</div>
-                <span class="f-filters"></span>
-            </div>
+        <div class="calc-slot-name" title="${esc(slot.type_names.join(', '))}">${esc(label)}${slot.hidden ? ' · скрыта' : ''}</div>
+        <div class="calc-slot-filters"><span class="f-filters"></span></div>
+        <div class="calc-slot-pick">
+            <div class="calc-item-qty"><input type="number" class="f-item-qty" min="1" value="${value ? value.quantity : 1}" title="Количество, шт."><span>шт.</span></div>
             <select class="f-slot-module"><option value="">— не выбран —</option></select>
         </div>
-        <div class="calc-item-side">
-            <div class="calc-item-price"></div>
-            <div class="calc-item-sum"></div>
-        </div>`;
+        <div class="calc-slot-sum"><span class="calc-item-price"></span><span class="calc-item-sum"></span></div>`;
     const select = row.querySelector('.f-slot-module');
     if (value) {
         select.add(new Option('', value.module_id));
@@ -198,6 +198,7 @@ function appendSlot(el, slot, value, target, filterKeys) {
             module_id: parseInt(select.value) || null,
             quantity: Math.max(1, parseInt(qtyEl.value) || 1),
             template_id: parseInt(el.dataset.id),
+            copy_no: copyNo || 0,
         };
         const data = await api(`/reg/api/module-type-slots/${slot.id}/default`, 'PUT', body);
         if (data) {
@@ -264,7 +265,8 @@ function recalc(el) {
         const price = select ? modulePrice(parseInt(select.value)) : parseFloat(row.dataset.price) || 0;
         const qty = parseInt(row.querySelector('.f-item-qty').value) || 0;
         const has = select ? !!select.value : true;
-        row.querySelector('.calc-item-price').textContent = has ? formatFinancial(price) : '';
+        // Строка шаблона — «кол-во × цена за ед.», добавленный модуль — цена за ед.
+        row.querySelector('.calc-item-price').textContent = !has ? '' : select ? `${qty} × ${formatFinancial(price)}` : formatFinancial(price);
         row.querySelector('.calc-item-sum').textContent = has ? '= ' + formatFinancial(price * qty) : '';
         if (select) {
             row.classList.toggle('empty', !has);
@@ -318,10 +320,23 @@ async function copyTemplate(el) {
     }
 }
 
-// Копия блока объединённых строк: строки с модулями во всех шаблонах раздела; страница перезагружается
-async function copySlotGroup(slot) {
-    if (!confirm('Добавить в раздел копию строк этого блока? Новые строки появятся во всех шаблонах и расчётах раздела.')) return;
-    if (await api(`/reg/api/module-type-slots/${slot.id}/copy-group`, 'POST')) location.reload();
+// Шаблон изменён на сервере — перерисовать на месте
+function replaceTemplate(el, tpl) {
+    const fresh = renderTemplate(tpl, el);
+    el.remove();
+    setStatus(fresh, '✓ сохранено', 'ok');
+}
+
+// Копия блока строк с модулями — только в этом шаблоне («Обязательные строки» и расчёты не меняются)
+async function copySlotGroup(el, slot, copyNo) {
+    const tpl = await api(`/reg/api/module-type-templates/${el.dataset.id}/slot-copies`, 'POST', {slot_id: slot.id, copy_no: copyNo || 0});
+    if (tpl) { replaceTemplate(el, tpl); showToast('Блок строк скопирован'); }
+}
+
+async function deleteSlotCopy(el, slot, copyNo) {
+    if (!confirm('Удалить копию блока строк вместе с её модулями?')) return;
+    const tpl = await api(`/reg/api/module-type-templates/${el.dataset.id}/slot-copies?slot_id=${slot.id}&copy_no=${copyNo}`, 'DELETE');
+    if (tpl) { replaceTemplate(el, tpl); showToast('Копия блока удалена'); }
 }
 
 async function deleteTemplate(el) {
@@ -353,6 +368,7 @@ function showToast(msg) {
     showToast.timer = setTimeout(() => t.style.display = 'none', 2500);
 }
 
-{{ tpls | tojson }}.forEach(renderTemplate);
+// Только шаблон: forEach передал бы индекс вторым аргументом (after) — со второго шаблона рендер падал
+{{ tpls | tojson }}.forEach(tpl => renderTemplate(tpl));
 </script>
 {% endblock %}

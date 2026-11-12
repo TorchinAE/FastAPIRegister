@@ -1,7 +1,7 @@
 from datetime import date as Date
 from datetime import datetime
 
-from pydantic import BaseModel, ConfigDict, Field
+from pydantic import BaseModel, ConfigDict, Field, field_validator
 
 from scr.dbase.models import RequestStatus
 
@@ -234,6 +234,13 @@ class MaterialCreateSchema(BaseModel):
     voltage: str | None = None
     unit: str = Field("шт", min_length=1, max_length=20)
     accuracy_class: str | None = Field(None, max_length=20)
+
+    @field_validator("accuracy_class")
+    @classmethod
+    def _accuracy_comma(cls, v: str | None) -> str | None:
+        # Десятичная запятая: 0.5S → 0,5S
+        return v.strip().replace(".", ",") if v else v
+
     stats: bool = True
     vtych: bool = False
     vykat: bool = False
@@ -262,6 +269,13 @@ class MaterialUpdateSchema(BaseModel):
     voltage: str | None = None
     unit: str | None = Field(None, min_length=1, max_length=20)
     accuracy_class: str | None = Field(None, max_length=20)
+
+    @field_validator("accuracy_class")
+    @classmethod
+    def _accuracy_comma(cls, v: str | None) -> str | None:
+        # Десятичная запятая: 0.5S → 0,5S
+        return v.strip().replace(".", ",") if v else v
+
     stats: bool | None = None
     vtych: bool | None = None
     vykat: bool | None = None
@@ -855,6 +869,15 @@ class SlotModuleSchema(BaseModel):
     quantity: int = Field(1, ge=1)
     # Шаблон блока («по умолчанию»); None — основной шаблон раздела
     template_id: int | None = None
+    # Копия блока строк в блоке расчёта / шаблоне: 0 — сама строка
+    copy_no: int = Field(0, ge=0)
+
+
+class SlotCopySchema(BaseModel):
+    """Копия блока строк в блоке расчёта / шаблоне: строка блока и номер экземпляра (0 — сам блок)"""
+
+    slot_id: int
+    copy_no: int = Field(0, ge=0)
 
 
 class ModuleTypeTemplateCreateSchema(BaseModel):

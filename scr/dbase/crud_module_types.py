@@ -229,17 +229,28 @@ async def create_calc(
     return calc
 
 
-async def _add_template_items(session: AsyncSession, calc: RequestCalc, tpl, filled: set[int] = frozenset()) -> None:
-    """Состав блока — модули шаблона: обязательные строки и добавленные модули.
-    filled — строки, уже заполненные в блоке (скрытые строки после sync_hidden_slots), не трогаются."""
-    from scr.dbase.crud_module_slots import get_slots
+async def _add_template_items(
+    session: AsyncSession, calc: RequestCalc, tpl, filled: set[tuple[int, int]] = frozenset()
+) -> None:
+    """Состав блока — модули шаблона: обязательные строки (с копиями блоков строк шаблона) и добавленные модули.
+    filled — строки (slot_id, copy_no), уже заполненные в блоке (скрытые строки после sync_hidden_slots)."""
+    from scr.dbase.crud_module_slots import get_copies, get_slots, set_copies
 
     slot_ids = {s.id for s in await get_slots(session, calc.module_type_id)}
     for d in tpl.defaults:
         slot_id = d.slot_id if d.slot_id in slot_ids else None
-        if slot_id is not None and slot_id in filled:
+        copy_no = (d.copy_no or 0) if slot_id is not None else 0
+        if slot_id is not None and (slot_id, copy_no) in filled:
             continue
-        session.add(RequestCalcItem(calc_id=calc.id, module_id=d.module_id, quantity=d.quantity, slot_id=slot_id))
+        session.add(
+            RequestCalcItem(
+                calc_id=calc.id, module_id=d.module_id, quantity=d.quantity, slot_id=slot_id, copy_no=copy_no
+            )
+        )
+    copies = get_copies(calc)
+    for head, count in get_copies(tpl).items():
+        copies[head] = max(copies.get(head, 0), count)
+    set_copies(calc, copies)
     await session.flush()
 
 
@@ -285,7 +296,8 @@ async def fill_empty_from_template(session: AsyncSession, calcs: list[RequestCal
             calc.name = tpl.name
         if not calc.purpose:
             calc.purpose = tpl.purpose
-        await _add_template_items(session, calc, tpl, {it.slot_id for it in calc.items if it.slot_id is not None})
+        filled = {(it.slot_id, it.copy_no or 0) for it in calc.items if it.slot_id is not None}
+        await _add_template_items(session, calc, tpl, filled)
         session.expire(calc, ["items"])
         calc = await get_calc_by_id(session, calc.id)
         await recalc_calc_totals(session, calc, mod_type)
@@ -303,13 +315,17 @@ async def copy_calc(session: AsyncSession, calc_id: int) -> RequestCalc | None:
     fields = (
         "request_id", "module_type_id", "fot", "overhead", "profitability_percent", "total_cost", "final_price",
         "quantity", "qty_1sh", "qty_2sh", "purpose", "name", "template_id", "works_cost", "fot_manual",
-        "overhead_manual",
+        "overhead_manual", "slot_copies",
     )  # fmt: skip
     copy = RequestCalc(**{f: getattr(src, f) for f in fields})
     session.add(copy)
     await session.flush()
     for it in src.items:
-        session.add(RequestCalcItem(calc_id=copy.id, module_id=it.module_id, quantity=it.quantity, slot_id=it.slot_id))
+        session.add(
+            RequestCalcItem(
+                calc_id=copy.id, module_id=it.module_id, quantity=it.quantity, slot_id=it.slot_id, copy_no=it.copy_no
+            )
+        )
     # Порядок раздела: копия сразу за исходным
     order = []
     for c in siblings:
@@ -412,15 +428,21 @@ def _item_data(it: RequestCalcItem, prices: dict[int, float]) -> dict:
 def calc_block_data(calc: RequestCalc, prices: dict[int, float], default_profit: float, slots: list) -> dict:
     """Данные блока расчёта для страницы.
 
-    slots — обязательные строки раздела: видимые выводятся строками с выбором модуля,
-    скрытые не выводятся, их сумма идёт в hidden_total. items — модули, добавленные вручную.
+    slots — обязательные строки раздела: видимые выводятся строками с выбором модуля (копии блоков строк
+    этого блока — сразу за блоком, copy_no > 0), скрытые не выводятся, их сумма идёт в hidden_total.
+    items — модули, добавленные вручную.
     """
+    from scr.dbase.crud_module_slots import get_copies, slot_entries
+
     profit = float(calc.profitability_percent or 0)
-    by_slot = {it.slot_id: it for it in calc.items if it.slot_id is not None}
     known = {s.id for s in slots}
+    hidden = {s.id for s in slots if s.hidden}
     hidden_total = sum(
-        prices.get(by_slot[s.id].module_id, 0.0) * by_slot[s.id].quantity for s in slots if s.hidden and s.id in by_slot
+        prices.get(it.module_id, 0.0) * it.quantity
+        for it in calc.items
+        if it.slot_id is not None and it.slot_id in hidden
     )
+    entries = slot_entries(slots, get_copies(calc), list(calc.items), include_hidden=False)
     return {
         "id": calc.id,
         "fot": float(calc.fot or 0),
@@ -437,9 +459,8 @@ def calc_block_data(calc: RequestCalc, prices: dict[int, float], default_profit:
         "total_cost": float(calc.total_cost or 0),
         "final_price": float(calc.final_price or 0),
         "slots": [
-            {"slot_id": s.id, "item": _item_data(by_slot[s.id], prices) if s.id in by_slot else None}
-            for s in slots
-            if not s.hidden
+            {"slot_id": s.id, "copy_no": n, "group": group, "item": _item_data(it, prices) if it else None}
+            for s, n, it, group in entries
         ],
         "hidden_total": hidden_total,
         "items": [_item_data(it, prices) for it in calc.items if it.slot_id not in known],

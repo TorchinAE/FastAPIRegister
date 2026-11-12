@@ -218,7 +218,7 @@ async def build_tkp_kit(session: AsyncSession, req: Request) -> list[dict]:
     zero_lines — номера строк lines с модулем с ценой 0 (сам или материал состава), has_zero — такой модуль
     есть в блоке (в т.ч. в скрытой строке).
     """
-    from scr.dbase.crud_module_slots import get_slots, order_by_slots
+    from scr.dbase.crud_module_slots import get_slots, order_by_slots, slot_label
 
     zero = await crud_modules.get_zero_price_modules(session)
 
@@ -269,7 +269,8 @@ async def build_tkp_kit(session: AsyncSession, req: Request) -> list[dict]:
                 name = item.module.name if item.module else f"Модуль {item.module_id}"
                 if is_zero:
                     zero_lines.append(len(lines))
-                lines.append(kit_line(slot.name if slot else None, item.quantity, name))
+                label = slot_label(slot.name, item.copy_no or 0) if slot else None
+                lines.append(kit_line(label, item.quantity, name))
             blocks.append(
                 {
                     "title": title,

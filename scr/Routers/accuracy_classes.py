@@ -30,6 +30,21 @@ async def add_accuracy_class(
     return {"id": obj.id, "name": obj.name}
 
 
+@ac_router.patch("/{class_id}")
+async def rename_accuracy_class(
+    class_id: int, data: AccuracyClassCreateSchema, session: AsyncSession = Depends(db_helper.session_dependency)
+):
+    """Переименование: материалы с этим классом получают новое значение; такой класс уже есть — объединение."""
+    obj = await session.get(AccuracyClass, class_id)
+    if not obj:
+        raise HTTPException(status_code=404, detail="Класс точности не найден")
+    if not crud_accuracy_classes.normalize(data.name):
+        raise HTTPException(status_code=400, detail="Пустое название")
+    obj = await crud_accuracy_classes.rename(session, obj, data.name)
+    await session.commit()
+    return {"id": obj.id, "name": obj.name}
+
+
 @ac_router.delete("/{class_id}")
 async def delete_accuracy_class(class_id: int, session: AsyncSession = Depends(db_helper.session_dependency)):
     obj = await session.get(AccuracyClass, class_id)

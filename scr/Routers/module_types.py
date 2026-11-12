@@ -1,4 +1,5 @@
 import io
+import re
 
 from fastapi import APIRouter, Depends, File, HTTPException, Query, UploadFile
 from openpyxl import Workbook, load_workbook
@@ -23,6 +24,7 @@ from scr.dbase.schemas.schemas import (
     RequestCalcItemUpdateSchema,
     RequestCalcResponseSchema,
     RequestCalcUpdateSchema,
+    SlotCopySchema,
     SlotModuleSchema,
     TemplateItemCreateSchema,
 )
@@ -184,7 +186,9 @@ async def export_defaults_excel(
     tpl = await crud_module_templates.resolve_template(session, type_id, template_id)
     slots = await crud_module_slots.get_slots(session, type_id)
     prices = await crud_modules.get_module_prices(session)
-    by_slot = {d.slot_id: d for d in tpl.defaults if d.slot_id is not None}
+    entries = crud_module_slots.slot_entries(
+        slots, crud_module_slots.get_copies(tpl), [d for d in tpl.defaults if d.slot_id is not None], True
+    )
 
     wb = Workbook()
     ws = wb.active
@@ -195,8 +199,8 @@ async def export_defaults_excel(
     ws.cell(1, 1).font = Font(bold=True, size=14)
     write_header(ws, headers)
     first_row = ws.max_row + 1
-    # Обязательные строки (включая скрытые) по порядку
-    rows = [(s.name, by_slot.get(s.id)) for s in slots]
+    # Обязательные строки (включая скрытые) по порядку, копии блоков строк — «Название N»
+    rows = [(crud_module_slots.slot_label(s.name, n), d) for s, n, d, _ in entries]
     for slot_name, d in rows:
         if d is None:
             ws.append([None, slot_name])
@@ -288,16 +292,23 @@ async def import_defaults_excel(
             skipped.append(f"{mod.name}: количество {qty}")
             continue
         slot_name = cell(row, col_map, "slot")
-        slot = slots.get(str(slot_name).strip().lower()) if slot_name else None
+        key = str(slot_name).strip().lower() if slot_name else ""
+        slot, copy_no = slots.get(key), 0
+        # Строка копии блока строк шаблона: «Название N»
+        copy_match = re.fullmatch(r"(.+) (\d+)", key)
+        if not slot and copy_match and copy_match.group(1) in slots and int(copy_match.group(2)) > 1:
+            slot, copy_no = slots[copy_match.group(1)], int(copy_match.group(2)) - 1
         if not slot:
             skipped.append(f"{mod.name}: нет обязательной строки «{slot_name or ''}»")
             continue
         default_stmt = select(ModuleTypeDefault.id).where(
-            ModuleTypeDefault.slot_id == slot.id, ModuleTypeDefault.template_id == tpl.id
+            ModuleTypeDefault.slot_id == slot.id,
+            ModuleTypeDefault.template_id == tpl.id,
+            ModuleTypeDefault.copy_no == copy_no,
         )
         had_default = (await session.execute(default_stmt)).first() is not None
         try:
-            await crud_module_slots.set_slot_default(session, slot, mod.id, qty, tpl.id)
+            await crud_module_slots.set_slot_default(session, slot, mod.id, qty, tpl.id, copy_no)
         except ValueError as exc:
             skipped.append(f"{mod.name}: {exc}")
             continue
@@ -402,24 +413,12 @@ async def move_slot(slot_id: int, data: dict, session: AsyncSession = Depends(db
 
 
 @mt_calc_router.post("/api/module-type-slots/{slot_id}/copy-group")
-async def copy_slot_group(
-    slot_id: int,
-    calc_id: int | None = Query(None),
-    session: AsyncSession = Depends(db_helper.session_dependency),
-):
-    """Копия блока объединённых строк (или одной строки) — сразу за ним. calc_id — копия из блока расчёта:
-    модули строк этого расчёта копируются в новые строки, стоимость блока пересчитывается."""
-    copies = await crud_module_slots.copy_slot_group(session, slot_id, calc_id)
+async def copy_slot_group(slot_id: int, session: AsyncSession = Depends(db_helper.session_dependency)):
+    """Копия блока объединённых строк (или одной строки) в разделе — сразу за ним (страница «Обязательные строки»).
+    Копия блока в расчёте или шаблоне — /api/request-calcs/{id}/slot-copies, /api/module-type-templates/{id}/slot-copies."""
+    copies = await crud_module_slots.copy_slot_group(session, slot_id)
     if copies is None:
         raise HTTPException(status_code=404, detail="Строка не найдена")
-    if calc_id is not None:
-        calc = await crud_module_types.get_calc_by_id(session, calc_id)
-        if calc:
-            session.expire(calc, ["items"])
-            calc = await crud_module_types.get_calc_by_id(session, calc_id)
-            mod_type = await crud_module_types.get_module_type_by_id(session, calc.module_type_id)
-            await crud_module_types.recalc_calc_totals(session, calc, mod_type)
-            await crud_module_types.recalc_section_cost(session, calc.request_id, calc.module_type_id)
     await session.commit()
     return {"ids": [c.id for c in copies]}
 
@@ -441,7 +440,9 @@ async def set_slot_default(
     """Модуль обязательной строки в шаблоне «по умолчанию» (template_id не задан — в основном)."""
     slot = await _slot_or_404(session, slot_id)
     try:
-        obj = await crud_module_slots.set_slot_default(session, slot, data.module_id, data.quantity, data.template_id)
+        obj = await crud_module_slots.set_slot_default(
+            session, slot, data.module_id, data.quantity, data.template_id, data.copy_no
+        )
     except ValueError as exc:
         raise HTTPException(status_code=400, detail=str(exc)) from exc
     await session.commit()
@@ -527,6 +528,33 @@ async def delete_template(template_id: int, session: AsyncSession = Depends(db_h
     return {"ok": True}
 
 
+@mt_calc_router.post("/api/module-type-templates/{template_id}/slot-copies")
+async def copy_template_slot_group(
+    template_id: int, data: SlotCopySchema, session: AsyncSession = Depends(db_helper.session_dependency)
+):
+    """Копия блока строк только в этом шаблоне (строки раздела не меняются). Возвращает шаблон."""
+    tpl = await _template_or_404(session, template_id)
+    if await crud_module_slots.copy_group_in(session, tpl, data.slot_id, data.copy_no) is None:
+        raise HTTPException(status_code=404, detail="Строка не найдена")
+    await session.commit()
+    return await _template_json(session, template_id)
+
+
+@mt_calc_router.delete("/api/module-type-templates/{template_id}/slot-copies")
+async def delete_template_slot_copy(
+    template_id: int,
+    slot_id: int = Query(...),
+    copy_no: int = Query(..., ge=1),
+    session: AsyncSession = Depends(db_helper.session_dependency),
+):
+    """Удаление копии блока строк шаблона. Возвращает шаблон."""
+    tpl = await _template_or_404(session, template_id)
+    if not await crud_module_slots.delete_group_copy(session, tpl, slot_id, copy_no):
+        raise HTTPException(status_code=404, detail="Копия блока не найдена")
+    await session.commit()
+    return await _template_json(session, template_id)
+
+
 @mt_calc_router.post("/api/module-type-templates/{template_id}/items")
 async def add_template_item(
     template_id: int,
@@ -557,7 +585,7 @@ async def set_calc_slot(
     if slot.hidden:
         raise HTTPException(status_code=400, detail="Скрытая строка задаётся в модулях по умолчанию")
     try:
-        obj = await crud_module_slots.set_calc_slot(session, calc_id, slot, data.module_id, data.quantity)
+        obj = await crud_module_slots.set_calc_slot(session, calc_id, slot, data.module_id, data.quantity, data.copy_no)
     except ValueError as exc:
         raise HTTPException(status_code=400, detail=str(exc)) from exc
     await session.commit()
@@ -574,6 +602,54 @@ async def set_calc_slot(
             "module_price": prices.get(obj.module_id, 0.0),
         }
     }
+
+
+async def _calc_block_response(session: AsyncSession, calc_id: int) -> dict:
+    """Пересчёт итогов блока и раздела, данные блока для страницы."""
+    calc = await crud_module_types.get_calc_by_id(session, calc_id)
+    session.expire(calc, ["items"])
+    calc = await crud_module_types.get_calc_by_id(session, calc_id)
+    mod_type = await crud_module_types.get_module_type_by_id(session, calc.module_type_id)
+    await crud_module_types.recalc_calc_totals(session, calc, mod_type)
+    section_cost = await crud_module_types.recalc_section_cost(session, calc.request_id, calc.module_type_id)
+    await session.commit()
+    prices = await crud_modules.get_module_prices(session)
+    default_profit = await crud_module_types.default_profitability(session, calc.request_id)
+    slots = await crud_module_slots.get_slots(session, calc.module_type_id)
+    calc = await crud_module_types.get_calc_by_id(session, calc_id)
+    return {
+        "block": crud_module_types.calc_block_data(calc, prices, default_profit, slots),
+        "section_cost": section_cost,
+    }
+
+
+@mt_calc_router.post("/api/request-calcs/{calc_id}/slot-copies")
+async def copy_calc_slot_group(
+    calc_id: int, data: SlotCopySchema, session: AsyncSession = Depends(db_helper.session_dependency)
+):
+    """Копия блока строк с модулями только в этом блоке расчёта: строки раздела и шаблоны не меняются."""
+    calc = await crud_module_types.get_calc_by_id(session, calc_id)
+    if not calc:
+        raise HTTPException(status_code=404, detail="Расчёт не найден")
+    if await crud_module_slots.copy_group_in(session, calc, data.slot_id, data.copy_no) is None:
+        raise HTTPException(status_code=404, detail="Строка не найдена")
+    return await _calc_block_response(session, calc_id)
+
+
+@mt_calc_router.delete("/api/request-calcs/{calc_id}/slot-copies")
+async def delete_calc_slot_copy(
+    calc_id: int,
+    slot_id: int = Query(...),
+    copy_no: int = Query(..., ge=1),
+    session: AsyncSession = Depends(db_helper.session_dependency),
+):
+    """Удаление копии блока строк из блока расчёта (с её модулями)."""
+    calc = await crud_module_types.get_calc_by_id(session, calc_id)
+    if not calc:
+        raise HTTPException(status_code=404, detail="Расчёт не найден")
+    if not await crud_module_slots.delete_group_copy(session, calc, slot_id, copy_no):
+        raise HTTPException(status_code=404, detail="Копия блока не найдена")
+    return await _calc_block_response(session, calc_id)
 
 
 # ── RequestCalcs ──

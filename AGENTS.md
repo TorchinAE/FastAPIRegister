@@ -111,7 +111,11 @@ alembic/                    # Migrations
 - Папки (ТКП, ЗЗ, договор) браузер не открывает (`file://` со страницы сайта блокируется) — `openFolderPath(path)` из `base.html` копирует путь в буфер и показывает его.
 - Фильтры, страница и прокрутка списков сохраняются в `sessionStorage` (`ListState` в `static/table-filter.js`) — возврат из карточки на тот же список.
 - Порядок блоков расчёта — `RequestCalc.sort_order`, затем `id` (копия блока встаёт рядом с исходным). Пустой блок при открытии раздела заполняется из своего шаблона.
-- Обязательные строки можно объединять (`ModuleTypeSlot.join_prev`): подряд идущие строки — один блок с общим фильтром «Ном Ток», остальные фильтры — у каждой строки (`crud_module_slots.slots_json`, `ModulePicker.renderSlotGroups`). Блок копируется целиком (`copy_slot_group`). Строка с несколькими типами модулей получает фильтр «Тип».
+- Обязательные строки можно объединять (`ModuleTypeSlot.join_prev`): подряд идущие строки — один блок с общим фильтром «Ном Ток», остальные фильтры — у каждой строки (`crud_module_slots.slots_json`, `ModulePicker.renderSlotGroups`). Строка с несколькими типами модулей получает фильтр «Тип».
+- Копия блока строк в расчёте или шаблоне — только там (`crud_module_slots.copy_group_in`): модули копии — `RequestCalcItem` / `ModuleTypeDefault` с `copy_no > 0`, число копий — `slot_copies` (JSON) блока / шаблона, название строки копии — «Выключатель 2» (`slot_label`). `copy_slot_group` (новые строки раздела) — только со страницы «Обязательные строки».
+- Цвет полей ввода — CSS-переменные `--input-bg` / `--input-border`, значения из настроек отдаёт `/reg/theme.css` (блок «Оформление» в «Настройки → Общие»).
+- Классы точности — с десятичной запятой (точка заменяется при вводе), порядок — `crud_accuracy_classes.natural_key`.
+- Тесты на Windows запускать через `.venv/Scripts/python.exe -m pytest`: `uv run pytest` и `seed.py` здесь могут зависать.
 - Модуль без своего типа подходит в строку раздела по типам материалов состава (`ModulePicker.typeMatch`, `crud_module_slots.allowed_module`).
 - Деньги в Excel — `scr.utils.excel.MONEY_FMT` (`#,##0.00`), не литеральный пробел.
 - Ruff ignores: `B008` (Depends in function args), `F401` (unused imports), `DTZ005` (datetime.utcnow).

@@ -22,6 +22,7 @@
                 <th>№ счёта</th>
                 <th>Дата счёта</th>
                 <th>Сумма</th>
+                <th>Оплачено</th>
                 <th>% от заказа</th>
                 <th>Организация</th>
                 <th>Менеджер</th>
@@ -33,22 +34,29 @@
                 <th><input type="text" class="tf-input" data-col="2" placeholder="заказ"></th>
                 <th><input type="text" class="tf-input" data-col="3" placeholder="№ счёта"></th>
                 <th><input type="text" class="tf-input" data-col="4" placeholder="дата"></th>
-                <th><input type="text" class="tf-input" data-col="5" placeholder="сумма"></th>
-                <th><input type="text" class="tf-input" data-col="6" placeholder="%"></th>
-                <th><input type="text" class="tf-input" data-col="7" placeholder="организация"></th>
-                <th><input type="text" class="tf-input" data-col="8" placeholder="менеджер"></th>
-                <th><input type="text" class="tf-input" data-col="9" placeholder="оборудование"></th>
+                <th><input type="text" class="tf-input" data-col="5" data-num placeholder="сумма"></th>
+                <th><input type="text" class="tf-input" data-col="6" data-num placeholder="оплачено"></th>
+                <th><input type="text" class="tf-input" data-col="7" placeholder="%"></th>
+                <th><input type="text" class="tf-input" data-col="8" placeholder="организация"></th>
+                <th><input type="text" class="tf-input" data-col="9" placeholder="менеджер"></th>
+                <th><input type="text" class="tf-input" data-col="10" placeholder="оборудование"></th>
             </tr>
         </thead>
         <tbody>
             {% for inv in items %}
-            <tr class="clickable-row" onclick="window.location='/reg/requests/{{ inv.request_id }}'">
+            {% set paid = inv.paid_amount or 0 %}
+            {% set fully_paid = inv.amount and inv.amount > 0 and paid >= inv.amount %}
+            {# Счета одной ТКП подряд: чередование фона групп, линия перед первой строкой группы #}
+            <tr class="clickable-row inv-group-{{ 'odd' if groups[inv.request_id] % 2 else 'even' }}{{ ' inv-group-start' if loop.first or loop.previtem.request_id != inv.request_id else '' }}{{ ' inv-paid-row' if fully_paid else '' }}"
+                onclick="window.location='/reg/requests/{{ inv.request_id }}'">
                 <td>{{ inv.id }}</td>
                 <td><strong>{{ inv.request.tkp_num if inv.request else '-' }}</strong></td>
                 <td>{{ inv.request.factory_order_num if inv.request and inv.request.factory_order_num else '-' }}</td>
                 <td>{{ inv.invoice_num or '-' }}</td>
                 <td>{{ inv.invoice_date.strftime('%d.%m.%Y') if inv.invoice_date else '-' }}</td>
                 <td style="text-align:right;white-space:nowrap;">{{ inv.amount|money if inv.amount else '0.00' }}</td>
+                <td class="{{ 'inv-paid-full' if fully_paid else '' }}" style="text-align:right;white-space:nowrap;"
+                    title="{{ 'Оплачен полностью' if fully_paid else 'Оплачено ' ~ ((paid / inv.amount * 100)|round(1) if inv.amount else 0) ~ '% от счёта' }}">{{ paid|money }}</td>
                 <td>{{ inv.percent }}</td>
                 <td>{{ inv.request.company.name if inv.request and inv.request.company else '-' }}</td>
                 <td>{{ inv.request.manager.name if inv.request and inv.request.manager else '-' }}</td>
@@ -56,7 +64,7 @@
             </tr>
             {% endfor %}
             {% if not items %}
-            <tr class="empty-row"><td colspan="10">Нет счетов</td></tr>
+            <tr class="empty-row"><td colspan="11">Нет счетов</td></tr>
             {% endif %}
         </tbody>
     </table>
@@ -107,19 +115,20 @@ async function exportInvoicesExcel() {
         cell.border = border;
     });
 
-    const idCol = 0, amountCol = 5, pctCol = 6, dateCol = 4;
+    const idCol = 0, amountCol = 5, paidCol = 6, pctCol = 7, dateCol = 4;
     const toNum = v => parseFloat(String(v).replace(/\s/g, '').replace(',', '.'));
-    let total = 0;
+    let total = 0, paidTotal = 0;
     rows.forEach(r => {
         const row = ws.addRow(r);
         row.eachCell({includeEmpty: true}, (cell, colNumber) => {
             const ci = colNumber - 1;
             cell.border = border;
-            if (ci === idCol || ci === pctCol || ci === amountCol) {
+            if (ci === idCol || ci === pctCol || ci === amountCol || ci === paidCol) {
                 const n = toNum(cell.value);
                 if (!isNaN(n)) {
                     cell.value = n;
                     if (ci === amountCol) { cell.numFmt = '#,##0.00'; total += n; }
+                    if (ci === paidCol) { cell.numFmt = '#,##0.00'; paidTotal += n; }
                 }
             } else if (ci === dateCol && /^\d{2}\.\d{2}\.\d{4}$/.test(cell.value)) {
                 const [d, m, y] = cell.value.split('.').map(Number);
@@ -128,11 +137,11 @@ async function exportInvoicesExcel() {
             }
         });
     });
-    const totalRow = ws.addRow(headers.map((_, i) => i === 0 ? 'Итого' : (i === amountCol ? total : '')));
+    const totalRow = ws.addRow(headers.map((_, i) => i === 0 ? 'Итого' : i === amountCol ? total : i === paidCol ? paidTotal : ''));
     totalRow.eachCell({includeEmpty: true}, (cell, colNumber) => {
         cell.font = {bold: true};
         cell.border = border;
-        if (colNumber - 1 === amountCol) cell.numFmt = '#,##0.00';
+        if (colNumber - 1 === amountCol || colNumber - 1 === paidCol) cell.numFmt = '#,##0.00';
     });
 
     ws.columns.forEach((col, i) => {

@@ -109,7 +109,8 @@ document.getElementById('newCompanyForm').addEventListener('submit', async funct
         });
         if (resp.ok) {
             const company = await resp.json();
-            if (backTo.includes('/counterparties/')) {
+            // Возврат к контрагенту или к списку контрагентов — новая компания подставляется в поле «Компания»
+            if (backTo.includes('/counterparties')) {
                 const sep = backTo.includes('?') ? '&' : '?';
                 window.location.href = backTo + sep + 'company_id=' + company.id;
             } else {

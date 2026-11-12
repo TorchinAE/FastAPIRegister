@@ -301,8 +301,9 @@ async def test_slot_groups_share_first_slot_filters(client, db_session):
     assert (copied.module_id, copied.quantity, copied.template_id) == (ids["mod"], 2, ids["tpl"])
 
 
-async def test_copy_slot_group_from_calc_keeps_calc_modules(client, db_session):
-    """Копия блока строк из расчёта: модули строк этого расчёта переносятся в новые строки, стоимость растёт."""
+async def test_copy_slot_group_in_calc_is_local(client, db_session):
+    """Копия блока строк в расчёте: только в этом блоке (строки раздела не добавляются), с модулями,
+    название копии — «Строка 2», стоимость растёт; удаление копии возвращает стоимость."""
     ids = await _setup(db_session, "i", "sho-i")
     block = (
         await client.post("/reg/api/request-calcs/", json={"request_id": ids["req"], "module_type_id": ids["mt"]})
@@ -310,10 +311,78 @@ async def test_copy_slot_group_from_calc_keeps_calc_modules(client, db_session):
     await client.put(
         f"/reg/api/request-calcs/{block['id']}/slots/{ids['slot']}", json={"module_id": ids["mod"], "quantity": 2}
     )
-    resp = await client.post(f"/reg/api/module-type-slots/{ids['slot']}/copy-group?calc_id={block['id']}")
-    new_id = resp.json()["ids"][0]
-    calc = await crud_module_types.get_calc_by_id(db_session, block["id"])
-    await db_session.refresh(calc, ["items"])
-    assert sorted((it.slot_id, it.quantity) for it in calc.items) == sorted([(ids["slot"], 2), (new_id, 2)])
-    data = (await client.get(f"/reg/api/request-calcs/{block['id']}")).json()
-    assert float(data["total_cost"]) >= 400
+    slots_before = (await client.get(f"/reg/api/module-types/{ids['mt']}/slots")).json()
+    resp = await client.post(f"/reg/api/request-calcs/{block['id']}/slot-copies", json={"slot_id": ids["slot"]})
+    assert resp.status_code == 200
+    data = resp.json()["block"]
+    assert [(s["slot_id"], s["copy_no"], s["item"]["quantity"]) for s in data["slots"]] == [
+        (ids["slot"], 0, 2),
+        (ids["slot"], 1, 2),
+    ]
+    assert data["slots"][0]["group"] != data["slots"][1]["group"]
+    assert data["total_cost"] >= 400
+    # Строки раздела не изменились
+    assert (await client.get(f"/reg/api/module-types/{ids['mt']}/slots")).json() == slots_before
+
+    # Модуль строки копии меняется отдельно от исходной строки
+    resp = await client.put(
+        f"/reg/api/request-calcs/{block['id']}/slots/{ids['slot']}",
+        json={"module_id": ids["mod"], "quantity": 5, "copy_no": 1},
+    )
+    assert resp.json()["item"]["quantity"] == 5
+    bad = await client.put(
+        f"/reg/api/request-calcs/{block['id']}/slots/{ids['slot']}", json={"module_id": ids["mod"], "copy_no": 3}
+    )
+    assert bad.status_code == 400
+
+    # Копия блока расчёта копирует и копии строк
+    copied = (await client.post(f"/reg/api/request-calcs/{block['id']}/copy")).json()["block"]
+    assert [(s["copy_no"], s["item"]["quantity"]) for s in copied["slots"]] == [(0, 2), (1, 5)]
+
+    # Комплектация ТКП: строка копии — «Строка 2»
+    from scr.dbase.crud_tkp import build_tkp_kit
+
+    req = await db_session.get(Request, ids["req"])
+    kit = await build_tkp_kit(db_session, req)
+    lines = [line for section in kit for b in section["blocks"] for line in b["lines"]]
+    assert any(line.startswith("Строка 2: 5х") for line in lines)
+
+    resp = await client.delete(f"/reg/api/request-calcs/{block['id']}/slot-copies?slot_id={ids['slot']}&copy_no=1")
+    data = resp.json()["block"]
+    assert [s["copy_no"] for s in data["slots"]] == [0]
+    assert data["total_cost"] < 400 + 1
+
+
+async def test_copy_slot_group_in_template_and_new_block(client, db_session):
+    """Копия блока строк в шаблоне — только в шаблоне; новый блок расчёта из шаблона получает копию."""
+    ids = await _setup(db_session, "j", "sho-j")
+    await client.put(
+        f"/reg/api/module-type-slots/{ids['slot']}/default",
+        json={"module_id": ids["mod"], "quantity": 3, "template_id": ids["tpl"]},
+    )
+    resp = await client.post(
+        f"/reg/api/module-type-templates/{ids['tpl']}/slot-copies", json={"slot_id": ids["slot"], "copy_no": 0}
+    )
+    tpl = resp.json()
+    assert [(e["copy_no"], e["value"]["quantity"]) for e in tpl["slots"]] == [(0, 3), (1, 3)]
+    assert len((await client.get(f"/reg/api/module-types/{ids['mt']}/slots")).json()) == 1
+
+    block = (
+        await client.post(
+            "/reg/api/request-calcs/",
+            json={"request_id": ids["req"], "module_type_id": ids["mt"], "template_id": ids["tpl"]},
+        )
+    ).json()["block"]
+    assert [(s["copy_no"], s["item"]["quantity"]) for s in block["slots"]] == [(0, 3), (1, 3)]
+
+    # Пустая копия остаётся (количество копий хранится в шаблоне)
+    resp = await client.put(
+        f"/reg/api/module-type-slots/{ids['slot']}/default",
+        json={"module_id": None, "template_id": ids["tpl"], "copy_no": 1},
+    )
+    assert resp.status_code == 200
+    # Копия без модуля существует: удаляется (иначе — 404)
+    resp = await client.delete(
+        f"/reg/api/module-type-templates/{ids['tpl']}/slot-copies?slot_id={ids['slot']}&copy_no=1"
+    )
+    assert [e["copy_no"] for e in resp.json()["slots"]] == [0]

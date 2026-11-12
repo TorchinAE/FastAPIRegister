@@ -422,7 +422,7 @@ def _parse_by_header(row, col_map: dict) -> dict | None:
         "url_agent": str(_get(row, col_map, "url_agent", "")).strip() or None,
         "voltage": str(_get(row, col_map, "voltage", "")).strip() or None,
         "unit": str(_get(row, col_map, "unit", "")).strip()[:20] or None,
-        "accuracy_class": str(_get(row, col_map, "accuracy_class", "")).strip()[:20] or None,
+        "accuracy_class": str(_get(row, col_map, "accuracy_class", "")).strip().replace(".", ",")[:20] or None,
     }
 
 

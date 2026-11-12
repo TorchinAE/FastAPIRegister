@@ -23,9 +23,17 @@
     --shadow-md: 0 4px 6px rgba(0,0,0,0.07), 0 2px 4px rgba(0,0,0,0.06);
     --radius: 8px;
     --transition: 0.2s ease;
+    /* Поля ввода чуть темнее фона карточек; цвет меняется в «Настройки → Общие» (/reg/theme.css) */
+    --input-bg: #f3f6fa;
+    --input-border: #cbd5e1;
 }
 
 * { box-sizing: border-box; margin: 0; padding: 0; }
+/* Все поля ввода по умолчанию — цвет из настроек; :where — нулевая специфичность, правила классов и style="" важнее */
+:where(input:not([type=checkbox], [type=radio], [type=color], [type=range], [type=file], [type=submit], [type=button]), select, textarea) {
+    background-color: var(--input-bg);
+    border-color: var(--input-border);
+}
 body { font-family: 'Segoe UI', system-ui, -apple-system, sans-serif; background: var(--bg); color: var(--text); line-height: 1.5; }
 
 /* Layout */
@@ -76,10 +84,10 @@ tr:hover td { background: #f8fafc; }
 .clickable-row { cursor: pointer; }
 .clickable-row:hover td { background: #eef2ff; }
 .table-filter th { background: #f8fafc !important; padding: 0.4rem 0.5rem !important; border-bottom: 2px solid var(--border) !important; }
-.table-filter .tf-input { width: 100%; padding: 0.55rem 0.75rem; border: 1.5px solid var(--border); border-radius: 6px; font-size: 0.9rem; color: var(--text); background: #fff; outline: none; font-family: inherit; transition: border-color var(--transition), box-shadow var(--transition); }
+.table-filter .tf-input { width: 100%; padding: 0.55rem 0.75rem; border: 1.5px solid var(--input-border); border-radius: 6px; font-size: 0.9rem; color: var(--text); background: var(--input-bg); outline: none; font-family: inherit; transition: border-color var(--transition), box-shadow var(--transition); }
 .table-filter .tf-input:focus { border-color: var(--primary); box-shadow: 0 0 0 3px rgba(79,70,229,0.15); }
 .table-filter .tf-input::placeholder { color: var(--text-muted); }
-.table-filter .tf-select { width: 100%; padding: 0.45rem 0.5rem; border: 1.5px solid var(--border); border-radius: 6px; font-size: 0.85rem; color: var(--text); background: #fff; outline: none; font-family: inherit; transition: border-color var(--transition), box-shadow var(--transition); cursor: pointer; }
+.table-filter .tf-select { width: 100%; padding: 0.45rem 0.5rem; border: 1.5px solid var(--input-border); border-radius: 6px; font-size: 0.85rem; color: var(--text); background: var(--input-bg); outline: none; font-family: inherit; transition: border-color var(--transition), box-shadow var(--transition); cursor: pointer; }
 .table-filter .tf-select:focus { border-color: var(--primary); box-shadow: 0 0 0 3px rgba(79,70,229,0.15); }
 tr { transition: background var(--transition); }
 .empty-row td { text-align: center; padding: 2rem; color: var(--text-muted); font-style: italic; }
@@ -122,13 +130,13 @@ form { background: var(--surface); padding: 1.5rem; border-radius: var(--radius)
 .form-group { margin-bottom: 1rem; }
 .form-group label { display: block; margin-bottom: 0.35rem; font-weight: 600; font-size: 0.85rem; color: var(--text); }
 .form-group input, .form-group select, .form-group textarea {
-    width: 100%; padding: 0.55rem 0.75rem; border: 1.5px solid var(--border); border-radius: 6px;
-    font-size: 0.9rem; color: var(--text); background: #fff; transition: border-color var(--transition), box-shadow var(--transition);
+    width: 100%; padding: 0.55rem 0.75rem; border: 1.5px solid var(--input-border); border-radius: 6px;
+    font-size: 0.9rem; color: var(--text); background: var(--input-bg); transition: border-color var(--transition), box-shadow var(--transition);
     outline: none; font-family: inherit;
 }
 .form-group input:focus, .form-group select:focus, .form-group textarea:focus { border-color: var(--primary); box-shadow: 0 0 0 3px rgba(79,70,229,0.15); }
 /* Поле ввода в таблице в стиле полей формы */
-.cell-input { width: 80px; padding: 0.55rem 0.75rem; border: 1.5px solid var(--border); border-radius: 6px; font-size: 0.9rem; color: var(--text); background: #fff; outline: none; font-family: inherit; transition: border-color var(--transition), box-shadow var(--transition); }
+.cell-input { width: 80px; padding: 0.55rem 0.75rem; border: 1.5px solid var(--input-border); border-radius: 6px; font-size: 0.9rem; color: var(--text); background: var(--input-bg); outline: none; font-family: inherit; transition: border-color var(--transition), box-shadow var(--transition); }
 .cell-input:focus { border-color: var(--primary); box-shadow: 0 0 0 3px rgba(79,70,229,0.15); }
 .form-group textarea { min-height: 80px; resize: vertical; }
 .form-row { display: grid; grid-template-columns: repeat(auto-fill, minmax(140px, 1fr)); gap: 0.75rem; }
@@ -258,7 +266,7 @@ form { background: var(--surface); padding: 1.5rem; border-radius: var(--radius)
 .eq-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 0.3rem 0.5rem; }
 .fg-h { display: flex; align-items: center; gap: 0.5rem; }
 .fg-h label { flex: 0 0 140px; font-size: 0.8rem; font-weight: 600; color: var(--text); text-align: right; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; margin: 0; }
-.fg-h input, .fg-h select, .fg-h textarea { flex: 1; min-width: 0; padding: 0.35rem 0.5rem; font-size: 0.85rem; border: 1.5px solid var(--border); border-radius: 4px; background: #fff; color: var(--text); outline: none; font-family: inherit; }
+.fg-h input, .fg-h select, .fg-h textarea { flex: 1; min-width: 0; padding: 0.35rem 0.5rem; font-size: 0.85rem; border: 1.5px solid var(--input-border); border-radius: 4px; background: var(--input-bg); color: var(--text); outline: none; font-family: inherit; }
 .fg-h input:focus, .fg-h select:focus, .fg-h textarea:focus { border-color: var(--primary); box-shadow: 0 0 0 2px rgba(79,70,229,0.12); }
 .fg-h textarea { min-height: 28px; resize: vertical; }
 .fg-wide { grid-column: 1 / -1; }
@@ -279,7 +287,7 @@ form { background: var(--surface); padding: 1.5rem; border-radius: var(--radius)
 
 /* Searchable select */
 .search-select { position: relative; flex: 1; min-width: 0; }
-.search-select .ss-input { width: 100%; padding: 0.35rem 0.5rem; font-size: 0.85rem; border: 1.5px solid var(--border); border-radius: 4px; background: #fff; color: var(--text); outline: none; font-family: inherit; cursor: text; }
+.search-select .ss-input { width: 100%; padding: 0.35rem 0.5rem; font-size: 0.85rem; border: 1.5px solid var(--input-border); border-radius: 4px; background: var(--input-bg); color: var(--text); outline: none; font-family: inherit; cursor: text; }
 .search-select .ss-input:focus { border-color: var(--primary); box-shadow: 0 0 0 2px rgba(79,70,229,0.12); }
 .search-select .ss-clear { position: absolute; right: 6px; top: 50%; transform: translateY(-50%); background: none; border: none; color: var(--text-muted); cursor: pointer; font-size: 1rem; padding: 0 4px; line-height: 1; display: none; }
 .search-select .ss-clear:hover { color: var(--text); }
@@ -296,7 +304,7 @@ form { background: var(--surface); padding: 1.5rem; border-radius: var(--radius)
 .nom-tok-badge.auto { background: #e0e7ff; color: #3730a3; }
 
 /* Страницы расчёта: поля ввода светло-серые, слабый контраст */
-.calc-page input, .calc-page select, .calc-page textarea { background: #f1f5f9; border-color: #e2e8f0; color: var(--text); }
+.calc-page input, .calc-page select, .calc-page textarea { background: var(--input-bg); border-color: var(--input-border); color: var(--text); }
 .calc-page input:focus, .calc-page select:focus, .calc-page textarea:focus { background: #fff; }
 .calc-page input[readonly] { background: #e9eef4; cursor: default; }
 .calc-page input.money { text-align: right; font-variant-numeric: tabular-nums; }
@@ -311,10 +319,12 @@ form { background: var(--surface); padding: 1.5rem; border-radius: var(--radius)
 .calc-blocks.multi { flex-wrap: nowrap; overflow-x: auto; padding-bottom: 0.5rem; }
 /* не более 1/8 ширины страницы; при нехватке места — горизонтальная прокрутка */
 /* Одна ширина блока во всех разделах (КСО, КРУ, ЩО): содержимое (фильтры строк, 1СШ/2СШ) переносится, а не растягивает блок */
-.calc-blocks.multi .calc-block { flex: 0 0 var(--calc-block-w, 280px); width: var(--calc-block-w, 280px); min-width: 0; }
+.calc-blocks.multi .calc-block { flex: 0 0 var(--calc-block-w, 320px); width: var(--calc-block-w, 320px); min-width: 0; }
 .calc-blocks.multi .calc-slot-filters select, .calc-blocks.multi .calc-slot-filters input { max-width: 100%; }
 /* Список модулей с длинными названиями не должен растягивать блок — ширину задаёт содержимое блока */
 .calc-blocks.multi .calc-add-row select, .calc-blocks.multi .calc-slot select { width: 0; min-width: 100%; }
+/* модуль строки — справа от количества, занимает остаток ширины */
+.calc-blocks.multi .calc-slot .calc-slot-pick select { width: 0; min-width: 0; flex: 1 1 auto; }
 .calc-blocks.single .calc-block { flex: 1; }
 .calc-block { display: flex; flex-direction: column; gap: 0.6rem; margin: 0; padding: 0.75rem; }
 .calc-blocks .card + .card { margin-top: 0; }
@@ -331,7 +341,7 @@ form { background: var(--surface); padding: 1.5rem; border-radius: var(--radius)
 .calc-block-del, .calc-item-del { border: none; background: transparent; color: #94a3b8; cursor: pointer; font-size: 0.8rem; padding: 0 0.2rem; line-height: 1; }
 .calc-block-del:hover, .calc-item-del:hover { color: #dc2626; }
 .calc-add-row { display: flex; flex-direction: column; gap: 0.35rem; }
-.calc-add-row select, .calc-add-row input { width: 100%; min-width: 0; padding: 0.3rem 0.4rem; font-size: 0.8rem; border: 1px solid #e2e8f0; border-radius: 6px; }
+.calc-add-row select, .calc-add-row input { width: 100%; min-width: 0; padding: 0.3rem 0.4rem; font-size: 0.8rem; border: 1px solid var(--input-border); border-radius: 6px; background: var(--input-bg); }
 .calc-add-row-bottom { display: flex; gap: 0.35rem; }
 .calc-add-row-bottom .f-module-qty { width: 3.5rem; flex: 0 0 auto; }
 .calc-add-row-bottom .btn { flex: 1; white-space: nowrap; }
@@ -339,17 +349,24 @@ form { background: var(--surface); padding: 1.5rem; border-radius: var(--radius)
 .calc-item { position: relative; display: flex; justify-content: space-between; gap: 0.4rem; padding: 0.35rem 1.1rem 0.35rem 0.45rem; border: 1px solid #edf1f5; border-radius: 6px; background: #fafbfc; font-size: 0.8rem; }
 .calc-item-main { min-width: 0; flex: 1; }
 .calc-item-qty { display: flex; align-items: center; gap: 0.2rem; color: var(--text-muted); font-size: 0.72rem; }
-.calc-item-qty input { width: 3rem; padding: 0.1rem 0.25rem; font-size: 0.75rem; border: 1px solid #e2e8f0; border-radius: 4px; }
+.calc-item-qty input { width: 3rem; padding: 0.1rem 0.25rem; font-size: 0.75rem; border: 1px solid var(--input-border); border-radius: 4px; background: var(--input-bg); }
 .calc-item-name { margin-top: 0.15rem; overflow: hidden; text-overflow: ellipsis; display: -webkit-box; -webkit-line-clamp: 2; -webkit-box-orient: vertical; word-break: break-word; }
 .calc-item-side { text-align: right; white-space: nowrap; font-variant-numeric: tabular-nums; }
 .calc-item-price { font-size: 0.7rem; color: var(--text-muted); }
 .calc-item-sum { font-weight: 600; }
 .calc-item-del { position: absolute; top: 0.2rem; right: 0.15rem; }
-.calc-slot { padding-right: 0.45rem; border-color: #dfe5f7; background: #f6f8fe; }
+.calc-slot { flex-direction: column; justify-content: flex-start; gap: 0.2rem; padding-right: 0.45rem; border-color: #dfe5f7; background: #f6f8fe; }
+.calc-slot-pick { display: flex; align-items: center; gap: 0.3rem; min-width: 0; }
+.calc-slot-pick .calc-item-qty { flex: 0 0 auto; }
+.calc-slot-pick select { flex: 1 1 auto; }
+.calc-slot-sum { display: flex; justify-content: space-between; align-items: baseline; gap: 0.4rem; white-space: nowrap; font-variant-numeric: tabular-nums; }
+.calc-slot-sum:empty, .calc-slot.empty .calc-slot-sum { display: none; }
+.calc-slot-sum .calc-item-price { font-size: 0.72rem; }
 .calc-slot.empty { background: #fff; border-style: dashed; }
 .calc-slot-name { font-size: 0.72rem; font-weight: 600; color: #4338ca; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
 /* количество — отдельной строкой, фильтры строки — не более 2 в ряд */
-.calc-slot-filters { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); align-items: end; gap: 0.25rem 0.4rem; margin: 0.15rem 0; min-width: 0; }
+.calc-slot-filters { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); align-items: end; gap: 0.25rem 0.4rem; margin: 0; min-width: 0; }
+.calc-slot > .calc-slot-filters:not(:has(.mp-filter)) { display: none; }
 .calc-slot-filters .mp-filter { min-width: 0; }
 .calc-slot-filters .calc-item-qty { grid-column: 1 / -1; }
 /* Блок объединённых строк: общие фильтры сверху действуют на все строки блока */
@@ -357,9 +374,12 @@ form { background: var(--surface); padding: 1.5rem; border-radius: var(--radius)
 .calc-group-filters { margin: 0 0 0.1rem; }
 .calc-slot-group-bar { display: flex; align-items: center; justify-content: space-between; gap: 0.3rem; font-size: 0.7rem; font-weight: 600; color: #4338ca; }
 .calc-slot-group-bar .btn { padding: 0.1rem 0.4rem; font-size: 0.7rem; }
+.calc-slot-group-actions { display: flex; gap: 0.25rem; }
+.calc-slot-group.is-copy { border-color: #86efac; background: #f6fef9; }
+.calc-slot-group.is-copy .calc-slot-group-bar { color: #15803d; }
 .calc-group-filters .mp-filter select { width: 100%; min-width: 0; margin: 0; padding: 0.05rem 0.2rem; font-size: 0.72rem; }
 .calc-slot-filters .f-filters { display: contents; }
-.calc-slot select { width: 100%; min-width: 0; margin: 0.15rem 0; padding: 0.15rem 0.25rem; font-size: 0.78rem; border: 1px solid #e2e8f0; border-radius: 4px; background: #fff; }
+.calc-slot select { width: 100%; min-width: 0; margin: 0; padding: 0.15rem 0.25rem; font-size: 0.78rem; border: 1px solid var(--input-border); border-radius: 4px; background: var(--input-bg); }
 .calc-items-total { font-size: 0.8rem; text-align: right; color: var(--text-muted); }
 .calc-items-total strong { color: var(--text); font-variant-numeric: tabular-nums; }
 .calc-fields { display: grid; grid-template-columns: 1fr; gap: 0.5rem; }
@@ -414,7 +434,7 @@ form { background: var(--surface); padding: 1.5rem; border-radius: var(--radius)
 .mp-title { font-size: 0.8rem; font-weight: 600; color: var(--text-muted); align-self: center; }
 .mp-filter { display: flex; flex-direction: column; gap: 0.1rem; margin: 0; }
 .mp-filter span { font-size: 0.68rem; font-weight: 600; color: var(--text-muted); }
-.mp-filter select { padding: 0.2rem 0.3rem; font-size: 0.8rem; border: 1px solid var(--border); border-radius: 4px; min-width: 3.5rem; }
+.mp-filter select { padding: 0.2rem 0.3rem; font-size: 0.8rem; border: 1px solid var(--input-border); border-radius: 4px; min-width: 3.5rem; background: var(--input-bg); }
 .mp-filter select.active { border-color: var(--sidebar-active); box-shadow: 0 0 0 1px var(--sidebar-active); }
 .mp-legend { display: flex; flex-wrap: wrap; gap: 0.3rem; margin-left: auto; align-self: center; }
 .calc-slot .calc-slot-filters .mp-filter select { width: 100%; min-width: 0; margin: 0; padding: 0.05rem 0.2rem; font-size: 0.72rem; }
@@ -448,3 +468,9 @@ tr.zero-price > td { background: #fef2f2; }
 .folder-path-box { position: fixed; bottom: 1.5rem; right: 1.5rem; z-index: 1001; background: var(--surface); border: 1px solid var(--border); border-radius: 8px; box-shadow: var(--shadow-md); padding: 0.75rem 1rem; display: flex; flex-direction: column; gap: 0.5rem; width: min(70ch, calc(100vw - 3rem)); font-size: 0.85rem; }
 .folder-path-box input { width: 100%; font-family: monospace; padding: 4px 6px; border: 1px solid var(--border); border-radius: 4px; }
 .folder-path-box .btn { align-self: flex-end; }
+
+/* Счета: группы по ТКП (чередование фона, линия перед первой строкой группы), полностью оплаченный счёт */
+tr.inv-group-odd > td { background: #f8fafc; }
+tr.inv-group-start > td { border-top: 2px solid #cbd5e1; }
+tr.inv-paid-row > td { background: #f0fdf4; }
+td.inv-paid-full, tr.inv-group-odd > td.inv-paid-full { background: #dcfce7; color: #166534; font-weight: 600; }

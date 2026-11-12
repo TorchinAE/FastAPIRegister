@@ -69,7 +69,8 @@ PAYMENT_TYPES = ["предоплата", "доплата-1", "доплата-2",
 DEFAULT_NOMINAL_CURRENTS = [16, 25, 40, 63, 100, 160, 250, 400, 630, 800, 1000, 1250, 1600, 2000, 2500, 3150, 4000]
 DEFAULT_UNIT = "шт"
 DEFAULT_UNITS = [DEFAULT_UNIT, "кг", "м2", "пог.м."]
-DEFAULT_ACCURACY_CLASSES = ["0.2", "0.2S", "0.5", "0.5S", "1", "3", "5P", "10P"]
+# Десятичный разделитель — запятая (точка при вводе заменяется)
+DEFAULT_ACCURACY_CLASSES = ["0,2", "0,2S", "0,5", "0,5S", "1", "3", "5P", "10P"]
 
 # Ном. ток модуля из названия материала: «{число}A» (латинская или русская «А»), напр. «ВВ/TEL 1000A»
 NOM_TOK_IN_NAME_RE = r"(?<![\d.,])(\d+)\s*[AaАа](?![A-Za-zА-Яа-яЁё\d])"
@@ -80,6 +81,13 @@ REGISTRATION_DENIED_MSG = "Регистрация не допустима. Об�
 
 # Списки на страницах грузятся целиком: фильтр и пагинация — на клиенте (static/table-filter.js)
 LIST_ALL_ROWS = 1_000_000
+
+# Оформление: цвет фона и рамки полей ввода (#rrggbb) — «Настройки → Общие», отдаются в /reg/theme.css
+SETTING_INPUT_BG = "input_bg_color"
+SETTING_INPUT_BORDER = "input_border_color"
+DEFAULT_INPUT_BG = "#f3f6fa"
+DEFAULT_INPUT_BORDER = "#cbd5e1"
+THEME_SETTINGS = {SETTING_INPUT_BG: DEFAULT_INPUT_BG, SETTING_INPUT_BORDER: DEFAULT_INPUT_BORDER}
 
 # Сброс пароля: срок действия ссылки из письма, минимальная длина пароля
 PASSWORD_RESET_TTL_HOURS = 24

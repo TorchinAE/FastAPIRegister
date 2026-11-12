@@ -1,4 +1,10 @@
-"""Обязательные строки разделов расчёта (КСО, КРУ, ЩО, ...): одна строка — один модуль."""
+"""Обязательные строки разделов расчёта (КСО, КРУ, ЩО, ...): одна строка — один модуль.
+
+Копии блоков строк делаются в блоке расчёта или в шаблоне и существуют только там: строки раздела
+не добавляются. Модуль копии — RequestCalcItem / ModuleTypeDefault с copy_no > 0, количество копий
+блока — slot_copies блока расчёта / шаблона ({id первой строки блока: количество})."""
+
+import json
 
 from sqlalchemy import delete, select, update
 from sqlalchemy.ext.asyncio import AsyncSession
@@ -100,12 +106,10 @@ async def move_slot(session: AsyncSession, slot_id: int, direction: int) -> Modu
     return slot
 
 
-async def copy_slot_group(
-    session: AsyncSession, slot_id: int, calc_id: int | None = None
-) -> list[ModuleTypeSlot] | None:
-    """Копия блока объединённых строк (или одной строки) сразу за блоком: настройки строк и их модули
-    во всех шаблонах. Названия — «… (копия)», при совпадении — с номером.
-    calc_id — копия сделана из блока расчёта: модули строк этого расчёта тоже копируются в новые строки."""
+async def copy_slot_group(session: AsyncSession, slot_id: int) -> list[ModuleTypeSlot] | None:
+    """Копия блока объединённых строк (или одной строки) в разделе — сразу за блоком (страница
+    «Обязательные строки»): настройки строк и их модули во всех шаблонах. Названия — «… (копия)»,
+    при совпадении — с номером. Копия блока в расчёте или шаблоне — copy_group_in."""
     slot = await session.get(ModuleTypeSlot, slot_id)
     if not slot:
         return None
@@ -147,6 +151,8 @@ async def copy_slot_group(
     )
     copy_of = {src.id: copy.id for src, copy in zip(group, copies, strict=True)}
     for d in defaults:
+        if d.copy_no:
+            continue
         session.add(
             ModuleTypeDefault(
                 module_type_id=d.module_type_id,
@@ -156,24 +162,6 @@ async def copy_slot_group(
                 quantity=d.quantity,
             )
         )
-    if calc_id is not None:
-        items = (
-            (
-                await session.execute(
-                    select(RequestCalcItem).where(
-                        RequestCalcItem.calc_id == calc_id, RequestCalcItem.slot_id.in_([s.id for s in group])
-                    )
-                )
-            )
-            .scalars()
-            .all()
-        )
-        for it in items:
-            session.add(
-                RequestCalcItem(
-                    calc_id=calc_id, module_id=it.module_id, quantity=it.quantity, slot_id=copy_of[it.slot_id]
-                )
-            )
     order = slots[:end] + copies + slots[end:]
     for i, s in enumerate(order, start=1):
         s.sort_order = i
@@ -186,7 +174,9 @@ async def delete_slot(session: AsyncSession, slot_id: int) -> ModuleTypeSlot | N
     slot = await session.get(ModuleTypeSlot, slot_id)
     if slot:
         await session.execute(delete(ModuleTypeDefault).where(ModuleTypeDefault.slot_id == slot_id))
-        await session.execute(update(RequestCalcItem).where(RequestCalcItem.slot_id == slot_id).values(slot_id=None))
+        await session.execute(
+            update(RequestCalcItem).where(RequestCalcItem.slot_id == slot_id).values(slot_id=None, copy_no=0)
+        )
         await session.delete(slot)
         await session.flush()
     return slot
@@ -231,9 +221,165 @@ def slots_json(slots: list[ModuleTypeSlot]) -> list[dict]:
 
 
 def order_by_slots(items: list, slots: list[ModuleTypeSlot]) -> list:
-    """Общий порядок: сначала обязательные строки по порядку, затем остальные модули."""
-    order = {s.id: i for i, s in enumerate(slots)}
-    return sorted(items, key=lambda it: (it.slot_id not in order, order.get(it.slot_id, 0), it.id))
+    """Общий порядок: сначала обязательные строки по порядку (копии блока строк — сразу за блоком),
+    затем остальные модули."""
+    pos: dict[int, tuple[int, int]] = {}
+    for g, group in enumerate(slot_groups(slots)):
+        for i, slot in enumerate(group):
+            pos[slot.id] = (g, i)
+
+    def key(it):
+        g, i = pos.get(it.slot_id, (0, 0))
+        return (it.slot_id not in pos, g, getattr(it, "copy_no", 0) or 0, i, it.id)
+
+    return sorted(items, key=key)
+
+
+# ── Копии блоков строк в блоке расчёта и в шаблоне ──
+
+
+def slot_groups(slots: list[ModuleTypeSlot]) -> list[list[ModuleTypeSlot]]:
+    """Блоки объединения: подряд идущие строки, где следующая объединена с предыдущей (join_prev)."""
+    groups: list[list[ModuleTypeSlot]] = []
+    for slot in slots:
+        if groups and slot.join_prev:
+            groups[-1].append(slot)
+        else:
+            groups.append([slot])
+    return groups
+
+
+def group_of(slots: list[ModuleTypeSlot], slot_id: int) -> list[ModuleTypeSlot] | None:
+    return next((g for g in slot_groups(slots) if any(s.id == slot_id for s in g)), None)
+
+
+def slot_label(name: str, copy_no: int) -> str:
+    """Название строки копии блока: «Выключатель 2» (номер блока: сама строка — 1, копии — 2, 3, ...)."""
+    return f"{name} {copy_no + 1}" if copy_no else name
+
+
+def get_copies(obj) -> dict[int, int]:
+    """Количество копий блоков строк блока расчёта / шаблона: {id первой строки блока: количество}."""
+    try:
+        data = json.loads(obj.slot_copies or "{}")
+    except (TypeError, ValueError):
+        return {}
+    result = {}
+    for key, value in data.items() if isinstance(data, dict) else []:
+        try:
+            if int(value) > 0:
+                result[int(key)] = int(value)
+        except (TypeError, ValueError):
+            continue
+    return result
+
+
+def set_copies(obj, copies: dict[int, int]) -> None:
+    clean = {str(k): v for k, v in sorted(copies.items()) if v > 0}
+    obj.slot_copies = json.dumps(clean) if clean else None
+
+
+def effective_copies(slots: list[ModuleTypeSlot], copies: dict[int, int], items: list) -> dict[int, int]:
+    """Копии блоков с учётом модулей: копия с модулем показывается, даже если блок строк изменился."""
+    result = dict(copies)
+    for group in slot_groups(slots):
+        ids = {s.id for s in group}
+        top = max((it.copy_no for it in items if it.slot_id in ids and it.copy_no), default=0)
+        if top > result.get(group[0].id, 0):
+            result[group[0].id] = top
+    return {k: v for k, v in result.items() if v > 0}
+
+
+def slot_entries(slots: list[ModuleTypeSlot], copies: dict[int, int], items: list, include_hidden: bool) -> list:
+    """Строки блока по порядку: каждый блок строк, за ним его копии.
+    [(slot, copy_no, item | None, group)], group — «{id первой строки}:{copy_no}» (рамка блока на странице)."""
+    by_key = {(it.slot_id, it.copy_no or 0): it for it in items if it.slot_id is not None}
+    copies = effective_copies(slots, copies, items)
+    result = []
+    for group in slot_groups(slots):
+        head = group[0].id
+        for n in range(copies.get(head, 0) + 1):
+            for slot in group:
+                if slot.hidden and not include_hidden:
+                    continue
+                result.append((slot, n, by_key.get((slot.id, n)), f"{head}:{n}"))
+    return result
+
+
+def _items_model(container):
+    """Модель строк блока расчёта (RequestCalcItem) или шаблона (ModuleTypeDefault) и поле связи."""
+    if isinstance(container, RequestCalc):
+        return RequestCalcItem, RequestCalcItem.calc_id
+    return ModuleTypeDefault, ModuleTypeDefault.template_id
+
+
+async def _group_state(session: AsyncSession, container, slot_id: int):
+    """Блок строк, модули его строк в контейнере и количество копий: (group, items, copies) или None."""
+    slots = await get_slots(session, container.module_type_id)
+    group = group_of(slots, slot_id)
+    if group is None:
+        return None
+    model, field = _items_model(container)
+    stmt = select(model).where(field == container.id, model.slot_id.in_([s.id for s in group]))
+    items = list((await session.execute(stmt)).scalars().all())
+    return group, items, effective_copies(slots, get_copies(container), items)
+
+
+async def copy_group_in(session: AsyncSession, container, slot_id: int, copy_no: int = 0) -> int | None:
+    """Копия блока строк (copy_no — какой экземпляр копировать) в блоке расчёта (RequestCalc) или шаблоне
+    (ModuleTypeTemplate) — с модулями, в конец копий этого блока. Строки раздела не меняются.
+    Возвращает номер новой копии; None — строка не найдена."""
+    state = await _group_state(session, container, slot_id)
+    if state is None:
+        return None
+    group, items, copies = state
+    head = group[0].id
+    new_no = copies.get(head, 0) + 1
+    model, _ = _items_model(container)
+    for it in items:
+        if (it.copy_no or 0) != copy_no:
+            continue
+        data = {"slot_id": it.slot_id, "module_id": it.module_id, "quantity": it.quantity, "copy_no": new_no}
+        if model is RequestCalcItem:
+            session.add(RequestCalcItem(calc_id=container.id, **data))
+        else:
+            session.add(ModuleTypeDefault(module_type_id=container.module_type_id, template_id=container.id, **data))
+    copies[head] = new_no
+    set_copies(container, copies)
+    await session.flush()
+    return new_no
+
+
+async def delete_group_copy(session: AsyncSession, container, slot_id: int, copy_no: int) -> bool:
+    """Удаляет копию блока строк (copy_no ≥ 1) с её модулями; следующие копии сдвигаются на её место."""
+    state = await _group_state(session, container, slot_id)
+    if state is None or copy_no < 1:
+        return False
+    group, items, copies = state
+    head = group[0].id
+    if copy_no > copies.get(head, 0):
+        return False
+    for it in items:
+        if it.copy_no == copy_no:
+            await session.delete(it)
+    await session.flush()
+    for it in sorted(items, key=lambda x: x.copy_no or 0):
+        if (it.copy_no or 0) > copy_no:
+            it.copy_no -= 1
+            await session.flush()
+    copies[head] -= 1
+    set_copies(container, copies)
+    await session.flush()
+    return True
+
+
+async def check_copy_no(session: AsyncSession, container, slot: ModuleTypeSlot, copy_no: int) -> None:
+    """Копия блока строк должна существовать в блоке расчёта / шаблоне (ValueError)."""
+    if not copy_no:
+        return
+    state = await _group_state(session, container, slot.id) if container is not None else None
+    if state is None or copy_no < 0 or copy_no > state[2].get(state[0][0].id, 0):
+        raise ValueError("Копия блока строк не найдена")
 
 
 # ── Модуль строки: в «по умолчанию» и в блоке расчёта ──
@@ -256,15 +402,24 @@ async def _check_module(session: AsyncSession, slot: ModuleTypeSlot, module_id: 
 
 
 async def set_slot_default(
-    session: AsyncSession, slot: ModuleTypeSlot, module_id: int | None, quantity: int, template_id: int | None = None
+    session: AsyncSession,
+    slot: ModuleTypeSlot,
+    module_id: int | None,
+    quantity: int,
+    template_id: int | None = None,
+    copy_no: int = 0,
 ) -> ModuleTypeDefault | None:
-    """Модуль строки в шаблоне (не задан — в основном шаблоне раздела); module_id=None — строка пустая."""
+    """Модуль строки в шаблоне (не задан — в основном шаблоне раздела); module_id=None — строка пустая.
+    copy_no — строка копии блока строк этого шаблона."""
     from scr.dbase.crud_module_templates import resolve_template
 
     await _check_module(session, slot, module_id)
     tpl = await resolve_template(session, slot.module_type_id, template_id)
+    await check_copy_no(session, tpl, slot, copy_no)
     stmt = select(ModuleTypeDefault).where(
-        ModuleTypeDefault.slot_id == slot.id, ModuleTypeDefault.template_id == tpl.id
+        ModuleTypeDefault.slot_id == slot.id,
+        ModuleTypeDefault.template_id == tpl.id,
+        ModuleTypeDefault.copy_no == copy_no,
     )
     obj = (await session.execute(stmt)).scalar_one_or_none()
     if module_id is None:
@@ -274,7 +429,11 @@ async def set_slot_default(
         return None
     if not obj:
         obj = ModuleTypeDefault(
-            module_type_id=slot.module_type_id, slot_id=slot.id, module_id=module_id, template_id=tpl.id
+            module_type_id=slot.module_type_id,
+            slot_id=slot.id,
+            module_id=module_id,
+            template_id=tpl.id,
+            copy_no=copy_no,
         )
         session.add(obj)
     obj.module_id = module_id
@@ -284,11 +443,14 @@ async def set_slot_default(
 
 
 async def set_calc_slot(
-    session: AsyncSession, calc_id: int, slot: ModuleTypeSlot, module_id: int | None, quantity: int
+    session: AsyncSession, calc_id: int, slot: ModuleTypeSlot, module_id: int | None, quantity: int, copy_no: int = 0
 ) -> RequestCalcItem | None:
-    """Модуль строки в блоке расчёта; module_id=None — строка пустая."""
+    """Модуль строки в блоке расчёта; module_id=None — строка пустая. copy_no — строка копии блока строк."""
     await _check_module(session, slot, module_id)
-    stmt = select(RequestCalcItem).where(RequestCalcItem.calc_id == calc_id, RequestCalcItem.slot_id == slot.id)
+    await check_copy_no(session, await session.get(RequestCalc, calc_id), slot, copy_no)
+    stmt = select(RequestCalcItem).where(
+        RequestCalcItem.calc_id == calc_id, RequestCalcItem.slot_id == slot.id, RequestCalcItem.copy_no == copy_no
+    )
     obj = (await session.execute(stmt)).scalar_one_or_none()
     if module_id is None:
         if obj:
@@ -296,7 +458,7 @@ async def set_calc_slot(
             await session.flush()
         return None
     if not obj:
-        obj = RequestCalcItem(calc_id=calc_id, slot_id=slot.id, module_id=module_id)
+        obj = RequestCalcItem(calc_id=calc_id, slot_id=slot.id, module_id=module_id, copy_no=copy_no)
         session.add(obj)
     obj.module_id = module_id
     obj.quantity = quantity
@@ -333,7 +495,7 @@ async def sync_hidden_slots(session: AsyncSession, request_id: int) -> bool:
     defaults = {
         (d.template_id, d.slot_id): d
         for d in (await session.execute(defaults_stmt)).scalars().all()
-        if d.template_id in template_ids
+        if d.template_id in template_ids and not d.copy_no
     }
 
     calcs_stmt = (
@@ -343,7 +505,8 @@ async def sync_hidden_slots(session: AsyncSession, request_id: int) -> bool:
     )
     changed_calcs: list[RequestCalc] = []
     for calc in (await session.execute(calcs_stmt)).scalars().all():
-        items = {it.slot_id: it for it in calc.items if it.slot_id is not None}
+        # Копии блоков строк — данные блока расчёта, с шаблоном не синхронизируются
+        items = {it.slot_id: it for it in calc.items if it.slot_id is not None and not it.copy_no}
         tpl_id = calc.template_id if calc.template_id in template_ids else main_template[calc.module_type_id]
         changed = False
         for slot_id in hidden_by_type[calc.module_type_id]:

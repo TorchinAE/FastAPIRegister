@@ -540,6 +540,8 @@ class ModuleTypeTemplate(Base):
     name: Mapped[str] = mapped_column(String(200), nullable=False)
     purpose: Mapped[str | None] = mapped_column(String(20), nullable=True)
     sort_order: Mapped[int] = mapped_column(Integer, default=0, nullable=False)
+    # Копии блоков строк только в этом шаблоне: JSON {id первой строки блока: количество копий}
+    slot_copies: Mapped[str | None] = mapped_column(Text, nullable=True)
 
     module_type: Mapped["ModuleType"] = relationship(back_populates="templates")
     defaults: Mapped[list["ModuleTypeDefault"]] = relationship(
@@ -549,7 +551,7 @@ class ModuleTypeTemplate(Base):
 
 class ModuleTypeDefault(Base):
     __tablename__ = "module_type_defaults"
-    __table_args__ = (UniqueConstraint("template_id", "slot_id", name="uq_modtype_default_tpl_slot"),)
+    __table_args__ = (UniqueConstraint("template_id", "slot_id", "copy_no", name="uq_modtype_default_tpl_slot_copy"),)
 
     id: Mapped[int] = mapped_column(primary_key=True)
     module_type_id: Mapped[int] = mapped_column(ForeignKey("module_types_calc.id", ondelete="CASCADE"), nullable=False)
@@ -561,6 +563,8 @@ class ModuleTypeDefault(Base):
     template_id: Mapped[int | None] = mapped_column(
         ForeignKey("module_type_templates.id", ondelete="CASCADE"), nullable=True
     )
+    # Номер копии блока строк в шаблоне: 0 — сама строка, 1, 2, ... — копии (slot_copies шаблона)
+    copy_no: Mapped[int] = mapped_column(Integer, default=0, server_default="0", nullable=False)
 
     module_type: Mapped["ModuleType"] = relationship(back_populates="defaults")
     module: Mapped["Module"] = relationship(foreign_keys=[module_id])
@@ -597,6 +601,8 @@ class RequestCalc(BaseID):
     overhead_manual: Mapped[bool] = mapped_column(default=False, server_default="1", nullable=False)
     # Порядок блоков в разделе (копия блока встаёт рядом с исходным); при равенстве — по id
     sort_order: Mapped[int] = mapped_column(Integer, default=0, server_default="0", nullable=False)
+    # Копии блоков строк только в этом блоке расчёта: JSON {id первой строки блока: количество копий}
+    slot_copies: Mapped[str | None] = mapped_column(Text, nullable=True)
 
     request: Mapped["Request"] = relationship(foreign_keys=[request_id])
     module_type: Mapped["ModuleType"] = relationship(foreign_keys=[module_type_id])
@@ -607,7 +613,7 @@ class RequestCalc(BaseID):
 
 class RequestCalcItem(Base):
     __tablename__ = "request_calc_items"
-    __table_args__ = (UniqueConstraint("calc_id", "slot_id", name="uq_calc_item_slot"),)
+    __table_args__ = (UniqueConstraint("calc_id", "slot_id", "copy_no", name="uq_calc_item_slot_copy"),)
 
     id: Mapped[int] = mapped_column(primary_key=True)
     calc_id: Mapped[int] = mapped_column(ForeignKey("request_calcs.id", ondelete="CASCADE"), nullable=False)
@@ -615,6 +621,8 @@ class RequestCalcItem(Base):
     quantity: Mapped[int] = mapped_column(Integer, default=1, nullable=False)
     # Обязательная строка; None — модуль, добавленный вручную
     slot_id: Mapped[int | None] = mapped_column(ForeignKey("module_type_slots.id", ondelete="SET NULL"), nullable=True)
+    # Номер копии блока строк: 0 — сама строка, 1, 2, ... — копии (slot_copies блока)
+    copy_no: Mapped[int] = mapped_column(Integer, default=0, server_default="0", nullable=False)
 
     calc: Mapped["RequestCalc"] = relationship(back_populates="items")
     module: Mapped["Module"] = relationship(foreign_keys=[module_id])

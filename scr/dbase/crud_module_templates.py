@@ -77,6 +77,7 @@ async def add_template(
     await session.flush()
     source = await get_template(session, copy_from) if copy_from else None
     if source and source.module_type_id == module_type_id:
+        tpl.slot_copies = source.slot_copies
         for d in source.defaults:
             session.add(
                 ModuleTypeDefault(
@@ -85,6 +86,7 @@ async def add_template(
                     slot_id=d.slot_id,
                     module_id=d.module_id,
                     quantity=d.quantity,
+                    copy_no=d.copy_no,
                 )
             )
         await session.flush()
@@ -161,18 +163,25 @@ async def add_template_item(
 
 
 def template_json(tpl: ModuleTypeTemplate, slots: list, prices: dict[int, float]) -> dict:
-    """Шаблон для страницы «по умолчанию»: модули обязательных строк и добавленные модули."""
+    """Шаблон для страницы «по умолчанию»: модули обязательных строк (с копиями блоков строк шаблона,
+    copy_no > 0) и добавленные модули."""
+    from scr.dbase.crud_module_slots import get_copies, slot_entries
+
     known = {s.id for s in slots}
-    by_slot = {d.slot_id: d for d in tpl.defaults if d.slot_id in known}
+    entries = slot_entries(slots, get_copies(tpl), [d for d in tpl.defaults if d.slot_id in known], True)
     return {
         "id": tpl.id,
         "name": tpl.name,
         "purpose": tpl.purpose or "",
-        "slots": {
-            s.id: {"module_id": by_slot[s.id].module_id, "quantity": by_slot[s.id].quantity}
-            for s in slots
-            if s.id in by_slot
-        },
+        "slots": [
+            {
+                "slot_id": s.id,
+                "copy_no": n,
+                "group": group,
+                "value": {"module_id": d.module_id, "quantity": d.quantity} if d else None,
+            }
+            for s, n, d, group in entries
+        ],
         "items": [
             {
                 "id": d.id,

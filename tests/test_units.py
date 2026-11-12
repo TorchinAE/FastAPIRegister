@@ -25,12 +25,36 @@ async def test_material_accuracy_class(client):
     mat = resp.json()
     assert mat["accuracy_class"] is None
 
+    # Точка заменяется на запятую
     resp = await client.patch("/reg/api/materials/", json={"id": mat["id"], "accuracy_class": "0.5S"})
-    assert resp.json()["accuracy_class"] == "0.5S"
+    assert resp.json()["accuracy_class"] == "0,5S"
     classes = {c["name"]: c["id"] for c in (await client.get("/reg/api/accuracy-classes/")).json()}
-    assert "0.5S" in classes
-    assert (await client.delete(f"/reg/api/accuracy-classes/{classes['0.5S']}")).status_code == 400
+    assert "0,5S" in classes and "0.5S" not in classes
+    assert (await client.delete(f"/reg/api/accuracy-classes/{classes['0,5S']}")).status_code == 400
 
     # Сброс в пустое значение
     resp = await client.patch("/reg/api/materials/", json={"id": mat["id"], "accuracy_class": None})
     assert resp.json()["accuracy_class"] is None
+
+
+async def test_accuracy_class_rename_and_order(client):
+    """Переименование класса меняет его у материалов; совпадение с существующим — объединение;
+    список — по возрастанию с учётом чисел."""
+    for name in ("10P", "3", "0.2S", "1", "5P"):
+        assert (await client.post("/reg/api/accuracy-classes/", json={"name": name})).status_code == 200
+    names = [c["name"] for c in (await client.get("/reg/api/accuracy-classes/")).json()]
+    picked = [n for n in names if n in {"10P", "3", "0,2S", "1", "5P"}]
+    assert picked == ["0,2S", "1", "3", "5P", "10P"]
+
+    mat = (await client.post("/reg/api/materials/", json={"name": "ТТ переименование", "accuracy_class": "5P"})).json()
+    classes = {c["name"]: c["id"] for c in (await client.get("/reg/api/accuracy-classes/")).json()}
+    resp = await client.patch(f"/reg/api/accuracy-classes/{classes['5P']}", json={"name": "5P20"})
+    assert resp.json()["name"] == "5P20"
+    got = (await client.get(f"/reg/api/materials/{mat['id']}")).json()
+    assert got["accuracy_class"] == "5P20"
+
+    # В существующий класс — объединение
+    resp = await client.patch(f"/reg/api/accuracy-classes/{resp.json()['id']}", json={"name": "10P"})
+    assert resp.json()["id"] == classes["10P"]
+    names = [c["name"] for c in (await client.get("/reg/api/accuracy-classes/")).json()]
+    assert "5P20" not in names

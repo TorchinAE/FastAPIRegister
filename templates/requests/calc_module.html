@@ -207,9 +207,11 @@ function renderBlock(data, index, after = null) {
         el.dataset.hiddenTotal = data.hidden_total || 0;
         ModulePicker.renderSlotGroups(
             el.querySelector('.f-slots'),
-            data.slots.map(s => ({slot: SLOTS[s.slot_id], item: s.item})),
-            (e, target, keys) => appendSlot(el, e.slot, e.item, target, keys),
-            slot => copySlotGroup(el, slot),
+            data.slots.filter(s => SLOTS[s.slot_id])
+                .map(s => ({slot: SLOTS[s.slot_id], copy_no: s.copy_no, group: s.group, item: s.item})),
+            (e, target, keys) => appendSlot(el, e.slot, e.item, target, keys, e.copy_no),
+            (slot, copyNo) => copySlotGroup(el, slot, copyNo),
+            (slot, copyNo) => deleteSlotCopy(el, slot, copyNo),
         );
         data.items.forEach(item => appendItem(el, item));
         el.querySelector('.f-add-module').addEventListener('click', () => addModule(el));
@@ -275,28 +277,26 @@ function appendItem(el, item) {
     row.querySelector('.calc-item-price').textContent = formatFinancial(item.module_price);
 }
 
-// Обязательная строка: название, количество, фильтры строки и выбор модуля подходящего типа (как в шаблонах)
-function appendSlot(el, slot, item, target, filterKeys) {
+// Обязательная строка: название; фильтры строки (по 2 в ряд); количество и модуль подходящего типа в одну строку;
+// под ними — «кол-во × цена = сумма». copyNo — строка копии блока строк этого блока расчёта
+function appendSlot(el, slot, item, target, filterKeys, copyNo = 0) {
     const row = document.createElement('div');
     row.className = 'calc-item calc-slot';
     row.dataset.slotId = slot.id;
+    row.dataset.copyNo = copyNo || 0;
     if (slot.color) {
         row.classList.add('slot-colored');
         row.style.setProperty('--slot-color', slot.color);
     }
+    const label = ModulePicker.slotLabel(slot.name, copyNo);
     row.innerHTML = `
-        <div class="calc-item-main">
-            <div class="calc-slot-name" title="${esc(slot.type_names.join(', '))}">${esc(slot.name)}</div>
-            <div class="calc-slot-filters">
-                <div class="calc-item-qty"><input type="number" class="f-item-qty" min="1" value="1"> шт.</div>
-                <span class="f-filters"></span>
-            </div>
+        <div class="calc-slot-name" title="${esc(slot.type_names.join(', '))}">${esc(label)}</div>
+        <div class="calc-slot-filters"><span class="f-filters"></span></div>
+        <div class="calc-slot-pick">
+            <div class="calc-item-qty"><input type="number" class="f-item-qty" min="1" value="1" title="Количество, шт."><span>шт.</span></div>
             <select class="f-slot-module"><option value="">— не выбран —</option></select>
         </div>
-        <div class="calc-item-side">
-            <div class="calc-item-price"></div>
-            <div class="calc-item-sum"></div>
-        </div>`;
+        <div class="calc-slot-sum"><span class="calc-item-price"></span><span class="calc-item-sum"></span></div>`;
     const select = row.querySelector('.f-slot-module');
     if (item) select.add(new Option(item.module_name, item.module_id));
     select.value = item ? item.module_id : '';
@@ -309,7 +309,7 @@ function appendSlot(el, slot, item, target, filterKeys) {
         ModulePicker.slotFilters(row.querySelector('.f-filters'), select, filterKeys, slot.type_ids.map((id, k) => ({id, name: slot.type_names[k]})));
     }
     select.addEventListener('change', () => saveSlot(el, row));
-    row.querySelector('.f-item-qty').addEventListener('change', () => { if (select.value) saveSlot(el, row); });
+    row.querySelector('.f-item-qty').addEventListener('change', () => { if (select.value) saveSlot(el, row); else recalc(el); });
     target.appendChild(row);
     setSlotItem(row, item);
     return select;
@@ -324,7 +324,6 @@ function setSlotItem(row, item) {
     row.style.borderLeftColor = (item && ModulePicker.color(item.module_id)) || '';
     row.classList.toggle('zero-price', !!item && ModulePicker.isZero(item.module_id));
     row.querySelector('.f-item-qty').value = item ? item.quantity : 1;
-    row.querySelector('.calc-item-price').textContent = item ? formatFinancial(item.module_price) : '';
     row.classList.toggle('empty', !item);
 }
 
@@ -334,7 +333,7 @@ async function saveSlot(el, row, moduleId) {
     const resp = await fetch(`/reg/api/request-calcs/${el.dataset.id}/slots/${row.dataset.slotId}`, {
         method: 'PUT',
         headers: {'Content-Type': 'application/json'},
-        body: JSON.stringify({module_id: moduleId, quantity}),
+        body: JSON.stringify({module_id: moduleId, quantity, copy_no: parseInt(row.dataset.copyNo) || 0}),
     });
     if (resp.ok) {
         setSlotItem(row, (await resp.json()).item);
@@ -387,7 +386,17 @@ function modulesSum(el) {
     // Скрытые строки не выводятся, но входят в стоимость
     let total = parseFloat(el.dataset.hiddenTotal) || 0;
     el.querySelectorAll('.calc-item').forEach(row => {
-        const sum = (parseFloat(row.dataset.price) || 0) * (parseInt(row.querySelector('.f-item-qty').value) || 0);
+        const price = parseFloat(row.dataset.price) || 0;
+        const qty = parseInt(row.querySelector('.f-item-qty').value) || 0;
+        const sum = price * qty;
+        if (row.classList.contains('calc-slot')) {
+            // Строка без модуля — без расчёта; с модулем — «кол-во × цена за ед.» и сумма
+            const has = !!row.dataset.moduleId;
+            row.querySelector('.calc-item-price').textContent = has ? `${qty} × ${formatFinancial(price)}` : '';
+            row.querySelector('.calc-item-sum').textContent = has ? '= ' + formatFinancial(sum) : '';
+            if (has) total += sum;
+            return;
+        }
         row.querySelector('.calc-item-sum').textContent = '= ' + formatFinancial(sum);
         total += sum;
     });
@@ -580,13 +589,36 @@ async function copyBlock(el) {
     }
 }
 
-// Копия блока объединённых строк: строки добавляются в раздел (во все шаблоны и расчёты),
-// в этом расчёте — с выбранными модулями; страница перезагружается
-async function copySlotGroup(el, slot) {
-    if (!confirm('Добавить в раздел копию строк этого блока? Новые строки появятся во всех шаблонах и расчётах раздела.')) return;
+// Блок пересчитан на сервере — перерисовать на месте (порядок блоков и итоги раздела сохраняются)
+function replaceBlock(el, data) {
+    const fresh = renderBlock(data, 0, el);
+    el.remove();
+    renumberBlocks();
+    updateSectionTotal();
+    setStatus(fresh, '✓ сохранено', 'ok');
+    return fresh;
+}
+
+// Копия блока строк с модулями — только в этом блоке расчёта («Обязательные строки» и шаблоны не меняются)
+async function copySlotGroup(el, slot, copyNo) {
     await flushSaves();
-    const resp = await fetch(`/reg/api/module-type-slots/${slot.id}/copy-group?calc_id=${el.dataset.id}`, {method: 'POST'});
-    if (resp.ok) location.reload(); else showToast('Ошибка копирования');
+    const resp = await fetch(`/reg/api/request-calcs/${el.dataset.id}/slot-copies`, {
+        method: 'POST',
+        headers: {'Content-Type': 'application/json'},
+        body: JSON.stringify({slot_id: slot.id, copy_no: copyNo || 0}),
+    });
+    if (!resp.ok) { showToast('Ошибка копирования'); return; }
+    replaceBlock(el, (await resp.json()).block);
+    showToast('Блок строк скопирован');
+}
+
+async function deleteSlotCopy(el, slot, copyNo) {
+    if (!confirm('Удалить копию блока строк вместе с её модулями?')) return;
+    await flushSaves();
+    const resp = await fetch(`/reg/api/request-calcs/${el.dataset.id}/slot-copies?slot_id=${slot.id}&copy_no=${copyNo}`, {method: 'DELETE'});
+    if (!resp.ok) { showToast('Ошибка удаления'); return; }
+    replaceBlock(el, (await resp.json()).block);
+    showToast('Копия блока удалена');
 }
 
 async function deleteBlock(el) {

@@ -426,7 +426,7 @@ async def counterparties_page(
         return RedirectResponse("/reg/", status_code=302)
     per_page = await _get_per_page(session)
     items, total = await crud_counterparties.get_counterparties(session, page=1, per_page=LIST_ALL_ROWS)
-    companies, _ = await crud_organizations.get_organizations(session, per_page=100)
+    companies, _ = await crud_organizations.get_organizations(session, per_page=LIST_ALL_ROWS)
     return templates.TemplateResponse(
         request,
         "counterparties/list.html",
@@ -971,12 +971,50 @@ async def settings_page(
     user = await get_current_user(request, session)
     if not user:
         return RedirectResponse("/reg/", status_code=302)
+    from scr.constants import SETTING_INPUT_BG, SETTING_INPUT_BORDER, THEME_SETTINGS
+
     all_settings = await crud_settings.get_all_settings(session)
+    theme = await _theme_colors(session)
     return templates.TemplateResponse(
         request,
         "settings/list.html",
-        {"request": request, "user": user, "settings": all_settings, "active_page": "settings"},
+        {
+            "request": request,
+            "user": user,
+            # Цвета оформления — отдельным блоком, не в общей таблице
+            "settings": [s for s in all_settings if s.key not in THEME_SETTINGS],
+            "theme": theme,
+            "theme_defaults": THEME_SETTINGS,
+            "input_bg_key": SETTING_INPUT_BG,
+            "input_border_key": SETTING_INPUT_BORDER,
+            "active_page": "settings",
+        },
     )
+
+
+async def _theme_colors(session: AsyncSession) -> dict[str, str]:
+    """Цвета оформления из настроек; не задан или не #rrggbb — по умолчанию."""
+    import re
+
+    from scr.constants import THEME_SETTINGS
+
+    result = {}
+    for key, default in THEME_SETTINGS.items():
+        value = (await crud_settings.get_setting(session, key) or "").strip()
+        result[key] = value if re.fullmatch(r"#[0-9a-fA-F]{6}", value) else default
+    return result
+
+
+@pages_router.get("/theme.css")
+async def theme_css(session: AsyncSession = Depends(db_helper.session_dependency)):
+    """Переменные оформления из настроек (цвет полей ввода) — подключается в base.html после style.css."""
+    from fastapi.responses import Response
+
+    from scr.constants import SETTING_INPUT_BG, SETTING_INPUT_BORDER
+
+    theme = await _theme_colors(session)
+    css = f":root {{ --input-bg: {theme[SETTING_INPUT_BG]}; --input-border: {theme[SETTING_INPUT_BORDER]}; }}\n"
+    return Response(css, media_type="text/css", headers={"Cache-Control": "no-cache"})
 
 
 @pages_router.get("/invoices", response_class=HTMLResponse)
@@ -998,13 +1036,18 @@ async def invoices_page(
         .options(selectinload(Invoice.request).selectinload(ReqModel.manager))
         .options(selectinload(Invoice.request).selectinload(ReqModel.company))
         .options(selectinload(Invoice.request).selectinload(ReqModel.equipment))
-        .order_by(Invoice.id.desc())
+        # Группы по ТКП: новые ТКП сверху, счета ТКП — по дате
+        .order_by(Invoice.request_id.desc(), Invoice.invoice_date, Invoice.id)
     )
     count_stmt = select(func.count(Invoice.id))
     total = (await session.execute(count_stmt)).scalar() or 0
     per_page = await _get_per_page(session)
     result = await session.execute(stmt)
     items = list(result.scalars().all())
+    # Номер группы ТКП (чередование фона) и первая строка группы (разделитель)
+    groups: dict[int, int] = {}
+    for inv in items:
+        groups.setdefault(inv.request_id, len(groups))
     return templates.TemplateResponse(
         request,
         "invoices/list.html",
@@ -1012,6 +1055,7 @@ async def invoices_page(
             "request": request,
             "user": user,
             "items": items,
+            "groups": groups,
             "per_page": per_page,
             "total": total,
             "active_page": "invoices",
@@ -1659,7 +1703,7 @@ async def materials_create_submit(
             "nom_tok": int(form.get("nom_tok", 0)),
             "voltage": form.get("voltage") or None,
             "unit": (form.get("unit") or "").strip() or "шт",
-            "accuracy_class": (form.get("accuracy_class") or "").strip() or None,
+            "accuracy_class": (form.get("accuracy_class") or "").strip().replace(".", ",") or None,
             "stats": form.get("stats") == "on",
             "vtych": form.get("vtych") == "on",
             "vykat": form.get("vykat") == "on",

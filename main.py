@@ -144,6 +144,7 @@ async def lifespan(_: FastAPI):
         if not await crud_accuracy_classes.get_names(session):
             for name in DEFAULT_ACCURACY_CLASSES:
                 await crud_accuracy_classes.ensure_name(session, name)
+        await crud_accuracy_classes.normalize_existing(session)
         await crud_accuracy_classes.sync_from_materials(session)
         await session.commit()
     yield

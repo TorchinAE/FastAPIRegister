@@ -5,6 +5,32 @@
     <h1>Настройки</h1>
 </div>
 
+<div class="card" style="margin-bottom:1rem;">
+    <h3 style="margin-bottom:0.75rem;">Оформление</h3>
+    <div style="display:flex;gap:1.5rem;align-items:flex-end;flex-wrap:wrap;">
+        <div class="form-group" style="margin-bottom:0;">
+            <label>Фон полей ввода</label>
+            <input type="color" id="inputBg" data-key="{{ input_bg_key }}" data-default="{{ theme_defaults[input_bg_key] }}"
+                   value="{{ theme[input_bg_key] }}" style="width:5rem;height:38px;padding:2px;">
+        </div>
+        <div class="form-group" style="margin-bottom:0;">
+            <label>Рамка полей ввода</label>
+            <input type="color" id="inputBorder" data-key="{{ input_border_key }}" data-default="{{ theme_defaults[input_border_key] }}"
+                   value="{{ theme[input_border_key] }}" style="width:5rem;height:38px;padding:2px;">
+        </div>
+        <div class="form-group" style="margin-bottom:0;width:220px;">
+            <label>Пример</label>
+            <input type="text" value="Так выглядит поле" readonly>
+        </div>
+        <button type="button" class="btn btn-primary" onclick="saveTheme()" style="height:38px;">Сохранить</button>
+        <button type="button" class="btn btn-ghost" onclick="resetTheme()" style="height:38px;">По умолчанию</button>
+        <span id="themeStatus" style="font-size:0.85rem;color:var(--text-muted);"></span>
+    </div>
+    <div style="margin-top:0.75rem;font-size:0.85rem;color:var(--text-muted);">
+        Цвет полей ввода на всех страницах: фон немного отличается от фона карточки, чтобы поля не сливались с ним.
+    </div>
+</div>
+
 <div class="card">
     <div class="table-wrap">
         <table>
@@ -24,6 +50,33 @@
 </div>
 
 <script>
+const themeInputs = [document.getElementById('inputBg'), document.getElementById('inputBorder')];
+// Предпросмотр сразу на странице
+function previewTheme() {
+    document.documentElement.style.setProperty('--input-bg', themeInputs[0].value);
+    document.documentElement.style.setProperty('--input-border', themeInputs[1].value);
+}
+themeInputs.forEach(inp => inp.addEventListener('input', previewTheme));
+
+async function saveTheme() {
+    const status = document.getElementById('themeStatus');
+    for (const inp of themeInputs) {
+        const resp = await fetch('/reg/api/settings/', {
+            method: 'PUT',
+            headers: {'Content-Type': 'application/json'},
+            body: JSON.stringify({key: inp.dataset.key, value: inp.value}),
+        });
+        if (!resp.ok) { status.textContent = 'Ошибка сохранения'; return; }
+    }
+    status.textContent = '✓ сохранено';
+}
+
+function resetTheme() {
+    themeInputs.forEach(inp => { inp.value = inp.dataset.default; });
+    previewTheme();
+    saveTheme();
+}
+
 async function saveRow(btn) {
     const tr = btn.closest('tr');
     const key = tr.querySelector('[data-field="key"]').value.trim();

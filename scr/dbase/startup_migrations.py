@@ -41,6 +41,10 @@ ADD_COLUMNS = [
     ("request_calcs", "overhead_manual", "BOOLEAN NOT NULL DEFAULT 1"),
     ("request_calcs", "sort_order", "INTEGER NOT NULL DEFAULT 0"),
     ("module_type_slots", "join_prev", "BOOLEAN NOT NULL DEFAULT 0"),
+    ("request_calcs", "slot_copies", "TEXT"),
+    ("module_type_templates", "slot_copies", "TEXT"),
+    ("request_calc_items", "copy_no", "INTEGER NOT NULL DEFAULT 0"),
+    ("module_type_defaults", "copy_no", "INTEGER NOT NULL DEFAULT 0"),
 ]
 
 # Существующие блоки КСО: всё количество — на 1СШ
@@ -55,6 +59,9 @@ REBUILD_IF_CONSTRAINT = [
     # Модуль по умолчанию — один на строку в каждом шаблоне, а не на строку вообще
     ("module_type_defaults", "uq_modtype_default_slot UNIQUE"),
     ("request_calc_items", "uq_calc_item_module"),
+    # Копии блоков строк в расчёте и шаблоне: уникальность — с номером копии
+    ("request_calc_items", "uq_calc_item_slot UNIQUE"),
+    ("module_type_defaults", "uq_modtype_default_tpl_slot UNIQUE"),
 ]
 
 # Тип модуля по умолчанию — общий тип материалов его состава (если тип один)
